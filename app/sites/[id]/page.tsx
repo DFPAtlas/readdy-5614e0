@@ -1,0 +1,10 @@
+import SiteDetailClient from './SiteDetailClient';
+
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }];
+}
+
+export default async function SiteDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await params;
+  return <SiteDetailClient />;
+}
