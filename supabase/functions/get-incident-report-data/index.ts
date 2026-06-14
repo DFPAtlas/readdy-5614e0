@@ -21,7 +21,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const incidentId = body.incident_id;
     if (!incidentId) {
       return new Response(JSON.stringify({ error: "incident_id required" }), { status: 400, headers: corsHeaders });
@@ -33,7 +38,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No company assigned" }), { status: 403, headers: corsHeaders });
     }
 
-    // Fetch incident
     const { data: incident } = await supabase
       .from("incidents")
       .select("*, sites!inner(site_name, address, risk_level), guards!left(first_name, last_name, sia_licence)")
@@ -50,7 +54,6 @@ Deno.serve(async (req) => {
     const site = Array.isArray(incident.sites) ? incident.sites[0] : incident.sites;
     const guard = Array.isArray(incident.guards) ? incident.guards[0] : incident.guards;
 
-    // Build report data for client-side generation (return structured JSON)
     const reportData = {
       incident: {
         id: incident.id,

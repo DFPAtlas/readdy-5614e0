@@ -16,7 +16,11 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { email } = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { email } = body;
 
     if (!email) {
       return new Response(JSON.stringify({ error: 'Email is required' }), {
@@ -25,13 +29,11 @@ serve(async (req) => {
       });
     }
 
-    // Find auth user by email
     const { data: { users: authUsers }, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
     if (listErr) throw listErr;
 
     const existingUser = authUsers?.find((u: any) => u.email === email);
 
-    // No user exists — just send a fresh invite
     if (!existingUser) {
       const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
       if (inviteErr) throw inviteErr;
@@ -41,7 +43,6 @@ serve(async (req) => {
       });
     }
 
-    // User already confirmed their email — can't resend invite
     if (existingUser.email_confirmed_at) {
       return new Response(JSON.stringify({ error: 'User has already accepted the invitation. Send a password reset instead.' }), {
         status: 400,
@@ -49,21 +50,17 @@ serve(async (req) => {
       });
     }
 
-    // User exists but never confirmed — preserve data, delete auth user, re-invite
     const { data: publicUser } = await supabaseAdmin
       .from('users')
       .select('first_name, last_name, role, company_id, status')
       .eq('id', existingUser.id)
       .maybeSingle();
 
-    // Delete old auth user (Supabase will send invite to fresh user)
     const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
     if (deleteErr) throw deleteErr;
 
-    // Try to delete old public.users row so we can recreate cleanly
     await supabaseAdmin.from('users').delete().eq('id', existingUser.id);
 
-    // Send fresh invite
     const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: {
         first_name: publicUser?.first_name || null,

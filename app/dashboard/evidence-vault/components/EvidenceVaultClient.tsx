@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import GlassCard from '@/app/components/GlassCard';
 import { useEvidenceVault } from '@/lib/useEvidenceVault';
 import { useSites } from '@/lib/useSites';
+import { useAuth } from '@/lib/auth';
+import { callAgent } from '@/lib/guardianhubAgents';
+import AgentStatusBar from '@/components/AgentStatusBar';
+import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import SummaryCards from './SummaryCards';
 import EvidenceFilters from './EvidenceFilters';
 import EvidenceGallery from './EvidenceGallery';
@@ -14,7 +18,6 @@ import LoadingState from './LoadingState';
 import EmptyState from './EmptyState';
 import { useGuards } from '@/lib/useGuards';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
 
 interface Props {
   initialClientId?: string;
@@ -40,7 +43,45 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
   const { files, incidentMedia, stats, loading, error, refetch, uploadFile, markReviewed, linkToIncident, addNote, downloadFile, isSuperAdmin, role } = useEvidenceVault(filters);
   const { sites } = useSites();
   const { guards } = useGuards();
-  const { companyId } = useAuth();
+  const { companyId, profile } = useAuth();
+
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentData, setAgentData] = useState<any>(null);
+
+  const fetchAgent = useCallback(async () => {
+    if (!profile?.id || !companyId) return;
+    setAgentLoading(true);
+    setAgentError(null);
+    try {
+      const result = await callAgent(
+        'compliance',
+        {
+          total_files: stats?.total || 0,
+          reviewed: stats?.reviewed || 0,
+          flagged: stats?.flagged || 0,
+        },
+        {
+          clientId: companyId,
+          userId: profile.id,
+          requestedPage: '/dashboard/evidence-vault',
+          requestedFeature: 'compliance',
+        }
+      );
+      if (result.error) setAgentError(result.error);
+      setAgentData(result.data);
+    } catch (err: any) {
+      setAgentError(err.message || 'Agent call failed');
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [profile?.id, companyId, stats?.total, stats?.reviewed, stats?.flagged]);
+
+  useEffect(() => {
+    if (profile?.id && !loading) {
+      fetchAgent();
+    }
+  }, [profile?.id, loading]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -106,6 +147,16 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
         </div>
       </div>
 
+      <WidgetBoundary widgetName="EvidenceAgent" pagePath="/dashboard/evidence-vault" clientId={companyId || undefined} userId={profile?.id || undefined}>
+        <AgentStatusBar
+          agentKey="compliance"
+          loading={agentLoading}
+          error={agentError}
+          data={agentData}
+          onRetry={fetchAgent}
+        />
+      </WidgetBoundary>
+
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-center justify-between">
           <p className="text-sm text-red-400">{error}</p>
@@ -119,30 +170,36 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
         <LoadingState />
       ) : (
         <>
-          <SummaryCards stats={stats} />
+          <WidgetBoundary widgetName="EvidenceSummaryCards" pagePath="/dashboard/evidence-vault" clientId={companyId || undefined} userId={profile?.id || undefined}>
+            <SummaryCards stats={stats} />
+          </WidgetBoundary>
 
-          <EvidenceFilters
-            sites={allSites}
-            guards={allGuards}
-            clients={allClients}
-            onChange={(f) => setFilters(f)}
-          />
+          <WidgetBoundary widgetName="EvidenceFilters" pagePath="/dashboard/evidence-vault" clientId={companyId || undefined} userId={profile?.id || undefined}>
+            <EvidenceFilters
+              sites={allSites}
+              guards={allGuards}
+              clients={allClients}
+              onChange={(f) => setFilters(f)}
+            />
+          </WidgetBoundary>
 
           {totalItems === 0 ? (
             <EmptyState onUpload={() => setShowUpload(true)} />
           ) : (
-            <EvidenceGallery
-              files={files}
-              incidentMedia={incidentMedia}
-              onView={(url, name, type) => setViewerFile({ url, name, type })}
-              onDownload={downloadFile}
-              onMarkReviewed={handleMarkReviewed}
-              onLinkIncident={(fileId) => { setLinkFile(fileId); setShowLink(true); }}
-              onAddNote={(fileId) => {
-                const f = files.find((x) => x.id === fileId);
-                if (f) { setNoteFile({ id: fileId, name: f.file_name }); setShowNote(true); }
-              }}
-            />
+            <WidgetBoundary widgetName="EvidenceGallery" pagePath="/dashboard/evidence-vault" clientId={companyId || undefined} userId={profile?.id || undefined}>
+              <EvidenceGallery
+                files={files}
+                incidentMedia={incidentMedia}
+                onView={(url, name, type) => setViewerFile({ url, name, type })}
+                onDownload={downloadFile}
+                onMarkReviewed={handleMarkReviewed}
+                onLinkIncident={(fileId) => { setLinkFile(fileId); setShowLink(true); }}
+                onAddNote={(fileId) => {
+                  const f = files.find((x) => x.id === fileId);
+                  if (f) { setNoteFile({ id: fileId, name: f.file_name }); setShowNote(true); }
+                }}
+              />
+            </WidgetBoundary>
           )}
         </>
       )}

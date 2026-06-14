@@ -175,7 +175,7 @@ export function useRotaPatterns() {
         guards_required: d.guards_required,
       })),
     };
-    const { data, error } = await supabase.from('shift_pattern_templates').insert(payload).select().single();
+    const { data, error } = await supabase.from('shift_pattern_templates').insert(payload).select().maybeSingle();
     if (!error) load();
     return { data, error };
   };
@@ -194,7 +194,7 @@ export function useRotaPatterns() {
         guards_required: d.guards_required,
       }));
     }
-    const { data, error } = await supabase.from('shift_pattern_templates').update(payload).eq('id', id).select().single();
+    const { data, error } = await supabase.from('shift_pattern_templates').update(payload).eq('id', id).select().maybeSingle();
     if (!error) load();
     return { data, error };
   };

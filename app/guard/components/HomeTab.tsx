@@ -350,6 +350,27 @@ export default function HomeTab({ todayShift, nextShift, activeAttendance, guard
                   <span className="text-xs font-medium text-white whitespace-nowrap">Site Notices</span>
                 </button>
                 <button
+                  onClick={() => { setShowActionMenu(false); router.push('/guard/visitors'); }}
+                  className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform"
+                >
+                  <i className="ri-user-add-line text-emerald-400 text-xl"></i>
+                  <span className="text-xs font-medium text-white whitespace-nowrap">Visitor Log</span>
+                </button>
+                <button
+                  onClick={() => { setShowActionMenu(false); router.push('/guard/lone-worker'); }}
+                  className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform"
+                >
+                  <i className="ri-shield-user-line text-orange-400 text-xl"></i>
+                  <span className="text-xs font-medium text-white whitespace-nowrap">Lone Worker</span>
+                </button>
+                <button
+                  onClick={() => { setShowActionMenu(false); router.push('/guard/wellbeing'); }}
+                  className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform"
+                >
+                  <i className="ri-heart-pulse-line text-violet-400 text-xl"></i>
+                  <span className="text-xs font-medium text-white whitespace-nowrap">Wellbeing</span>
+                </button>
+                <button
                   onClick={() => { setShowActionMenu(false); router.push('/guard/assistant'); }}
                   className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform"
                 >

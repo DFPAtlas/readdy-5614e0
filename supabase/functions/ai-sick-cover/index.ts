@@ -146,7 +146,7 @@ function findBestCover(
       best = {
         guard,
         score,
-        reason: `${hours.toFixed(1)}h this week · ${guard.skills?.length || 0} skills · ${siaValid ? 'SIA valid' : 'SIA check needed'}`,
+        reason: `${hours.toFixed(1)}h this week \u00b7 ${guard.skills?.length || 0} skills \u00b7 ${siaValid ? 'SIA valid' : 'SIA check needed'}`,
       };
     }
   }
@@ -160,7 +160,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { company_id, week_start } = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { company_id, week_start } = body;
     if (!company_id || !week_start) {
       return new Response(JSON.stringify({ error: 'company_id and week_start required' }), {
         status: 400,
@@ -178,7 +182,6 @@ Deno.serve(async (req) => {
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // 1. Get all active guards
     const { data: guardsData } = await supabase
       .from('guards')
       .select('id, first_name, last_name, skills, sia_expiry, status')
@@ -186,7 +189,6 @@ Deno.serve(async (req) => {
       .eq('status', 'active');
     const guards: Guard[] = guardsData || [];
 
-    // 2. Get sick leave in this period
     const { data: sickLeaveData } = await supabase
       .from('guard_time_off')
       .select('id, guard_id, start_date, end_date, reason')
@@ -202,7 +204,6 @@ Deno.serve(async (req) => {
       reason: t.reason,
     }));
 
-    // 3. Get all approved time off
     const { data: allTimeOffData } = await supabase
       .from('guard_time_off')
       .select('id, guard_id, start_date, end_date, reason')
@@ -217,7 +218,6 @@ Deno.serve(async (req) => {
       reason: t.reason,
     }));
 
-    // 4. Get availability
     const guardIds = guards.map((g) => g.id);
     let availability: Availability[] = [];
     if (guardIds.length > 0) {
@@ -234,7 +234,6 @@ Deno.serve(async (req) => {
       }));
     }
 
-    // 5. Get shifts in the week
     const { data: shiftsData } = await supabase
       .from('shifts')
       .select('id, guard_id, site_id, start_time, end_time, shift_type, status, sites(site_name, risk_level)')
@@ -252,7 +251,6 @@ Deno.serve(async (req) => {
       sites: row.sites,
     }));
 
-    // 6. Find shifts affected by sick leave
     const affected: Array<{
       shift: Shift;
       sickGuard: Guard;
@@ -276,7 +274,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 7. Build response
     const response = {
       sick_count: sickLeave.length,
       affected_shifts: affected.length,
@@ -284,7 +281,7 @@ Deno.serve(async (req) => {
         shift_id: a.shift.id,
         site_name: a.shift.sites?.site_name || 'Unknown Site',
         shift_date: a.shift.start_time.slice(0, 10),
-        shift_time: `${a.shift.start_time.slice(11, 16)}–${a.shift.end_time.slice(11, 16)}`,
+        shift_time: `${a.shift.start_time.slice(11, 16)}\u2013${a.shift.end_time.slice(11, 16)}`,
         shift_type: a.shift.shift_type || 'day',
         sick_guard_name: `${a.sickGuard.first_name || ''} ${a.sickGuard.last_name || ''}`.trim() || 'Unknown',
         sick_guard_id: a.sickGuard.id,

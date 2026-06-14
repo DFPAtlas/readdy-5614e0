@@ -123,7 +123,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const body = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const notificationId = body.notification_id;
 
     if (!notificationId) {
@@ -133,7 +136,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1. Fetch notification
     const { data: notification, error: notifError } = await supabase
       .from("notifications")
       .select("*")
@@ -147,7 +149,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Fetch user
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("id, email, first_name, last_name, company_id")
@@ -161,7 +162,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Fetch preferences
     const { data: prefs } = await supabase
       .from("notification_preferences")
       .select("*")
@@ -174,7 +174,6 @@ Deno.serve(async (req) => {
     const quietStart = prefs?.quiet_hours_start || "22:00";
     const quietEnd = prefs?.quiet_hours_end || "07:00";
 
-    // Check suppression rules
     let suppressReason: string | null = null;
 
     if (!emailEnabled) {
@@ -198,7 +197,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Fetch company
     const { data: company } = await supabase
       .from("companies")
       .select("name, brand_color, logo_url")
@@ -207,7 +205,6 @@ Deno.serve(async (req) => {
 
     const brandColor = company?.brand_color || "#3b82f6";
 
-    // 5. Build and send email
     const toEmail = prefs?.email_address || user.email;
     if (!toEmail) {
       await supabase.from("notification_deliveries").insert({
@@ -253,7 +250,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 6. Log success
     await supabase.from("notification_deliveries").insert({
       notification_id: notificationId,
       channel: "email",

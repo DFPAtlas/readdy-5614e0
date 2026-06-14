@@ -31,7 +31,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No company assigned" }), { status: 403, headers: corsHeaders });
     }
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { site_id, period_days = 30 } = body;
     if (!site_id || !isValidUUID(site_id)) {
       return new Response(JSON.stringify({ error: "site_id required" }), { status: 400, headers: corsHeaders });
@@ -301,7 +306,6 @@ Rules:
       return new Response(JSON.stringify({ error: saveErr.message }), { status: 500, headers: corsHeaders });
     }
 
-    // Sync site risk_level if it differs from AI assessment
     if (site.risk_level !== level) {
       await supabase.from("sites").update({ risk_level: level }).eq("id", site_id).eq("company_id", companyId);
     }

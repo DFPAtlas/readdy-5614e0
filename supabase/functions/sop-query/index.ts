@@ -49,7 +49,7 @@ async function generateAnswer(question: string, chunks: any[], conversationHisto
 
 Rules:
 - Base your answer ONLY on the provided document chunks below.
-- If the answer is not in the documents, say so clearly — do not invent facts.
+- If the answer is not in the documents, say so clearly \u2014 do not invent facts.
 - Use British English.
 - Be concise and factual. Bullet points are fine.
 - If the user asks something clearly unrelated to security operations, politely redirect them.
@@ -109,7 +109,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No company assigned" }), { status: 403, headers: corsHeaders });
     }
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { question, document_id, conversation_id, site_id } = body;
     if (!question || typeof question !== "string") {
       return new Response(JSON.stringify({ error: "question required" }), { status: 400, headers: corsHeaders });

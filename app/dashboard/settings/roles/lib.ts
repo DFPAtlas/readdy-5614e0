@@ -175,7 +175,7 @@ export function useRolesManager() {
       description,
       is_system: false,
       is_default: isDefault,
-    }).select().single();
+    }).select().maybeSingle();
 
     if (!error && data) {
       if (isDefault) {
@@ -243,7 +243,7 @@ export function useRolesManager() {
     setSaving(true);
     const { data, error } = await supabase.from('user_roles').insert({
       user_id: userId, role_id: roleId, company_id: companyId, is_primary: isPrimary,
-    }).select('*, role:roles(*), user:users(id,first_name,last_name,email)').single();
+    }).select('*, role:roles(*), user:users(id,first_name,last_name,email)').maybeSingle();
     if (!error && data) setUserRoles(prev => [...prev, data]);
     setSaving(false);
     return !error && !!data;

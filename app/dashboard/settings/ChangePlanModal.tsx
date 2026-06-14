@@ -7,41 +7,74 @@ interface ChangePlanModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentPlan: string;
+  onPlanChanged?: () => void;
 }
 
 const planStyles = {
+  'sentinel-starter': {
+    label: 'Starter',
+    colour: 'text-gray-600',
+    border: 'border-gray-200',
+    bg: 'bg-gray-50',
+    accent: 'bg-gray-500',
+    ring: 'ring-gray-200',
+    pillBg: 'bg-gray-100',
+  },
   sentinel: {
     label: 'Sentinel',
-    colour: 'text-gray-300',
-    border: 'border-gray-500/20',
-    bg: 'bg-gray-500/10',
+    colour: 'text-gray-600',
+    border: 'border-gray-200',
+    bg: 'bg-gray-50',
     accent: 'bg-gray-500',
-    ring: 'ring-gray-500/20',
-    pillBg: 'bg-gray-500/20',
+    ring: 'ring-gray-200',
+    pillBg: 'bg-gray-100',
   },
   command: {
     label: 'Command',
-    colour: 'text-blue-400',
-    border: 'border-blue-500/30',
-    bg: 'bg-blue-500/10',
+    colour: 'text-blue-600',
+    border: 'border-blue-200',
+    bg: 'bg-blue-50',
     accent: 'bg-blue-600',
-    ring: 'ring-blue-500/30',
-    pillBg: 'bg-blue-600/20',
+    ring: 'ring-blue-200',
+    pillBg: 'bg-blue-100',
   },
   titan: {
     label: 'Titan',
-    colour: 'text-amber-400',
-    border: 'border-amber-500/20',
-    bg: 'bg-amber-500/10',
+    colour: 'text-amber-600',
+    border: 'border-amber-200',
+    bg: 'bg-amber-50',
     accent: 'bg-amber-500',
-    ring: 'ring-amber-500/20',
-    pillBg: 'bg-amber-500/20',
+    ring: 'ring-amber-200',
+    pillBg: 'bg-amber-100',
   },
 };
 
 type PlanKey = keyof typeof planStyles;
 
 const plans = [
+  {
+    key: 'sentinel-starter' as PlanKey,
+    monthlyPrice: 49,
+    yearlyPrice: 49,
+    tag: 'For micro security teams',
+    guards: '10 guards',
+    sites: '1 site',
+    yearlyOnly: false,
+    features: [
+      'Basic rota system',
+      'Guard management (up to 10)',
+      '1 site',
+      'Incident reports',
+      'Digital occurrence book',
+      'Mobile guard portal',
+    ],
+    notIncluded: [
+      'AI features',
+      'Client portal',
+      'Patrol management',
+      'GPS tracking',
+    ],
+  },
   {
     key: 'sentinel' as PlanKey,
     monthlyPrice: 99,
@@ -50,12 +83,9 @@ const plans = [
     guards: '25 guards',
     sites: '3 sites',
     features: [
-      'Basic rota system',
-      'Guard management',
-      'Site management',
-      'Incident reports',
-      'Digital occurrence book',
-      'Mobile guard portal',
+      'Everything in Starter',
+      'Up to 25 guards',
+      'Up to 3 sites',
       'Basic KPI dashboard',
       'Limited AI usage',
     ],
@@ -113,17 +143,18 @@ const plans = [
   },
 ];
 
-export default function ChangePlanModal({ isOpen, onClose, currentPlan }: ChangePlanModalProps) {
+export default function ChangePlanModal({ isOpen, onClose, currentPlan, onPlanChanged }: ChangePlanModalProps) {
   const [selectedKey, setSelectedKey] = useState<PlanKey>(
-    (currentPlan.toLowerCase().replace('guardianhub ', '') as PlanKey) || 'sentinel'
+    (currentPlan.toLowerCase().replace('guardianhub ', '').replace(' starter', '') as PlanKey) || 'sentinel'
   );
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
-  const { checkout, loading } = useStripeCheckout();
+  const { checkout, loading, error: checkoutError } = useStripeCheckout();
 
   const selectedPlan = plans.find((p) => p.key === selectedKey)!;
   const s = planStyles[selectedKey];
   const isCustom = selectedKey === 'titan';
-  const isCurrent = currentPlan.toLowerCase().includes(selectedKey);
+  const isStarter = selectedKey === 'sentinel-starter';
+  const isCurrent = currentPlan.toLowerCase().includes(selectedKey) || (isStarter && currentPlan.toLowerCase().includes('starter'));
 
   const handleConfirm = () => {
     if (isCustom) {
@@ -133,7 +164,7 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
       return;
     }
     if (!isCurrent) {
-      checkout(selectedKey, billingPeriod);
+      checkout(selectedKey, isStarter ? 'monthly' : billingPeriod, onPlanChanged);
     } else {
       onClose();
     }
@@ -142,68 +173,69 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0f1425] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="px-8 py-5 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0f1425]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-lg font-semibold text-white">Change Plan</h2>
-            <p className="text-gray-500 text-sm">Current: <span className="text-gray-300">{currentPlan}</span></p>
+            <h2 className="text-lg font-semibold text-gray-900">Change Plan</h2>
+            <p className="text-gray-500 text-sm">Current: <span className="text-gray-700 font-medium">{currentPlan}</span></p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
-            <i className="ri-close-line text-gray-400" />
+            <i className="ri-close-line text-gray-500 text-lg" />
           </button>
         </div>
 
         <div className="p-8 space-y-8">
-          {/* Billing toggle */}
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-center bg-white/5 border border-white/10 rounded-xl p-1.5">
-              <button
-                onClick={() => setBillingPeriod('monthly')}
-                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                  billingPeriod === 'monthly' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingPeriod('yearly')}
-                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap flex items-center gap-2 ${
-                  billingPeriod === 'yearly' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Yearly
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                  billingPeriod === 'yearly' ? 'bg-white/20 text-white' : 'bg-green-500/15 text-green-400'
-                }`}>
-                  Save 20%
-                </span>
-              </button>
+          {!isStarter && (
+            <div className="flex items-center justify-center">
+              <div className="inline-flex items-center bg-gray-100 border border-gray-200 rounded-xl p-1.5">
+                <button
+                  onClick={() => setBillingPeriod('monthly')}
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                    billingPeriod === 'monthly' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingPeriod('yearly')}
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                    billingPeriod === 'yearly' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Yearly
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    billingPeriod === 'yearly' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
+                  }`}>
+                    Save 20%
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Plan selector */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {plans.map((plan) => {
               const ps = planStyles[plan.key];
               const active = selectedKey === plan.key;
-              const current = currentPlan.toLowerCase().includes(plan.key);
+              const current = currentPlan.toLowerCase().includes(plan.key) || (plan.key === 'sentinel-starter' && currentPlan.toLowerCase().includes('starter'));
               const custom = plan.key === 'titan';
+              const starter = plan.key === 'sentinel-starter';
 
               return (
                 <button
                   key={plan.key}
                   onClick={() => setSelectedKey(plan.key)}
-                  className={`relative text-left rounded-xl border p-6 transition-all cursor-pointer ${
-                    active ? `${ps.border} bg-white/[0.03] ring-1 ${ps.ring}` : 'border-white/5 bg-white/[0.01] hover:border-white/10'
+                  className={`relative text-left rounded-xl border p-5 transition-all cursor-pointer ${
+                    active ? `${ps.border} bg-white ring-1 ${ps.ring} shadow-sm` : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                   }`}
                 >
                   {current && (
                     <div className="absolute -top-2 left-4">
-                      <span className="px-2.5 py-0.5 bg-white/10 text-gray-300 text-[10px] font-bold uppercase tracking-wider rounded-full border border-white/10">
+                      <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-blue-200">
                         Current
                       </span>
                     </div>
@@ -212,45 +244,50 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
                     <span className={`w-2 h-2 rounded-full ${ps.accent}`} />
                     {ps.label}
                   </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    {custom ? 'Custom' : `£${billingPeriod === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice}`}
+                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                    {custom ? 'Custom' : starter ? '£49' : `£${billingPeriod === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice}`}
                   </div>
                   <div className="text-gray-500 text-sm mb-4">{plan.tag}</div>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="w-4 h-4 flex items-center justify-center">
-                        <i className="ri-shield-user-line text-gray-500 text-xs" />
+                        <i className="ri-shield-user-line text-gray-400 text-xs" />
                       </span>
                       {plan.guards}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="w-4 h-4 flex items-center justify-center">
-                        <i className="ri-building-line text-gray-500 text-xs" />
+                        <i className="ri-building-line text-gray-400 text-xs" />
                       </span>
                       {plan.sites}
                     </div>
                   </div>
+                  {starter && (
+                    <p className="text-xs text-gray-400 mt-3">Monthly only</p>
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {/* Selected plan detail */}
-          <div className={`rounded-xl border ${s.border} bg-white/[0.02] p-6`}>
+          <div className={`rounded-xl border ${s.border} bg-gray-50 p-6`}>
             <div className="flex items-center gap-2 mb-1">
               <span className={`w-2 h-2 rounded-full ${s.accent}`} />
               <span className={`text-sm font-bold ${s.colour}`}>{s.label}</span>
-              {billingPeriod === 'yearly' && !isCustom && (
-                <span className="ml-auto text-xs text-green-400">Save 20% with annual billing</span>
+              {billingPeriod === 'yearly' && !isCustom && !isStarter && (
+                <span className="ml-auto text-xs text-green-600 font-medium">Save 20% with annual billing</span>
+              )}
+              {isStarter && (
+                <span className="ml-auto text-xs text-gray-400 font-medium">Monthly billing only</span>
               )}
             </div>
-            <div className="text-sm text-gray-400 mb-4">
+            <div className="text-sm text-gray-500 mb-4">
               {!isCustom && (
-                <span className="text-white font-semibold">
-                  £{billingPeriod === 'yearly' ? selectedPlan.yearlyPrice : selectedPlan.monthlyPrice}
+                <span className="text-gray-900 font-semibold">
+                  £{isStarter ? '49' : billingPeriod === 'yearly' ? selectedPlan.yearlyPrice : selectedPlan.monthlyPrice}
                 </span>
               )}
-              {!isCustom && <span> /month{billingPeriod === 'yearly' ? ' (billed annually)' : ''}</span>}
+              {!isCustom && <span> /month{!isStarter && billingPeriod === 'yearly' ? ' (billed annually)' : ''}</span>}
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
@@ -258,9 +295,9 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Included</h4>
                 <ul className="space-y-2">
                   {selectedPlan.features.map((f, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm text-gray-300">
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
                       <span className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                        <i className="ri-check-line text-blue-400 text-sm" />
+                        <i className="ri-check-line text-blue-500 text-sm" />
                       </span>
                       {f}
                     </li>
@@ -272,9 +309,9 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
                   <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Not included</h4>
                   <ul className="space-y-2">
                     {selectedPlan.notIncluded.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-gray-500 opacity-60">
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-gray-400">
                         <span className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                          <i className="ri-subtract-line text-gray-700 text-sm" />
+                          <i className="ri-subtract-line text-gray-300 text-sm" />
                         </span>
                         {f}
                       </li>
@@ -285,11 +322,32 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
             </div>
           </div>
 
-          {/* Actions */}
+          {checkoutError && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
+              {checkoutError}
+            </div>
+          )}
+
+          {!isCurrent && !isCustom && (
+            <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+              <div className="flex items-start gap-3">
+                <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+                  <i className="ri-information-line text-amber-500 text-sm" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 mb-1">Plan Change Notice</p>
+                  <p className="text-sm text-amber-700">
+                    To change plan, your current subscription will be cancelled and a new checkout session will start. You will only be charged for the new plan going forward. Any remaining credit or unused time on your current plan will be handled by Stripe automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 text-sm font-medium text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+              className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors cursor-pointer whitespace-nowrap"
             >
               Cancel
             </button>
@@ -298,8 +356,8 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan }: Change
               disabled={loading}
               className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap disabled:opacity-50 ${
                 isCurrent
-                  ? 'bg-white/5 text-gray-400 border border-white/10'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white'
+                  ? 'bg-gray-100 text-gray-500 border border-gray-200'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
               }`}
             >
               {loading ? (

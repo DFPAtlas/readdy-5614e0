@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
+import { useEntitlements } from '@/lib/useEntitlements';
 import SOPAssistantWidget from '@/app/components/SOPAssistantWidget';
 import NotificationBell from '@/app/components/NotificationBell';
 import { usePendingLeave } from '@/lib/usePendingLeave';
 import { TablePageSkeleton } from './PageSkeleton';
+import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 
 const navItems = [
   { label: 'Dashboard', href: '/ops', icon: 'ri-dashboard-line', perm: 'dashboard' },
@@ -16,8 +18,8 @@ const navItems = [
   { label: 'Notices', href: '/dashboard/notices', icon: 'ri-notification-3-line', perm: 'sites' },
   { label: 'Guards', href: '/ops/guards', icon: 'ri-shield-user-line', perm: 'staff' },
   { label: 'Availability', href: '/ops/guards/availability', icon: 'ri-calendar-check-line', perm: 'staff' },
-  { label: 'Leave Approval', href: '/ops/guards/leave-approval', icon: 'ri-calendar-close-line', perm: 'staff', badge: true },
-  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-hand-heart-line', perm: 'staff' },
+  { label: 'Leave Approval', href: '/ops/guards/leave-approval', icon: 'ri-calendar-close-line', perm: 'staff', badge: true, feature: 'hasLeaveAutomation' },
+  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-hand-heart-line', perm: 'staff', feature: 'hasLeaveAutomation' },
   { label: 'Rotas', href: '/rotas', icon: 'ri-calendar-event-line', perm: 'rotas' },
   { label: 'Pattern Builder', href: '/rotas/patterns', icon: 'ri-stack-line', perm: 'shift_patterns' },
   { label: 'Incidents', href: '/ops/incidents', icon: 'ri-alarm-warning-line', perm: 'incidents' },
@@ -37,7 +39,9 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
   const { can } = useMyPermissions(user?.id || null, user?.company_id || null);
+  const { canAccess } = useEntitlements();
   const { pending } = usePendingLeave();
+  const [lockedFeature, setLockedFeature] = useState<string | null>(null);
 
   const isAuthPage = pathname && AUTH_PAGES.some((p) => pathname === p || pathname.startsWith(p + '/'));
 
@@ -127,6 +131,39 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
             {navItems.map((item: any) => {
               if (item.perm && !can(item.perm, 'view')) return null;
               const active = activeHref === item.href;
+              const isLocked = item.feature ? !canAccess(item.feature) : false;
+
+              if (isLocked) {
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => setLockedFeature(item.label)}
+                    title={`${item.label} requires upgrade`}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap w-full text-left opacity-40 cursor-pointer hover:opacity-60 hover:bg-gray-800/30 group relative"
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 relative">
+                      <i className={item.icon}></i>
+                      {item.badge && pending.length > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-500 rounded-full text-[9px] font-bold text-black flex items-center justify-center">
+                          {pending.length > 9 ? '9+' : pending.length}
+                        </span>
+                      )}
+                    </div>
+                    <span className={`transition-opacity flex items-center gap-1.5 ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
+                      {item.label}
+                      <span className="w-3.5 h-3.5 flex items-center justify-center text-amber-400">
+                        <i className="ri-lock-line text-[10px]"></i>
+                      </span>
+                    </span>
+                    {!sidebarOpen && (
+                      <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700">
+                        {item.label} — Upgrade required
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
@@ -214,6 +251,11 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <SOPAssistantWidget theme="dark" enableVoice={false} />
+      <UpgradeRequiredModal
+        isOpen={lockedFeature !== null}
+        onClose={() => setLockedFeature(null)}
+        featureName={lockedFeature || undefined}
+      />
     </div>
   );
 }

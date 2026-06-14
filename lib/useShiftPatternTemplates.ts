@@ -191,7 +191,7 @@ export function useShiftPatternTemplates() {
       .from('shift_pattern_templates')
       .insert(payload)
       .select()
-      .single();
+      .maybeSingle();
 
     if (!error) {
       load();
@@ -226,7 +226,7 @@ export function useShiftPatternTemplates() {
       .update(payload)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (!error) {
       load();

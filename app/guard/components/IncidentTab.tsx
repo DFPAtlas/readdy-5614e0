@@ -97,7 +97,7 @@ export default function IncidentTab({ todayShift, guardId, companyId, onSubmitte
         status: 'open',
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !incidentData) {
       setSubmitting(false);

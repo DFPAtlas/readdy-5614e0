@@ -88,7 +88,7 @@ export function useRotaPublish() {
           published_at: new Date().toISOString(),
         })
         .select('*, profiles(full_name)')
-        .single();
+        .maybeSingle();
 
       if (err) {
         setError(err.message);

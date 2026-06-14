@@ -32,7 +32,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No company assigned" }), { status: 403, headers: corsHeaders });
     }
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { api_key } = body;
     if (!api_key || typeof api_key !== "string" || !api_key.startsWith("sk-")) {
       return new Response(JSON.stringify({ error: "Invalid API key format" }), { status: 400, headers: corsHeaders });
@@ -42,7 +47,6 @@ Deno.serve(async (req) => {
       .from("company_secrets")
       .upsert({ company_id: companyId, secret_name: "OPENAI_API_KEY", secret_value: api_key, updated_at: new Date().toISOString() }, { onConflict: "company_id,secret_name" });
 
-    // Quick verification call
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${api_key}`, "Content-Type": "application/json" },

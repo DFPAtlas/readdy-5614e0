@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGuardWelfare } from '@/lib/useGuardWelfare';
+import { useAuth } from '@/lib/auth';
+import { callAgent } from '@/lib/guardianhubAgents';
+import AgentStatusBar from '@/components/AgentStatusBar';
+import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import WelfareStatusCards from './WelfareStatusCards';
 import MissedCheckCallList from './MissedCheckCallList';
 import PanicAlertPanel from './PanicAlertPanel';
@@ -11,8 +15,47 @@ import QuickActionBar from './QuickActionBar';
 import WelfareLoadingState from './WelfareLoadingState';
 
 export default function GuardWelfareClient() {
+  const { profile } = useAuth();
   const { sessions, wellbeingCheckins, guards, welfareIncidents, notifications, loading, error, lastUpdated, refetch } = useGuardWelfare();
   const [showRaiseTicket, setShowRaiseTicket] = useState(false);
+
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentData, setAgentData] = useState<any>(null);
+
+  const fetchAgent = useCallback(async () => {
+    if (!profile?.id) return;
+    setAgentLoading(true);
+    setAgentError(null);
+    try {
+      const result = await callAgent(
+        'guard_welfare',
+        {
+          guards_active: guards.length,
+          sessions_active: sessions.length,
+          incidents_count: welfareIncidents.length,
+        },
+        {
+          clientId: profile.company_id,
+          userId: profile.id,
+          requestedPage: '/dashboard/guard-welfare',
+          requestedFeature: 'guard_welfare',
+        }
+      );
+      if (result.error) setAgentError(result.error);
+      setAgentData(result.data);
+    } catch (err: any) {
+      setAgentError(err.message || 'Agent call failed');
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [profile?.id, profile?.company_id, guards.length, sessions.length, welfareIncidents.length]);
+
+  useEffect(() => {
+    if (profile?.id && !loading) {
+      fetchAgent();
+    }
+  }, [profile?.id, loading]);
 
   if (loading) {
     return <WelfareLoadingState />;
@@ -64,27 +107,49 @@ export default function GuardWelfareClient() {
         </div>
       </div>
 
-      <QuickActionBar />
+      <WidgetBoundary widgetName="GuardWelfareAgent" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+        <AgentStatusBar
+          agentKey="guard_welfare"
+          loading={agentLoading}
+          error={agentError}
+          data={agentData}
+          onRetry={fetchAgent}
+        />
+      </WidgetBoundary>
 
-      <WelfareStatusCards
-        guards={guards}
-        sessions={sessions}
-        incidents={welfareIncidents}
-        notifications={notifications}
-      />
+      <WidgetBoundary widgetName="WelfareQuickActionBar" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+        <QuickActionBar />
+      </WidgetBoundary>
+
+      <WidgetBoundary widgetName="WelfareStatusCards" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+        <WelfareStatusCards
+          guards={guards}
+          sessions={sessions}
+          incidents={welfareIncidents}
+          notifications={notifications}
+        />
+      </WidgetBoundary>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <MissedCheckCallList sessions={sessions} />
-        <PanicAlertPanel notifications={notifications} incidents={welfareIncidents} />
+        <WidgetBoundary widgetName="MissedCheckCallList" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <MissedCheckCallList sessions={sessions} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="PanicAlertPanel" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <PanicAlertPanel notifications={notifications} incidents={welfareIncidents} />
+        </WidgetBoundary>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <GuardActivityTimeline
-          guards={guards}
-          sessions={sessions}
-          wellbeingCheckins={wellbeingCheckins}
-        />
-        <EscalationRulesPanel />
+        <WidgetBoundary widgetName="GuardActivityTimeline" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <GuardActivityTimeline
+            guards={guards}
+            sessions={sessions}
+            wellbeingCheckins={wellbeingCheckins}
+          />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="EscalationRulesPanel" pagePath="/dashboard/guard-welfare" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <EscalationRulesPanel />
+        </WidgetBoundary>
       </div>
     </div>
   );

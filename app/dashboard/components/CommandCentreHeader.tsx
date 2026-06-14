@@ -52,7 +52,7 @@ export default function CommandCentreHeader({ kpis, lastUpdated, onRefresh }: Co
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Operations Command Centre</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Operation Dashboard</h1>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
               <PulsingDot color="bg-emerald-500" />
               LIVE

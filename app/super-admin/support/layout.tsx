@@ -2,6 +2,7 @@
 
 import SuperAdminGate from '../../admin/components/SuperAdminGate';
 import AdminShell from '../../admin/components/AdminShell';
+import Footer from '@/app/components/Footer';
 
 export default function SupportLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function SupportLayout({ children }: { children: React.ReactNode 
           {children}
         </div>
       </AdminShell>
+      <Footer />
     </SuperAdminGate>
   );
 }

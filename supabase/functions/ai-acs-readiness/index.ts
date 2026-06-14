@@ -15,7 +15,14 @@ serve(async (req) => {
   }
 
   try {
-    const { company_id } = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { company_id } = body;
     if (!company_id) {
       return new Response(JSON.stringify({ error: "Missing company_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -149,7 +156,6 @@ serve(async (req) => {
           report.summary = aiData.choices?.[0]?.message?.content || report.summary;
         }
       } catch {
-        // AI fallback to local summary
       }
     }
 

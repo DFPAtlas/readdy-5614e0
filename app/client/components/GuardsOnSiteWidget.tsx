@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useClientPortal } from '@/lib/useClientPortal';
+import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
+import WidgetFallback from '@/components/dashboard/WidgetFallback';
 
 function formatTimeOnSite(clockedInAt: string | null) {
   if (!clockedInAt) return 'Not clocked in';
@@ -38,20 +40,7 @@ export default function GuardsOnSiteWidget() {
 
   if (guards.length === 0) {
     return (
-      <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 flex items-center justify-center">
-            <i className="ri-shield-user-line text-emerald-400"></i>
-          </div>
-          <h3 className="text-sm font-semibold text-white">Guards on Site</h3>
-        </div>
-        <div className="text-center py-4">
-          <div className="w-10 h-10 flex items-center justify-center bg-white/5 rounded-full mx-auto mb-2">
-            <i className="ri-shield-user-line text-gray-500"></i>
-          </div>
-          <p className="text-xs text-gray-500">No officers currently assigned</p>
-        </div>
-      </div>
+      <WidgetFallback state="empty" title="No officers" message="No officers currently assigned" />
     );
   }
 

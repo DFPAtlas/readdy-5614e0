@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface FinishScreenProps {
   companyName: string | null;
@@ -10,7 +10,6 @@ interface FinishScreenProps {
 }
 
 export default function FinishScreen({ companyName, stepsCompleted, totalSteps, onRestart }: FinishScreenProps) {
-  const router = useRouter();
 
   const progressItems = [
     { label: 'Company Profile', icon: 'ri-building-2-line', done: true, link: '/dashboard/settings' },
@@ -46,13 +45,16 @@ export default function FinishScreen({ companyName, stepsCompleted, totalSteps, 
             style={{ width: `${(stepsCompleted / totalSteps) * 100}%` }}
           />
         </div>
+        <p className="text-xs text-emerald-400/60 mt-3 text-center">
+          Redirecting to your dashboard...
+        </p>
       </div>
 
       <div className="space-y-2">
         {progressItems.map((item) => (
-          <button
+          <Link
             key={item.label}
-            onClick={() => router.push(item.link)}
+            href={item.link}
             className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 rounded-lg border border-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
@@ -66,23 +68,23 @@ export default function FinishScreen({ companyName, stepsCompleted, totalSteps, 
             ) : (
               <span className="text-xs text-gray-500">Next</span>
             )}
-          </button>
+          </Link>
         ))}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          onClick={() => router.push('/dashboard/command-centre')}
+        <a
+          href="/dashboard/command-centre"
           className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
         >
           <i className="ri-command-line" /> Go to Command Centre
-        </button>
-        <button
-          onClick={() => router.push('/dashboard')}
+        </a>
+        <a
+          href="/dashboard"
           className="flex-1 bg-white/10 hover:bg-white/15 text-white text-sm font-medium py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
         >
           <i className="ri-dashboard-line" /> Go to Dashboard
-        </button>
+        </a>
       </div>
 
       <button

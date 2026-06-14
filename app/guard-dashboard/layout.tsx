@@ -1,5 +1,10 @@
-import GuardDashboardShell from './components/GuardDashboardShell';
+import Footer from '@/app/components/Footer';
 
 export default function GuardDashboardLayout({ children }: { children: React.ReactNode }) {
-  return <GuardDashboardShell>{children}</GuardDashboardShell>;
+  return (
+    <>
+      {children}
+      <Footer />
+    </>
+  );
 }

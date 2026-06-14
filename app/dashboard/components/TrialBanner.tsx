@@ -1,103 +1,92 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-interface TrialBannerProps {
-  trialEndsAt: string | null;
-  companyName: string | null;
-}
-
-export default function TrialBanner({ trialEndsAt, companyName }: TrialBannerProps) {
-  const [dismissed, setDismissed] = useState(false);
+export default function TrialBanner({ companyId }: { companyId: string | null }) {
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const key = 'trial_banner_dismissed';
-    const val = localStorage.getItem(key);
-    if (val) {
-      const dismissedAt = new Date(val);
-      const now = new Date();
-      const hoursSince = (now.getTime() - dismissedAt.getTime()) / (1000 * 60 * 60);
-      if (hoursSince < 24) setDismissed(true);
+    if (!companyId) {
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  const handleDismiss = () => {
-    localStorage.setItem('trial_banner_dismissed', new Date().toISOString());
-    setDismissed(true);
-  };
+    let cancelled = false;
 
-  if (!trialEndsAt || dismissed) return null;
+    async function checkTrial() {
+      const { data } = await supabase
+        .from('companies')
+        .select('subscription_plan, subscription_status, subscription_period_end')
+        .eq('id', companyId)
+        .maybeSingle();
 
-  const end = new Date(trialEndsAt);
-  const now = new Date();
-  const diffMs = end.getTime() - now.getTime();
-  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (cancelled) return;
 
-  if (daysLeft <= 0) {
-    return (
-      <div className="mb-5 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-        <div className="w-9 h-9 shrink-0 rounded-lg bg-red-500/20 flex items-center justify-center">
-          <i className="ri-time-line text-red-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-red-400">
-            {companyName ? `${companyName}'s trial has ended` : 'Your trial has ended'}
-          </p>
-          <p className="text-xs text-red-400/70 mt-0.5">
-            Upgrade now to keep full access to all features, sites, and guard data.
-          </p>
-        </div>
-        <Link
-          href="/dashboard/settings?tab=billing"
-          className="shrink-0 bg-red-600 hover:bg-red-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer"
-        >
-          Upgrade Now
-        </Link>
-        <button
-          onClick={handleDismiss}
-          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-red-400/60 hover:text-red-400 transition-colors cursor-pointer"
-        >
-          <i className="ri-close-line" />
-        </button>
-      </div>
-    );
-  }
+      if (
+        data?.subscription_plan === 'sentinel-starter' &&
+        data?.subscription_status === 'trialing' &&
+        data?.subscription_period_end
+      ) {
+        const now = new Date();
+        const end = new Date(data.subscription_period_end);
+        const diff = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        setDaysLeft(diff);
+      }
 
-  if (daysLeft > 7) return null;
+      setLoading(false);
+    }
 
-  const urgency = daysLeft <= 3 ? 'high' : daysLeft <= 5 ? 'medium' : 'low';
-  const colors = {
-    high: { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: 'text-red-400', iconBg: 'bg-red-500/20', text: 'text-red-400', sub: 'text-red-400/70', btn: 'bg-red-600 hover:bg-red-500' },
-    medium: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: 'text-amber-400', iconBg: 'bg-amber-500/20', text: 'text-amber-400', sub: 'text-amber-400/70', btn: 'bg-amber-600 hover:bg-amber-500' },
-    low: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', icon: 'text-blue-400', iconBg: 'bg-blue-500/20', text: 'text-blue-400', sub: 'text-blue-400/70', btn: 'bg-blue-600 hover:bg-blue-500' },
-  }[urgency];
+    checkTrial();
+
+    const interval = setInterval(checkTrial, 1000 * 60 * 30);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [companyId]);
+
+  if (loading || daysLeft === null || daysLeft <= 0) return null;
+
+  const isUrgent = daysLeft <= 3;
 
   return (
-    <div className={`mb-5 p-4 ${colors.bg} border ${colors.border} rounded-lg flex items-start gap-3`}>
-      <div className={`w-9 h-9 shrink-0 rounded-lg ${colors.iconBg} flex items-center justify-center`}>
-        <i className={`ri-time-line ${colors.icon}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium ${colors.text}`}>
-          {companyName ? `${companyName}'s trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}` : `Trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
-        </p>
-        <p className={`text-xs ${colors.sub} mt-0.5`}>
-          Upgrade before your trial expires to keep full access to all features, sites, and guard data.
-        </p>
+    <div
+      className={`flex items-center justify-between px-4 lg:px-6 py-2.5 text-sm ${
+        isUrgent
+          ? 'bg-amber-950/60 border-b border-amber-500/30'
+          : 'bg-blue-950/40 border-b border-blue-500/20'
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className={`w-5 h-5 flex items-center justify-center ${isUrgent ? 'text-amber-400' : 'text-blue-400'}`}>
+          <i className={`${isUrgent ? 'ri-timer-flash-line' : 'ri-timer-line'}`}></i>
+        </span>
+        <span className="text-gray-300">
+          {isUrgent ? (
+            <>
+              Your free trial ends in{' '}
+              <span className="text-amber-400 font-bold">{daysLeft} {daysLeft === 1 ? 'day' : 'days'}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-blue-400 font-bold">{daysLeft} {daysLeft === 1 ? 'day' : 'days'}</span> remaining on your Sentinel Starter trial
+            </>
+          )}
+        </span>
       </div>
       <Link
-        href="/dashboard/settings?tab=billing"
-        className={`shrink-0 ${colors.btn} text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer`}
+        href="/pricing"
+        className={`shrink-0 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+          isUrgent
+            ? 'bg-amber-600 hover:bg-amber-500 text-white'
+            : 'bg-blue-600 hover:bg-blue-500 text-white'
+        }`}
       >
         Upgrade Now
       </Link>
-      <button
-        onClick={handleDismiss}
-        className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-400 hover:text-gray-300 transition-colors cursor-pointer"
-      >
-        <i className="ri-close-line" />
-      </button>
     </div>
   );
 }

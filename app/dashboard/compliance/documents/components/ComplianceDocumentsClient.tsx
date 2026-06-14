@@ -1,13 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useComplianceDocuments } from '@/lib/useComplianceDocuments';
+import { useAuth } from '@/lib/auth';
+import { callAgent, logWebhookEvent } from '@/lib/guardianhubAgents';
+import AgentStatusBar from '@/components/AgentStatusBar';
+import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import SummaryCards from './SummaryCards';
 import DocumentFilters from './DocumentFilters';
 import DocumentsTable from './DocumentsTable';
 import UploadReviewModal from './UploadReviewModal';
 import LoadingState from './LoadingState';
 import EmptyState from './EmptyState';
+import { FeatureGate } from '@/lib/useEntitlements';
 
 export default function ComplianceDocumentsClient() {
   const {
@@ -22,12 +27,56 @@ export default function ComplianceDocumentsClient() {
     refetch,
   } = useComplianceDocuments();
 
+  const { profile, companyId } = useAuth();
+
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState<'all' | 'guard' | 'site' | 'client' | 'company'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'expired' | 'expiring_7d' | 'expiring_30d' | 'active' | 'missing' | 'awaiting_review'>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentData, setAgentData] = useState<any>(null);
+
+  const fetchAgent = useCallback(async () => {
+    if (!profile?.id || !companyId) return;
+    setAgentLoading(true);
+    setAgentError(null);
+    try {
+      const result = await callAgent(
+        'compliance',
+        {
+          expired: summary?.expired || 0,
+          expiring_soon: summary?.expiringSoon || 0,
+          total_docs: summary?.total || 0,
+        },
+        {
+          clientId: companyId,
+          userId: profile.id,
+          requestedPage: '/dashboard/compliance/documents',
+          requestedFeature: 'compliance',
+        }
+      );
+      if (result.error) setAgentError(result.error);
+      setAgentData(result.data);
+      if (summary?.expired > 0) {
+        logWebhookEvent('compliance', 'compliance_warning', {
+          expired_count: summary.expired,
+          expiring_soon: summary.expiringSoon,
+        }, companyId);
+      }
+    } catch (err: any) {
+      setAgentError(err.message || 'Agent call failed');
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [profile?.id, companyId, summary?.expired, summary?.expiringSoon, summary?.total]);
+
+  useEffect(() => {
+    if (profile?.id && !loading) fetchAgent();
+  }, [profile?.id, loading]);
 
   if (loading) {
     return (
@@ -48,6 +97,7 @@ export default function ComplianceDocumentsClient() {
     clientDocs.length === 0;
 
   return (
+    <FeatureGate feature="hasCompliance">
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -84,6 +134,16 @@ export default function ComplianceDocumentsClient() {
         </div>
       </div>
 
+      <WidgetBoundary widgetName="ComplianceAgent" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
+        <AgentStatusBar
+          agentKey="compliance"
+          loading={agentLoading}
+          error={agentError}
+          data={agentData}
+          onRetry={fetchAgent}
+        />
+      </WidgetBoundary>
+
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-sm">
           <div className="flex items-center gap-2">
@@ -95,34 +155,40 @@ export default function ComplianceDocumentsClient() {
         </div>
       )}
 
-      <SummaryCards summary={summary} />
+      <WidgetBoundary widgetName="ComplianceSummaryCards" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
+        <SummaryCards summary={summary} />
+      </WidgetBoundary>
 
       {allEmpty ? (
         <EmptyState onUpload={() => setShowUploadModal(true)} />
       ) : (
         <>
-          <DocumentFilters
-            search={search}
-            onSearchChange={setSearch}
-            entityFilter={entityFilter}
-            onEntityChange={setEntityFilter}
-            typeFilter={typeFilter}
-            onTypeChange={setTypeFilter}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-          />
-          <DocumentsTable
-            complianceDocs={complianceDocs}
-            guardCerts={guardCerts}
-            guardVetting={guardVetting}
-            acsEvidence={acsEvidence}
-            clientDocs={clientDocs}
-            search={search}
-            entityFilter={entityFilter}
-            typeFilter={typeFilter}
-            statusFilter={statusFilter}
-            onRefresh={refetch}
-          />
+          <WidgetBoundary widgetName="DocumentFilters" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
+            <DocumentFilters
+              search={search}
+              onSearchChange={setSearch}
+              entityFilter={entityFilter}
+              onEntityChange={setEntityFilter}
+              typeFilter={typeFilter}
+              onTypeChange={setTypeFilter}
+              statusFilter={statusFilter}
+              onStatusChange={setStatusFilter}
+            />
+          </WidgetBoundary>
+          <WidgetBoundary widgetName="DocumentsTable" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
+            <DocumentsTable
+              complianceDocs={complianceDocs}
+              guardCerts={guardCerts}
+              guardVetting={guardVetting}
+              acsEvidence={acsEvidence}
+              clientDocs={clientDocs}
+              search={search}
+              entityFilter={entityFilter}
+              typeFilter={typeFilter}
+              statusFilter={statusFilter}
+              onRefresh={refetch}
+            />
+          </WidgetBoundary>
         </>
       )}
 
@@ -141,5 +207,6 @@ export default function ComplianceDocumentsClient() {
         />
       )}
     </div>
+    </FeatureGate>
   );
 }

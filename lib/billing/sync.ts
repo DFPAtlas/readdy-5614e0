@@ -1,3 +1,7 @@
+// SERVER-SIDE ONLY — DO NOT IMPORT IN BROWSER CODE.
+// Sync utilities for Stripe billing data. Used by edge functions or CLI tools.
+// Requires STRIPE_SECRET_KEY and SUPABASE_SERVICE_ROLE_KEY.
+
 import { getStripe } from "./stripe";
 import { getSupabaseAdmin } from "./supabase-admin";
 

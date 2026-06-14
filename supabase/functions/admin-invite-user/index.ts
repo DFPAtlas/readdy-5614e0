@@ -16,7 +16,11 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { email, first_name, last_name, role, company_id } = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { email, first_name, last_name, role, company_id } = body;
 
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), {
@@ -33,12 +37,10 @@ serve(async (req) => {
       });
     }
 
-    // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find((u: any) => u.email === email);
 
     if (existingUser) {
-      // Update their role in the users table
       const { error: updateErr } = await supabaseAdmin
         .from('users')
         .update({ role, company_id: company_id || null, first_name, last_name })
@@ -51,7 +53,6 @@ serve(async (req) => {
       });
     }
 
-    // Invite new user
     const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { first_name, last_name, role, company_id },
     });
@@ -61,7 +62,6 @@ serve(async (req) => {
     const userId = inviteData?.user?.id;
     if (!userId) throw new Error('No user ID returned from invite');
 
-    // Upsert into users table
     const { error: upsertErr } = await supabaseAdmin.from('users').upsert({
       id: userId,
       email,

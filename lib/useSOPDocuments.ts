@@ -113,7 +113,7 @@ export function useSOPDocuments(siteId?: string, includeSuperseded?: boolean) {
       is_active: true,
       version_number: 1,
       is_current: true,
-    }).select().single();
+    }).select().maybeSingle();
 
     if (!error) await load();
     return { data, error };
@@ -168,7 +168,7 @@ export function useSOPDocuments(siteId?: string, includeSuperseded?: boolean) {
       is_current: true,
       change_notes: changeNotes || null,
       superseded_by_id: null,
-    }).select().single();
+    }).select().maybeSingle();
 
     // Link the old version to this new one
     if (data) {

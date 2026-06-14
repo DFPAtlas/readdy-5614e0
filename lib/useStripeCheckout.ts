@@ -7,7 +7,7 @@ export function useStripeCheckout() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const checkout = async (plan: 'sentinel' | 'command', billing: 'monthly' | 'yearly') => {
+  const checkout = async (plan: 'sentinel-starter' | 'sentinel' | 'command', billing: 'monthly' | 'yearly', onSuccess?: () => void) => {
     setLoading(true);
     setError(null);
 
@@ -16,11 +16,11 @@ export function useStripeCheckout() {
 
       if (sessionError || !sessionData.session) {
         setError('Please log in to choose a plan');
-        router.push('/login?next=/pricing');
+        try { router.push('/login?next=/pricing'); } catch { window.location.href = '/login?next=/pricing'; }
         return;
       }
 
-      if (!['sentinel', 'command'].includes(plan)) {
+      if (!['sentinel-starter', 'sentinel', 'command'].includes(plan)) {
         setError('Invalid plan selected');
         return;
       }
@@ -46,6 +46,7 @@ export function useStripeCheckout() {
       }
 
       if (data.url) {
+        if (onSuccess) onSuccess();
         window.location.href = data.url;
       } else {
         throw new Error('No checkout URL returned');

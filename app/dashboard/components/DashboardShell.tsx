@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import RaiseTicketModal from './RaiseTicketModal';
+import TrialBanner from './TrialBanner';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
+import { useEntitlements } from '@/lib/useEntitlements';
 import SOPAssistantWidget from '@/app/components/SOPAssistantWidget';
 import NotificationBell from '@/app/components/NotificationBell';
 import { DashboardPageSkeleton } from '@/app/components/PageSkeleton';
+import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: 'ri-dashboard-line', perm: 'dashboard' },
@@ -17,25 +20,25 @@ const navItems = [
   { label: 'Evidence Vault', href: '/dashboard/evidence-vault', icon: 'ri-folder-shield-line', perm: 'incidents' },
   { label: 'Site Assignments', href: '/dashboard/site-assignments', icon: 'ri-grid-line', perm: 'staff' },
   { label: 'Setup Wizard', href: '/dashboard/setup-wizard', icon: 'ri-magic-line', perm: 'settings' },
-  { label: 'Compliance', href: '/dashboard/compliance/documents', icon: 'ri-file-shield-line', perm: 'dashboard' },
+  { label: 'Compliance', href: '/dashboard/compliance/documents', icon: 'ri-file-shield-line', perm: 'dashboard', feature: 'hasCompliance' },
   { label: 'Client SLA', href: '/dashboard/client-sla', icon: 'ri-line-chart-line', perm: 'dashboard' },
   { label: 'Admin', href: '/dashboard/admin', icon: 'ri-user-settings-line', perm: 'settings' },
   { label: 'Sites', href: '/sites', icon: 'ri-building-line', perm: 'sites' },
-  { label: 'Clients', href: '/dashboard/clients', icon: 'ri-briefcase-line', perm: 'client_portal' },
-  { label: 'Patrol Checkpoints', href: '/dashboard/patrol-checkpoints', icon: 'ri-qr-code-line', perm: 'sites' },
-  { label: 'Patrol Monitoring', href: '/dashboard/patrol-monitoring', icon: 'ri-route-line', perm: 'sites' },
+  { label: 'Clients', href: '/dashboard/clients', icon: 'ri-briefcase-line', perm: 'client_portal', feature: 'hasClientPortal' },
+  { label: 'Patrol Checkpoints', href: '/dashboard/patrol-checkpoints', icon: 'ri-qr-code-line', perm: 'sites', feature: 'hasPatrolManagement' },
+  { label: 'Patrol Monitoring', href: '/dashboard/patrol-monitoring', icon: 'ri-route-line', perm: 'sites', feature: 'hasPatrolManagement' },
   { label: 'Notices', href: '/dashboard/notices', icon: 'ri-notification-3-line', perm: 'sites' },
   { label: 'Incidents', href: '/incidents', icon: 'ri-alarm-warning-line', perm: 'incidents' },
   { label: 'Occurrence Book', href: '/occurrence-book', icon: 'ri-book-line', perm: 'occurrence_book' },
   { label: 'Guards', href: '/guards', icon: 'ri-shield-user-line', perm: 'staff' },
-  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-calendar-close-line', perm: 'staff' },
+  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-calendar-close-line', perm: 'staff', feature: 'hasLeaveAutomation' },
   { label: 'Rotas', href: '/rotas', icon: 'ri-calendar-event-line', perm: 'rotas' },
   { label: 'Pattern Builder', href: '/rotas/patterns', icon: 'ri-stack-line', perm: 'shift_patterns' },
   { label: 'Reports', href: '/reports', icon: 'ri-bar-chart-box-line', perm: 'reports' },
-  { label: 'Weekly Reports', href: '/dashboard/reports/client-weekly', icon: 'ri-file-chart-line', perm: 'reports' },
+  { label: 'Weekly Reports', href: '/dashboard/reports/client-weekly', icon: 'ri-file-chart-line', perm: 'reports', feature: 'hasAiReports' },
   { label: 'SOP Builder', href: '/sop-builder', icon: 'ri-draft-line', perm: 'sop_documents' },
   { label: 'SOP Library', href: '/sops', icon: 'ri-book-open-line', perm: 'sop_documents' },
-  { label: 'AI Automation Hub', href: '/dashboard/ai-automation', icon: 'ri-robot-2-line', perm: 'ai_tools' },
+  { label: 'AI Automation Hub', href: '/dashboard/ai-automation', icon: 'ri-robot-2-line', perm: 'ai_tools', feature: 'hasAiRota' },
   { label: 'Staff', href: '/dashboard/staff', icon: 'ri-team-line', perm: 'staff' },
   { label: 'Settings', href: '/dashboard/settings', icon: 'ri-settings-3-line', perm: 'settings' },
 ];
@@ -50,9 +53,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isMobile, setIsMobile] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showTicketModal, setShowTicketModal] = useState(false);
+  const [lockedFeature, setLockedFeature] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const { profile, signOut, isLoading } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, profile?.company_id || null);
+  const { canAccess } = useEntitlements();
+
+  const adminRoles = ['super_admin', 'company_admin', 'operations_manager'];
+  const isAdminUser = profile?.role ? adminRoles.includes(profile.role) : false;
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -75,7 +84,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return pathname.startsWith(href + '/');
   };
 
-  const isSetupPage = pathname === '/dashboard/setup' || pathname === '/dashboard/setup-wizard';
+  const isSetupPage = pathname ? (pathname === '/dashboard/setup' || pathname === '/dashboard/setup-wizard') : false;
+
+  useEffect(() => {
+    if (!isLoading && profile?.role === 'client') {
+      setTimeout(() => {
+        try { router.push('/client'); } catch { window.location.href = '/client'; }
+      }, 0);
+    }
+  }, [isLoading, profile?.role, router]);
 
   if (isLoading) {
     return (
@@ -155,8 +172,36 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
           <nav className="dash-sidebar-scroll flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
-              if (item.perm && !can(item.perm, 'view')) return null;
+              if (item.perm && !can(item.perm, 'view') && !isAdminUser) return null;
               const active = isActive(item.href);
+              const isLocked = item.feature ? !canAccess(item.feature) : false;
+
+              if (isLocked) {
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => setLockedFeature(item.label)}
+                    title={`${item.label} requires upgrade`}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap w-full text-left opacity-40 cursor-pointer hover:opacity-60 hover:bg-gray-800/30 group relative"
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                      <i className={item.icon}></i>
+                    </div>
+                    <span className={`transition-opacity flex items-center gap-1.5 ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
+                      {item.label}
+                      <span className="w-3.5 h-3.5 flex items-center justify-center text-amber-400">
+                        <i className="ri-lock-line text-[10px]"></i>
+                      </span>
+                    </span>
+                    {!sidebarOpen && (
+                      <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700">
+                        {item.label} — Upgrade required
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
@@ -198,7 +243,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             )}
 
             {adminNavItems.map((item) => {
-              if (item.perm && !can(item.perm, 'manage')) return null;
+              if (item.perm && !can(item.perm, 'manage') && !isAdminUser) return null;
               const active = isActive(item.href);
               return (
                 <Link
@@ -346,11 +391,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
         </header>
 
+        <TrialBanner companyId={profile?.company_id || null} />
         <main className="dash-main-scroll flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
 
       <SOPAssistantWidget theme="dark" enableVoice={false} />
       {showTicketModal && <RaiseTicketModal onClose={() => setShowTicketModal(false)} />}
+      <UpgradeRequiredModal
+        isOpen={lockedFeature !== null}
+        onClose={() => setLockedFeature(null)}
+        featureName={lockedFeature || undefined}
+      />
     </div>
   );
 }

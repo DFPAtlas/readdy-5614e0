@@ -11,7 +11,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { user_id, company_id, permission_key } = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { user_id, company_id, permission_key } = body;
 
     if (!user_id || !company_id || !permission_key) {
       return new Response(

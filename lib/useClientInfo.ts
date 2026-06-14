@@ -173,7 +173,7 @@ export function useClientInfo() {
       setSaving(false);
       return { error };
     }
-    const { data: inserted, error } = await supabase.from('client_profiles').insert({ ...payload, created_at: new Date().toISOString() }).select().single();
+    const { data: inserted, error } = await supabase.from('client_profiles').insert({ ...payload, created_at: new Date().toISOString() }).select().maybeSingle();
     if (!error && inserted) setProfile(inserted);
     setSaving(false);
     return { error };
@@ -189,7 +189,7 @@ export function useClientInfo() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const { data: inserted, error } = await supabase.from('client_sites').insert(payload).select().single();
+    const { data: inserted, error } = await supabase.from('client_sites').insert(payload).select().maybeSingle();
     if (!error && inserted) setSites((prev) => [...prev, inserted].sort((a, b) => a.site_name.localeCompare(b.site_name)));
     setSaving(false);
     return { data: inserted, error };
@@ -244,7 +244,7 @@ export function useClientInfo() {
       uploaded_by: currentUser.id,
       upload_date: new Date().toISOString(),
       is_public: isPublic,
-    }).select().single();
+    }).select().maybeSingle();
 
     if (!error && inserted) setDocuments((prev) => [inserted, ...prev]);
     setSaving(false);
@@ -281,7 +281,7 @@ export function useClientInfo() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const { data: inserted, error } = await supabase.from('client_contacts').insert(payload).select().single();
+    const { data: inserted, error } = await supabase.from('client_contacts').insert(payload).select().maybeSingle();
     if (!error && inserted) setContacts((prev) => [...prev, inserted].sort((a, b) => a.name.localeCompare(b.name)));
     setSaving(false);
     return { data: inserted, error };
@@ -354,10 +354,10 @@ export function useClientInfo() {
       const existing = summaries.find((s) => s.site_id === siteId);
       let result;
       if (existing) {
-        const { data, error } = await supabase.from('site_ai_summaries').update(payload).eq('id', existing.id).select().single();
+        const { data, error } = await supabase.from('site_ai_summaries').update(payload).eq('id', existing.id).select().maybeSingle();
         result = { data, error };
       } else {
-        const { data, error } = await supabase.from('site_ai_summaries').insert({ ...payload, created_at: new Date().toISOString() }).select().single();
+        const { data, error } = await supabase.from('site_ai_summaries').insert({ ...payload, created_at: new Date().toISOString() }).select().maybeSingle();
         result = { data, error };
       }
 

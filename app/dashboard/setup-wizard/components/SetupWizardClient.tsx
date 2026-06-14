@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useSetupWizard } from '@/lib/useSetupWizard';
+import { callAgent, logWebhookEvent } from '@/lib/guardianhubAgents';
 import StepIndicator from './StepIndicator';
 import CompanyProfileStep, { CompanyFormData } from './CompanyProfileStep';
 import FirstSiteStep, { SiteFormData } from './FirstSiteStep';
@@ -85,6 +86,8 @@ export default function SetupWizardClient() {
   const [error, setError] = useState('');
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isFinished, setIsFinished] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const [finishError, setFinishError] = useState('');
 
   const [companyData, setCompanyData] = useState<CompanyFormData>(emptyCompany);
   const [siteData, setSiteData] = useState<SiteFormData>(emptySite);
@@ -127,18 +130,32 @@ export default function SetupWizardClient() {
   useEffect(() => {
     if (authLoading) return;
     if (!profile) {
-      router.replace('/login');
+      try { router.replace('/login'); } catch { window.location.href = '/login'; }
       return;
     }
     if (profile.role === 'client') {
-      router.replace('/client');
+      try { router.replace('/client'); } catch { window.location.href = '/client'; }
       return;
     }
     if (profile.role === 'guard') {
-      router.replace('/guard');
+      try { router.replace('/guard'); } catch { window.location.href = '/guard'; }
       return;
     }
   }, [profile, authLoading, router]);
+
+  useEffect(() => {
+    if (isFinished) {
+      setRedirecting(true);
+      const doRedirect = () => {
+        router.push('/dashboard');
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 800);
+      };
+      const timer = setTimeout(doRedirect, 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [isFinished, router]);
 
   const validateStep = useCallback((s: number): boolean => {
     setError('');
@@ -190,9 +207,39 @@ export default function SetupWizardClient() {
       res = await saveCompliance(complianceData);
     } else if (step === 6) {
       res = await finishSetup();
-      if (!res.error) {
-        setIsFinished(true);
+      if (res.error) {
+        setFinishError(res.error.message || 'Failed to finalise setup');
+        return;
       }
+      callAgent(
+        'setup_wizard',
+        {
+          client_id: companyId,
+          user_id: profile?.id,
+          company_name: companyData.name || company?.name,
+          selected_plan: company?.subscription_plan || 'none',
+          sites: [siteData.site_name].filter(Boolean),
+          guards: guardsData.length,
+          billing_status: company?.subscription_status || 'unknown',
+          timestamp: new Date().toISOString(),
+          source: 'guardianhub_web_app',
+        },
+        {
+          clientId: companyId,
+          userId: profile?.id,
+          requestedPage: '/dashboard/setup-wizard',
+          requestedFeature: 'setup_wizard',
+        }
+      ).then(() => {
+        logWebhookEvent('setup_wizard', 'setup_wizard_completed', {
+          company_name: companyData.name || company?.name,
+          plan: company?.subscription_plan,
+          sites_created: siteData.site_name ? 1 : 0,
+          guards_created: guardsData.length,
+        }, companyId);
+      }).catch(() => {});
+      setIsFinished(true);
+      return;
     }
 
     if (res?.error) {
@@ -251,18 +298,25 @@ export default function SetupWizardClient() {
             <div className="w-14 h-14 bg-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-4">
               <i className="ri-check-double-line text-white text-2xl" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-1">Setup Wizard</h1>
+            <h1 className="text-2xl font-bold text-white mb-1">Setup Complete</h1>
             <p className="text-gray-400 text-sm">
-              {company?.name ? `Welcome back, ${company.name}` : 'Welcome to GuardianHub'}
+              {company?.name || 'Your company'} is ready. Taking you to your dashboard...
             </p>
           </div>
           <div className="bg-[#111827]/80 backdrop-blur-sm border border-white/10 rounded-xl p-6 animate-fadeSlide">
-            <FinishScreen
-              companyName={company?.name || null}
-              stepsCompleted={completedSteps.length}
-              totalSteps={STEPS.length}
-              onRestart={handleRestart}
-            />
+            {redirecting ? (
+              <div className="flex flex-col items-center gap-4 py-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p className="text-sm text-gray-400">Loading your dashboard...</p>
+              </div>
+            ) : (
+              <FinishScreen
+                companyName={company?.name || null}
+                stepsCompleted={completedSteps.length}
+                totalSteps={STEPS.length}
+                onRestart={handleRestart}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -308,10 +362,10 @@ export default function SetupWizardClient() {
             {step === 6 && 'Review your setup and finish.'}
           </p>
 
-          {(error || wizardError) && (
+          {(error || wizardError || finishError) && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex items-start gap-2">
               <i className="ri-error-warning-line mt-0.5" />
-              {error || wizardError}
+              {error || wizardError || finishError}
             </div>
           )}
 

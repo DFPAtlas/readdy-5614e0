@@ -256,8 +256,8 @@ export function useSuperAdminTicketDetail(ticketId: string | null) {
         is_internal: isInternal,
       })
       .select()
-      .single();
-    if (err) throw err;
+      .maybeSingle();
+    if (err || !data) throw err || new Error('Failed to add message');
     await fetchTicket();
     return data;
   };
@@ -294,8 +294,8 @@ export function useSuperAdminTicketDetail(ticketId: string | null) {
         raw_data: result.raw_data || {},
       })
       .select()
-      .single();
-    if (insErr) throw insErr;
+      .maybeSingle();
+    if (insErr || !data) throw insErr || new Error('AI check failed');
     await fetchTicket();
     return data;
   };
@@ -320,8 +320,8 @@ export function useSuperAdminTicketDetail(ticketId: string | null) {
         ai_check_id: aiCheckId || null,
       })
       .select()
-      .single();
-    if (actErr) throw actErr;
+      .maybeSingle();
+    if (actErr || !action) throw actErr || new Error('Failed to create repair action');
 
     const { data: log, error: logErr } = await supabase
       .from('admin_repair_logs')
@@ -336,8 +336,8 @@ export function useSuperAdminTicketDetail(ticketId: string | null) {
         after_data: afterData,
       })
       .select()
-      .single();
-    if (logErr) throw logErr;
+      .maybeSingle();
+    if (logErr || !log) throw logErr || new Error('Failed to create repair log');
 
     await fetchTicket();
     return { action, log };

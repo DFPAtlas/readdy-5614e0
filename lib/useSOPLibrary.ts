@@ -126,7 +126,7 @@ export function useSOPLibrary() {
         uploaded_by: user.id,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (!insertErr && data && edgeBase) {
       const session = await supabase.auth.getSession();

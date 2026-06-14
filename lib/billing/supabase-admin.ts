@@ -1,3 +1,8 @@
+// SERVER-SIDE ONLY — DO NOT IMPORT IN BROWSER CODE.
+// This file uses process.env.SUPABASE_SERVICE_ROLE_KEY and only works in Node.js / Supabase Edge Functions.
+// For static export builds, all admin operations go through Supabase Edge Functions.
+// If you need to use this locally, run via: npx ts-node lib/billing/supabase-admin.ts
+
 import { createClient } from "@supabase/supabase-js";
 
 let adminClient: ReturnType<typeof createClient> | null = null;

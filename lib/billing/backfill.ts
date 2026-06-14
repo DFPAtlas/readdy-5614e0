@@ -1,3 +1,7 @@
+// SERVER-SIDE ONLY — DO NOT IMPORT IN BROWSER CODE.
+// This is a CLI tool for backfilling Stripe data. Run with: npx ts-node lib/billing/backfill.ts
+// Requires STRIPE_SECRET_KEY and SUPABASE_SERVICE_ROLE_KEY environment variables.
+
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 

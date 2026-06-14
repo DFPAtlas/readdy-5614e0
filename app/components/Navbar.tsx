@@ -42,7 +42,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16 lg:h-20">
           <Link href="/" className="flex items-center gap-2.5 group">
             <img
-              src="https://storage.readdy-site.link/project_files/18288eee-63fa-4165-a658-6aa7ab020255/0f55097c-53e5-494b-b419-876152a51ee7_edited_image_d3fb89d4-4c94-480b-911a-a4f5576d177c_0.png?v=4a5cb4d0eb32cb9bee8b5acd1d9f9fa6"
+              src="https://public.readdy.ai/ai/img_res/5b8fa21e-164b-4f73-ae11-f3bfe2d13e58.png"
               alt="GuardianHub"
               className="h-8 w-auto"
             />

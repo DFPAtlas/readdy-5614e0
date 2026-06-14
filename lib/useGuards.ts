@@ -110,7 +110,7 @@ export function useGuards() {
       .update({ status })
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
     return { data, error };
   };
 

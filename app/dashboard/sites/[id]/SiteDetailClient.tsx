@@ -31,20 +31,20 @@ export default function SiteDetailClient({ siteId }: { siteId: string }) {
         <div className="grid grid-cols-4 gap-6">
           {/* Left Column - Status Summary */}
           <div className="col-span-1 space-y-6">
-            <StatusSummary />
-            <RecentCheckIns />
+            <StatusSummary siteId={siteId} />
+            <RecentCheckIns siteId={siteId} />
           </div>
 
           {/* Center Column - Site Cards */}
           <div className="col-span-2">
-            <SiteCards />
+            <SiteCards siteId={siteId} />
           </div>
 
           {/* Right Column - Guards and Alerts */}
           <div className="col-span-1 space-y-6">
-            <GuardsOnDuty onOpenModal={openModal} />
+            <GuardsOnDuty onOpenModal={openModal} siteId={siteId} />
             <NoticeWidget siteId={siteId} siteName="" />
-            <ActiveAlerts />
+            <ActiveAlerts siteId={siteId} />
           </div>
         </div>
       </div>

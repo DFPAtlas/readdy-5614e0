@@ -16,12 +16,18 @@ export default function ClientLoginPage() {
   useEffect(() => {
     if (authLoading) return;
     if (currentUser && profile) {
-      if (profile.role === 'client') {
-        router.replace('/client');
-      } else if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) {
-        router.replace('/ops');
-      } else if (profile.role === 'guard') {
-        router.replace('/guard');
+      try {
+        if (profile.role === 'client') {
+          router.replace('/client');
+        } else if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) {
+          router.replace('/dashboard');
+        } else if (profile.role === 'guard') {
+          router.replace('/guard');
+        }
+      } catch {
+        if (profile.role === 'client') window.location.href = '/client';
+        else if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) window.location.href = '/dashboard';
+        else if (profile.role === 'guard') window.location.href = '/guard';
       }
     }
   }, [currentUser, profile, authLoading, router]);

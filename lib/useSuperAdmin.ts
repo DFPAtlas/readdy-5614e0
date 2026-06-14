@@ -279,7 +279,7 @@ export function useAdminNotes(companyId: string | null) {
       .from('admin_notes')
       .insert({ company_id: companyId, note, category, created_by: createdBy })
       .select()
-      .single();
+      .maybeSingle();
     if (!error && data) setNotes((prev) => [data, ...prev]);
   };
 

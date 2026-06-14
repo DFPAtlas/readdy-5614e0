@@ -2,6 +2,7 @@
 
 import SuperAdminGate from '../../admin/components/SuperAdminGate';
 import AdminShell from '../../admin/components/AdminShell';
+import Footer from '@/app/components/Footer';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -59,6 +60,7 @@ export default function FinancialLayout({ children }: { children: React.ReactNod
           {children}
         </div>
       </AdminShell>
+      <Footer />
     </SuperAdminGate>
   );
 }

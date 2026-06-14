@@ -92,11 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
+  const [routerReady, setRouterReady] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const redirectRef = useRef(false);
+  const loadingRef = useRef(false);
 
-  const isPublicRoute = (path: string) => {
+  const isPublicRoute = (path: string | null) => {
+    if (!path) return false;
     return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(route + '/'));
   };
 
@@ -104,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!userRole) return '/login';
     if (userRole === 'super_admin') return '/admin';
     if (['company_admin', 'operations_manager'].includes(userRole)) {
-      if (onboardingStatus === 'pending_setup') return '/dashboard/setup';
+      if (onboardingStatus && onboardingStatus !== 'completed') return '/dashboard/setup-wizard';
       return '/dashboard';
     }
     if (userRole === 'guard') return '/guard';
@@ -112,8 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return '/dashboard';
   };
 
-  const canAccessRoute = (userRole: UserRole | null, path: string) => {
-    if (!userRole) return false;
+  const canAccessRoute = (userRole: UserRole | null, path: string | null) => {
+    if (!userRole || !path) return false;
     if (path.startsWith('/admin') && userRole !== 'super_admin') return false;
     if (path.startsWith('/super-admin') && userRole !== 'super_admin') return false;
     if (userRole === 'super_admin') {
@@ -132,6 +135,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    setRouterReady(true);
+  }, []);
+
+  useEffect(() => {
     const initAuth = async () => {
       try {
         const { data: { session: sess } } = await supabase.auth.getSession();
@@ -140,7 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await loadUserProfile(sess.user.id);
         }
       } catch (err: any) {
-        console.error('[Auth] initAuth error:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Auth] initAuth error:', err);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -152,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (sess?.user) {
         loadUserProfile(sess.user.id);
       } else {
+        loadingRef.current = false;
         setCurrentUser(null);
         setUser(null);
         setProfile(null);
@@ -167,20 +177,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
+    if (!routerReady) return;
+    if (currentUser && profile && canAccessRoute(profile.role, pathname)) {
+      redirectRef.current = false;
+      if (['company_admin', 'operations_manager'].includes(profile.role) &&
+          company?.onboarding_status && company.onboarding_status !== 'completed' &&
+          !pathname.startsWith('/dashboard/setup') && !pathname.startsWith('/dashboard/setup-wizard') &&
+          pathname !== '/pricing' && pathname !== '/checkout/success' && pathname !== '/checkout/cancel') {
+        redirectRef.current = true;
+        setTimeout(() => {
+          try { router.push('/dashboard/setup-wizard'); } catch { window.location.href = '/dashboard/setup-wizard'; }
+        });
+        return;
+      }
+      return;
+    }
     if (redirectRef.current) return;
     if (!currentUser && !isPublicRoute(pathname)) {
       redirectRef.current = true;
-      router.push('/login');
+      setTimeout(() => {
+        try { router.push('/login'); } catch { window.location.href = '/login'; }
+      });
       return;
     }
     if (currentUser && profile && !canAccessRoute(profile.role, pathname)) {
       const home = getHomeRoute(profile.role, company?.onboarding_status);
       redirectRef.current = true;
-      router.push(home);
+      setTimeout(() => {
+        try { router.push(home); } catch { window.location.href = home; }
+      });
     }
-  }, [currentUser, profile, isLoading, pathname, company]);
+  }, [currentUser, profile, isLoading, pathname, company, routerReady]);
 
   const loadUserProfile = async (userId: string) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setIsLoading(true);
     try {
       const { data: userData } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
@@ -210,7 +241,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       setUser(enrichedUser);
     } catch (err: any) {
-      console.error('[Auth] loadUserProfile error:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Auth] loadUserProfile error:', err);
+      }
       setProfile(null);
       setCompany(null);
       setCompanyId(null);
@@ -218,6 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(null);
       setUser(null);
     } finally {
+      loadingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -258,24 +292,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       result = await rawResponse.json();
     } catch (networkErr: any) {
-      console.error('[Signup] Network/parse error:', networkErr);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Signup] Network/parse error:', networkErr);
+      }
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
 
     if (!rawResponse?.ok || result.error) {
-      console.error('[Signup] Edge function error:', result.error, result.code);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Signup] Edge function error:', result.error, result.code);
+      }
       return { error: new Error(result.error || 'Profile setup failed. Please contact support.') };
     }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
-      console.error('[Signup] Auto-login error:', signInError.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Signup] Auto-login error:', signInError.message);
+      }
       return { error: signInError };
     }
 
     const { data: userData } = await supabase.from('users').select('*').eq('id', result.userId).maybeSingle();
     if (!userData) {
-      console.error('[Signup] public.users insert failed — no profile row found after signup. UserId:', result.userId);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Signup] public.users insert failed — no profile row found after signup. UserId:', result.userId);
+      }
       await supabase.auth.signOut();
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
@@ -314,24 +356,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       result = await rawResponse.json();
     } catch (networkErr: any) {
-      console.error('[Client Signup] Network/parse error:', networkErr);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Client Signup] Network/parse error:', networkErr);
+      }
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
 
     if (!rawResponse?.ok || result.error) {
-      console.error('[Client Signup] Edge function error:', result.error, result.code);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Client Signup] Edge function error:', result.error, result.code);
+      }
       return { error: new Error(result.error || 'Profile setup failed. Please contact support.') };
     }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
-      console.error('[Client Signup] Auto-login error:', signInError.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Client Signup] Auto-login error:', signInError.message);
+      }
       return { error: signInError };
     }
 
     const { data: userData } = await supabase.from('users').select('*').eq('id', result.userId).maybeSingle();
     if (!userData) {
-      console.error('[Client Signup] public.users insert failed — no profile row found after signup. UserId:', result.userId);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Client Signup] public.users insert failed — no profile row found after signup. UserId:', result.userId);
+      }
       await supabase.auth.signOut();
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
@@ -348,7 +398,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCompanyId(null);
     setRole(null);
     setSession(null);
-    router.push('/');
+    setTimeout(() => {
+      try {
+        router.push('/');
+      } catch {
+        window.location.href = '/';
+      }
+    });
   };
 
   return (

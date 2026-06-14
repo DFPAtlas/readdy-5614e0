@@ -122,7 +122,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No company assigned" }), { status: 403, headers: corsHeaders });
     }
 
-    const body = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { question, conversation_id, site_id } = body;
 
     if (!question || typeof question !== "string") {
@@ -131,7 +134,6 @@ Deno.serve(async (req) => {
 
     const convId = isValidUUID(conversation_id || "") ? conversation_id : crypto.randomUUID();
 
-    // 2. Pre-check conversational
     if (isConversational(question)) {
       const greeting = "Hi! Ask me a question about your site procedures or operations.";
 
@@ -156,10 +158,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), { status: 500, headers: corsHeaders });
     }
 
-    // 3. Generate embedding
     const questionEmbedding = await createEmbedding(question);
 
-    // 4 + 5. Vector search via RPC
     const matchSiteId = isValidUUID(site_id || "") ? site_id : null;
 
     const { data: matches, error: matchErr } = await supabase.rpc("match_sop_chunks", {
@@ -176,7 +176,6 @@ Deno.serve(async (req) => {
 
     const chunks = matches || [];
 
-    // 6. No chunks found
     if (chunks.length === 0) {
       const fallback = "I couldn't find anything about that in your SOPs. You may want to ask your operations manager.";
 
@@ -197,10 +196,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 7. Build context + 8. Generate answer
     const answer = await generateAnswer(question, chunks);
 
-    // 9 + 10. Save chat messages
     const chunkIds = chunks.map((c: any) => c.id);
 
     await supabaseService.from("sop_chat_messages").insert([
@@ -208,7 +205,6 @@ Deno.serve(async (req) => {
       { company_id: companyId, user_id: user.id, conversation_id: convId, role: "assistant", content: answer, retrieved_chunk_ids: chunkIds },
     ]);
 
-    // 11. Log activity
     await supabaseService.from("ai_activity_logs").insert({
       company_id: companyId,
       action_type: "sop_query",
@@ -220,7 +216,6 @@ Deno.serve(async (req) => {
       },
     });
 
-    // 12. Build sources
     const sources = chunks.map((c: any) => ({
       document_id: c.document_id,
       document_title: c.document_title || "SOP Document",

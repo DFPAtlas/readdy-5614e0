@@ -8,6 +8,7 @@ import { useSupportTickets } from '@/lib/useSupportTickets';
 import { useSOPAcknowledgements } from '@/lib/useSOPAcknowledgements';
 import { useAvailableSOPs } from '@/lib/useAvailableSOPs';
 import RotaHelperCard from './RotaHelperCard';
+import { FeatureGate } from '@/lib/useEntitlements';
 
 interface AIModuleCard {
   number: number;
@@ -232,6 +233,7 @@ export default function AIAutomationHub() {
   }
 
   return (
+    <FeatureGate feature="hasAiRota">
     <div className="min-h-screen bg-[#0a0e1a]">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
         {/* Header */}
@@ -359,5 +361,6 @@ export default function AIAutomationHub() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }

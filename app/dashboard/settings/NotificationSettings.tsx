@@ -95,7 +95,7 @@ export default function NotificationSettings() {
         severity: 'info',
       })
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       setTestResult('Failed to create test notification');

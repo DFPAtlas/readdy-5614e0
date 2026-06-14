@@ -1,14 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import SectionHeading from './components/SectionHeading';
 import GlassCard from './components/GlassCard';
 import { useInView } from './hooks/useInView';
-
-import LoginModal from './components/LoginModal';
 
 function AudienceCard({
   icon,
@@ -91,18 +88,10 @@ function FeatureShowcase({
 
 export default function HomePage() {
   const { ref: heroRef, isInView: heroInView } = useInView();
-  const [loginOpen, setLoginOpen] = useState(false);
-
-  useEffect(() => {
-    const handler = () => setLoginOpen(true);
-    window.addEventListener('openLoginModal', handler);
-    return () => window.removeEventListener('openLoginModal', handler);
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0e1a]">
       <Navbar />
-      <LoginModal isOpen={loginOpen} onClose={() => setLoginOpen(false)} />
 
       {/* Hero */}
       <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
@@ -134,7 +123,10 @@ export default function HomePage() {
                   <i className="ri-arrow-right-line"></i>
                 </Link>
                 <button
-                  onClick={() => setLoginOpen(true)}
+                  onClick={() => {
+                    const event = new CustomEvent('openLoginModal');
+                    window.dispatchEvent(event);
+                  }}
                   className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg border border-white/10 transition-colors cursor-pointer"
                 >
                   <div className="w-4 h-4 flex items-center justify-center">

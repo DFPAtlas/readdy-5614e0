@@ -92,7 +92,7 @@ export default function PatrolTab({ todayShift, activeAttendance, guardId, compa
         status: 'active',
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (data) {
       setPatrolLogId(data.id);

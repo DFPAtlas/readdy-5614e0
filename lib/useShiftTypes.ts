@@ -66,13 +66,13 @@ export function useShiftTypes() {
       sort_order: maxSort + 1,
       is_active: true,
     };
-    const { data, error } = await supabase.from('shift_types').insert(payload).select().single();
+    const { data, error } = await supabase.from('shift_types').insert(payload).select().maybeSingle();
     if (!error) load();
     return { data, error };
   };
 
   const update = async (id: string, partial: Partial<ShiftType>) => {
-    const { data, error } = await supabase.from('shift_types').update(partial).eq('id', id).select().single();
+    const { data, error } = await supabase.from('shift_types').update(partial).eq('id', id).select().maybeSingle();
     if (!error) load();
     return { data, error };
   };

@@ -2,7 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useClientPortal } from '@/lib/useClientPortal';
+import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { callAgent, logWebhookEvent } from '@/lib/guardianhubAgents';
+import AgentGate from '@/components/AgentGate';
+import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
+import WidgetFallback from '@/components/dashboard/WidgetFallback';
 
 interface PatrolScanSummary {
   id: string;
@@ -46,11 +51,27 @@ function formatScanTime(dateStr: string) {
 
 export default function ClientPatrolMonitoringPage() {
   const { sites, companyId } = useClientPortal();
+  const { profile } = useAuth();
   const [scans, setScans] = useState<PatrolScanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSiteId, setFilterSiteId] = useState<string>('');
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('today');
+
+  const triggerPatrolAgent = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      await callAgent(
+        'patrol_qr',
+        { scans_count: scans.length, completed: scans.filter(s => s.status === 'completed').length },
+        { clientId: profile.company_id, userId: profile.id, requestedPage: '/client/patrol-monitoring', requestedFeature: 'patrol_qr' }
+      );
+    } catch {}
+  }, [profile?.id, profile?.company_id, scans.length]);
+
+  useEffect(() => {
+    if (!loading && profile?.id && scans.length > 0) triggerPatrolAgent();
+  }, [loading, profile?.id, scans.length]);
 
   const loadScans = useCallback(async () => {
     if (!companyId || sites.length === 0) {
@@ -158,183 +179,185 @@ export default function ClientPatrolMonitoringPage() {
   }
 
   return (
+    <AgentGate pagePath="/client/patrol-monitoring" featureName="Patrol Monitoring">
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Patrol Monitoring</h1>
-          <p className="text-gray-400 text-sm mt-1">Track patrol completions, GPS verifications and missed checkpoints</p>
+      <WidgetBoundary widgetName="PatrolHeader" pagePath="/client/patrol-monitoring" clientId={profile?.company_id} userId={profile?.id}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Patrol Monitoring</h1>
+            <p className="text-gray-400 text-sm mt-1">Track patrol completions, GPS verifications and missed checkpoints</p>
+          </div>
+          <button
+            onClick={exportCSV}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-download-line"></i></div>
+            Export CSV
+          </button>
         </div>
-        <button
-          onClick={exportCSV}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-download-line"></i></div>
-          Export CSV
-        </button>
-      </div>
+      </WidgetBoundary>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-5">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
-            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-route-line"></i></div>
-            Total Scans
+      <WidgetBoundary widgetName="PatrolStats" pagePath="/client/patrol-monitoring" clientId={profile?.company_id} userId={profile?.id}>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-route-line"></i></div>
+              Total Scans
+            </div>
+            <div className="text-3xl font-bold text-white">{totalCount}</div>
           </div>
-          <div className="text-3xl font-bold text-white">{totalCount}</div>
-        </div>
-        <div className="bg-emerald-500/[0.08] backdrop-blur-sm border border-emerald-500/20 rounded-xl p-5">
-          <div className="flex items-center gap-2 text-emerald-300 text-sm mb-2">
-            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-check-double-line"></i></div>
-            Completed
+          <div className="bg-emerald-500/[0.08] backdrop-blur-sm border border-emerald-500/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-emerald-300 text-sm mb-2">
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-check-double-line"></i></div>
+              Completed
+            </div>
+            <div className="text-3xl font-bold text-emerald-400">{completedCount}</div>
           </div>
-          <div className="text-3xl font-bold text-emerald-400">{completedCount}</div>
-        </div>
-        <div className="bg-amber-500/[0.08] backdrop-blur-sm border border-amber-500/20 rounded-xl p-5">
-          <div className="flex items-center gap-2 text-amber-300 text-sm mb-2">
-            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-map-pin-line"></i></div>
-            Outside Radius
+          <div className="bg-amber-500/[0.08] backdrop-blur-sm border border-amber-500/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-amber-300 text-sm mb-2">
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-map-pin-line"></i></div>
+              Outside Radius
+            </div>
+            <div className="text-3xl font-bold text-amber-400">{outsideCount}</div>
           </div>
-          <div className="text-3xl font-bold text-amber-400">{outsideCount}</div>
-        </div>
-        <div className="bg-amber-500/[0.08] backdrop-blur-sm border border-amber-500/20 rounded-xl p-5">
-          <div className="flex items-center gap-2 text-amber-300 text-sm mb-2">
-            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-time-line"></i></div>
-            Late
+          <div className="bg-amber-500/[0.08] backdrop-blur-sm border border-amber-500/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-amber-300 text-sm mb-2">
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-time-line"></i></div>
+              Late
+            </div>
+            <div className="text-3xl font-bold text-amber-400">{lateCount}</div>
           </div>
-          <div className="text-3xl font-bold text-amber-400">{lateCount}</div>
-        </div>
-        <div className="bg-red-500/[0.08] backdrop-blur-sm border border-red-500/20 rounded-xl p-5">
-          <div className="flex items-center gap-2 text-red-300 text-sm mb-2">
-            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-circle-line"></i></div>
-            Missed
+          <div className="bg-red-500/[0.08] backdrop-blur-sm border border-red-500/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-red-300 text-sm mb-2">
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-circle-line"></i></div>
+              Missed
+            </div>
+            <div className="text-3xl font-bold text-red-400">{missedCount}</div>
           </div>
-          <div className="text-3xl font-bold text-red-400">{missedCount}</div>
         </div>
-      </div>
+      </WidgetBoundary>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={filterSiteId}
-          onChange={(e) => setFilterSiteId(e.target.value)}
-          className="bg-[#0f172a]/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-        >
-          <option value="">All Sites</option>
-          {sites.map((s) => (
-            <option key={s.id} value={s.id}>{s.site_name}</option>
-          ))}
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-[#0f172a]/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-        >
-          <option value="all">All Statuses</option>
-          <option value="completed">Completed</option>
-          <option value="completed_outside_radius">Outside Radius</option>
-          <option value="late">Late</option>
-          <option value="missed">Missed</option>
-        </select>
-        <div className="flex bg-[#0f172a]/70 border border-white/10 rounded-lg overflow-hidden">
-          {(['today', 'week', 'month'] as const).map((range) => (
-            <button
-              key={range}
-              onClick={() => setDateRange(range)}
-              className={`px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                dateRange === range ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {range === 'today' ? 'Today' : range === 'week' ? '7 Days' : '30 Days'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        </div>
-      ) : scans.length === 0 ? (
-        <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-12 text-center">
-          <div className="w-16 h-16 flex items-center justify-center bg-white/5 rounded-full mx-auto mb-4">
-            <i className="ri-route-line text-gray-500 text-2xl"></i>
+      <WidgetBoundary widgetName="PatrolFilters" pagePath="/client/patrol-monitoring" clientId={profile?.company_id} userId={profile?.id}>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={filterSiteId}
+            onChange={(e) => setFilterSiteId(e.target.value)}
+            className="bg-[#0f172a]/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+          >
+            <option value="">All Sites</option>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>{s.site_name}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="bg-[#0f172a]/70 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+          >
+            <option value="all">All Statuses</option>
+            <option value="completed">Completed</option>
+            <option value="completed_outside_radius">Outside Radius</option>
+            <option value="late">Late</option>
+            <option value="missed">Missed</option>
+          </select>
+          <div className="flex bg-[#0f172a]/70 border border-white/10 rounded-lg overflow-hidden">
+            {(['today', 'week', 'month'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => setDateRange(range)}
+                className={`px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                  dateRange === range ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {range === 'today' ? 'Today' : range === 'week' ? '7 Days' : '30 Days'}
+              </button>
+            ))}
           </div>
-          <p className="text-gray-400 font-medium">No patrol scans yet</p>
-          <p className="text-sm text-gray-500 mt-1">Scans will appear once guards start patrolling.</p>
         </div>
-      ) : (
-        <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Site</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Checkpoint</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Guard</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Scheduled</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Scanned At</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">GPS</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Distance</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">SOP</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {scans.map((scan) => {
-                  const st = statusBadge(scan.status);
-                  return (
-                    <tr key={scan.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${st.bg} ${st.border} ${st.color}`}>
-                          {st.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-white">{scan.site_name}</td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-white">{scan.checkpoint_name}</p>
-                        <p className="text-xs text-gray-500 font-mono">{scan.checkpoint_code}</p>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-400">{scan.guard_name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-400">
-                        {scan.scheduled_patrol_time || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-400">{formatScanTime(scan.scanned_at)}</td>
-                      <td className="px-4 py-3 text-xs text-gray-400">
-                        {scan.gps_latitude != null ? (
-                          <span>{scan.gps_latitude.toFixed(4)}, {scan.gps_longitude?.toFixed(4)}</span>
-                        ) : (
-                          <span className="text-gray-600">No GPS</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-400">
-                        {scan.distance_from_checkpoint != null ? (
-                          <span className={scan.distance_from_checkpoint > 50 ? 'text-amber-400' : 'text-emerald-400'}>
-                            {Math.round(scan.distance_from_checkpoint)}m
+      </WidgetBoundary>
+
+      <WidgetBoundary widgetName="PatrolTable" pagePath="/client/patrol-monitoring" clientId={profile?.company_id} userId={profile?.id} fallbackTitle="Patrol Scans">
+        {loading ? (
+          <WidgetFallback state="loading" title="patrol scans" />
+        ) : scans.length === 0 ? (
+          <WidgetFallback state="empty" title="No scans" message="Scans will appear once guards start patrolling." />
+        ) : (
+          <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Site</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Checkpoint</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Guard</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Scheduled</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Scanned At</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">GPS</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Distance</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">SOP</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {scans.map((scan) => {
+                    const st = statusBadge(scan.status);
+                    return (
+                      <tr key={scan.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${st.bg} ${st.border} ${st.color}`}>
+                            {st.label}
                           </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {scan.sop_url ? (
-                          <a
-                            href={scan.sop_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer"
-                          >
-                            View SOP
-                          </a>
-                        ) : (
-                          <span className="text-xs text-gray-600">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-white">{scan.site_name}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-white">{scan.checkpoint_name}</p>
+                          <p className="text-xs text-gray-500 font-mono">{scan.checkpoint_code}</p>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-400">{scan.guard_name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400">
+                          {scan.scheduled_patrol_time || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-400">{formatScanTime(scan.scanned_at)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400">
+                          {scan.gps_latitude != null ? (
+                            <span>{scan.gps_latitude.toFixed(4)}, {scan.gps_longitude?.toFixed(4)}</span>
+                          ) : (
+                            <span className="text-gray-600">No GPS</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-400">
+                          {scan.distance_from_checkpoint != null ? (
+                            <span className={scan.distance_from_checkpoint > 50 ? 'text-amber-400' : 'text-emerald-400'}>
+                              {Math.round(scan.distance_from_checkpoint)}m
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {scan.sop_url ? (
+                            <a
+                              href={scan.sop_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer"
+                            >
+                              View SOP
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </WidgetBoundary>
     </div>
+    </AgentGate>
   );
 }

@@ -23,11 +23,9 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
   const PAGE_HEIGHT = 842;
   const usableWidth = PAGE_WIDTH - MARGIN * 2;
 
-  // ==== PAGE 1: Cover + Summary ====
   let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
 
-  // Header
   y -= 10;
   page.drawText("INCIDENT REPORT", {
     x: MARGIN,
@@ -52,7 +50,6 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
   });
   y -= 30;
 
-  // Reference number and date
   const shortRef = data.id?.slice(0, 8) || "UNKNOWN";
   const generatedAt = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -64,34 +61,30 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
   page.drawText(`Generated: ${generatedAt}`, { x: PAGE_WIDTH - MARGIN - 140, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) });
   y -= 30;
 
-  // Site Information block
   y = drawBlock(page, y, "Site Information", MARGIN, usableWidth, helveticaBold, helvetica);
   const siteRows = [
-    ["Site Name:", data.site_name || "—"],
-    ["Address:", data.site_address || "—"],
-    ["Risk Level:", (data.site_risk_level || "—").toUpperCase()],
+    ["Site Name:", data.site_name || "\u2014"],
+    ["Address:", data.site_address || "\u2014"],
+    ["Risk Level:", (data.site_risk_level || "\u2014").toUpperCase()],
   ];
   y = drawKeyValueRows(page, y, siteRows, MARGIN, usableWidth, helveticaBold, helvetica);
   y -= 20;
 
-  // Incident Summary block
   y = drawBlock(page, y, "Incident Summary", MARGIN, usableWidth, helveticaBold, helvetica);
 
-  const sevColor = severityColor(data.severity);
   const severityLabel = (data.severity || "unknown").toUpperCase();
 
   const summaryRows = [
-    ["Incident Type:", data.incident_type || "—"],
+    ["Incident Type:", data.incident_type || "\u2014"],
     ["Severity:", `${severityLabel}`],
-    ["Date/Time of Incident:", data.occurred_at ? formatDateTime(data.occurred_at) : "—"],
-    ["Reporting Officer:", data.guard_name || "—"],
-    ["SIA Licence:", data.guard_sia || "—"],
-    ["Current Status:", (data.status || "—").toUpperCase()],
+    ["Date/Time of Incident:", data.occurred_at ? formatDateTime(data.occurred_at) : "\u2014"],
+    ["Reporting Officer:", data.guard_name || "\u2014"],
+    ["SIA Licence:", data.guard_sia || "\u2014"],
+    ["Current Status:", (data.status || "\u2014").toUpperCase()],
   ];
   y = drawKeyValueRows(page, y, summaryRows, MARGIN, usableWidth, helveticaBold, helvetica);
   y -= 25;
 
-  // Report body
   y = drawBlock(page, y, "Report Details", MARGIN, usableWidth, helveticaBold, helvetica);
 
   const reportBody = data.ai_rewritten_report || data.description || "No description provided.";
@@ -100,7 +93,7 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
   if (!isAi) {
     y = drawWrappedText(
       page,
-      "Original officer description — not yet edited.",
+      "Original officer description \u2014 not yet edited.",
       MARGIN,
       y,
       usableWidth,
@@ -111,7 +104,6 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
     y -= 12;
   }
 
-  // If AI report has sections, format them nicely
   if (isAi && reportBody.includes("Summary")) {
     const sections = parseSections(reportBody);
     for (const [heading, body] of sections) {
@@ -131,7 +123,6 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
 
   y -= 30;
 
-  // ==== EVIDENCE PAGES ====
   const media = data.media || [];
   const images = media.filter((m: any) => m.media_type === "image");
 
@@ -168,7 +159,7 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
 
           page.drawImage(embeddedImg, { x: MARGIN, y: y - drawH, width: drawW, height: drawH });
 
-          const caption = `Image ${i + 1} — uploaded ${formatDateTime(img.created_at)}`;
+          const caption = `Image ${i + 1} \u2014 uploaded ${formatDateTime(img.created_at)}`;
           y -= drawH + 4;
           page.drawText(caption, {
             x: MARGIN,
@@ -180,12 +171,10 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
           y -= 20;
         }
       } catch {
-        // Skip images that fail to load
       }
     }
   }
 
-  // ==== DECLARATION PAGE ====
   page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   y = PAGE_HEIGHT - MARGIN;
   y = drawBlock(page, y, "Declaration", MARGIN, usableWidth, helveticaBold, helvetica);
@@ -220,11 +209,9 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
     color: rgb(0.4, 0.4, 0.4),
   });
 
-  // Add header/footer to all pages
   const pages = pdfDoc.getPages();
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
-    // Header: small company name + page number
     p.drawText(company.name || "GuardianHub", {
       x: MARGIN,
       y: PAGE_HEIGHT - 25,
@@ -240,9 +227,8 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
       color: rgb(0.5, 0.5, 0.5),
     });
 
-    // Footer
     const addr = company.address || "";
-    p.drawText(`${company.name || "GuardianHub"}${addr ? ` — ${addr}` : ""} — ${generatedAt}`, {
+    p.drawText(`${company.name || "GuardianHub"}${addr ? ` \u2014 ${addr}` : ""} \u2014 ${generatedAt}`, {
       x: MARGIN,
       y: 25,
       size: 7,
@@ -254,7 +240,6 @@ async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array>
   return await pdfDoc.save();
 }
 
-// ===== Helpers =====
 function hexToRgb(hex: string) {
   const clean = hex.replace("#", "");
   const bigint = parseInt(clean, 16);
@@ -262,16 +247,6 @@ function hexToRgb(hex: string) {
   const g = ((bigint >> 8) & 255) / 255;
   const b = (bigint & 255) / 255;
   return { r, g, b };
-}
-
-function severityColor(sev: string) {
-  switch ((sev || "").toLowerCase()) {
-    case "low": return { r: 0.13, g: 0.77, b: 0.37 };
-    case "medium": return { r: 0.92, g: 0.7, b: 0.03 };
-    case "high": return { r: 0.98, g: 0.45, b: 0.09 };
-    case "critical": return { r: 0.94, g: 0.27, b: 0.27 };
-    default: return { r: 0.5, g: 0.5, b: 0.5 };
-  }
 }
 
 function formatDateTime(iso: string) {
@@ -345,7 +320,6 @@ function drawWrappedText(page: any, text: string, x: number, y: number, maxWidth
   return y;
 }
 
-// ===== Main handler =====
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -363,20 +337,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const incidentId = body.incident_id;
     if (!incidentId) {
       return new Response(JSON.stringify({ error: "incident_id required" }), { status: 400, headers: corsHeaders });
     }
 
-    // Fetch user profile
     const { data: userProfile } = await supabase.from("users").select("company_id, first_name, last_name, role").eq("id", user.id).maybeSingle();
     const companyId = userProfile?.company_id;
     if (!companyId) {
       return new Response(JSON.stringify({ error: "No company assigned" }), { status: 403, headers: corsHeaders });
     }
 
-    // Fetch incident with related data
     const { data: incident } = await supabase
       .from("incidents")
       .select(`
@@ -397,13 +374,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Access denied" }), { status: 403, headers: corsHeaders });
     }
 
-    // Fetch media
     const { data: media } = await supabase
       .from("incident_media")
       .select("id, file_url, media_type, filename, created_at")
       .eq("incident_id", incidentId);
 
-    // Fetch company
     const { data: company } = await supabase
       .from("companies")
       .select("id, name, logo_url, address, brand_color")
@@ -432,10 +407,8 @@ Deno.serve(async (req) => {
       generated_by_role: userProfile?.role || "operations_manager",
     };
 
-    // Generate PDF
     const pdfBytes = await generateIncidentPDF(reportData, company || {});
 
-    // Upload to storage
     const timestamp = Date.now();
     const storagePath = `${companyId}/incidents/${incidentId}_${timestamp}.pdf`;
     const { error: uploadError } = await supabase.storage
@@ -449,7 +422,6 @@ Deno.serve(async (req) => {
     const { data: urlData } = supabase.storage.from("reports").getPublicUrl(storagePath);
     const fileUrl = urlData.publicUrl;
 
-    // Insert report record
     const { data: reportRecord } = await supabase
       .from("reports")
       .insert({
@@ -457,7 +429,7 @@ Deno.serve(async (req) => {
         site_id: incident.site_id,
         report_type: "incident",
         reference_id: incidentId,
-        title: `Incident Report — ${incident.incident_type || "Incident"} at ${site?.site_name || "Unknown"}`,
+        title: `Incident Report \u2014 ${incident.incident_type || "Incident"} at ${site?.site_name || "Unknown"}`,
         file_url: fileUrl,
         generated_by: user.id,
         generated_at: new Date().toISOString(),
@@ -465,7 +437,6 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    // Create signed URL valid for 24h
     const { data: signedData, error: signedError } = await supabase.storage
       .from("reports")
       .createSignedUrl(storagePath, 60 * 60 * 24);

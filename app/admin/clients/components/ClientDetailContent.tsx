@@ -31,7 +31,7 @@ interface ClientUser {
 export default function ClientDetailContent() {
   const searchParams = useSearchParams();
   const clientId = searchParams.get('id');
-  const { companies, updateCompany } = useSuperAdminCompanies();
+  const { companies } = useSuperAdminCompanies();
   const { profile } = useAuth();
   const { notes, addNote, refetch: refetchNotes } = useAdminNotes(clientId as string);
   const { logs, logAction, refetch: refetchLogs } = useAdminActivity(clientId as string);
@@ -44,8 +44,7 @@ export default function ClientDetailContent() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteCategory, setNoteCategory] = useState('support');
-  const [confirmAction, setConfirmAction] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+
 
   const company = companies.find(c => c.id === clientId);
 
@@ -101,21 +100,7 @@ export default function ClientDetailContent() {
     );
   }
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!profile) return;
-    setActionLoading(true);
-    try {
-      const updates: any = { account_status: newStatus };
-      if (newStatus === 'suspended') updates.suspended_at = new Date().toISOString();
-      if (newStatus === 'active') { updates.suspended_at = null; updates.cancelled_at = null; updates.archived_at = null; }
-      if (newStatus === 'cancelled') updates.cancelled_at = new Date().toISOString();
-      if (newStatus === 'archived') updates.archived_at = new Date().toISOString();
-      await updateCompany(company.id, updates);
-      await logAction(`client_status_change`, `Status changed to ${newStatus}`, company.id, profile.id, { new_status: newStatus });
-      setConfirmAction(null);
-    } catch {}
-    setActionLoading(false);
-  };
+
 
   const handleAddNote = async () => {
     if (!noteText.trim() || !profile) return;
@@ -154,33 +139,7 @@ export default function ClientDetailContent() {
             <SubscriptionStatusBadge status={company.subscription_status} />
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {company.account_status === 'active' && (
-            <button onClick={() => setConfirmAction('suspend')} className="px-3 py-2 bg-amber-500/10 text-amber-400 text-xs font-medium rounded-lg hover:bg-amber-500/20 transition-colors cursor-pointer whitespace-nowrap">
-              Suspend
-            </button>
-          )}
-          {company.account_status === 'suspended' && (
-            <button onClick={() => setConfirmAction('reactivate')} className="px-3 py-2 bg-emerald-500/10 text-emerald-400 text-xs font-medium rounded-lg hover:bg-emerald-500/20 transition-colors cursor-pointer whitespace-nowrap">
-              Reactivate
-            </button>
-          )}
-          {company.account_status !== 'cancelled' && company.account_status !== 'archived' && (
-            <button onClick={() => setConfirmAction('cancel')} className="px-3 py-2 bg-red-500/10 text-red-400 text-xs font-medium rounded-lg hover:bg-red-500/20 transition-colors cursor-pointer whitespace-nowrap">
-              Cancel
-            </button>
-          )}
-          {company.account_status !== 'archived' && (
-            <button onClick={() => setConfirmAction('archive')} className="px-3 py-2 bg-gray-700/40 text-gray-400 text-xs font-medium rounded-lg hover:bg-gray-700/60 transition-colors cursor-pointer whitespace-nowrap">
-              Archive
-            </button>
-          )}
-          {company.account_status === 'archived' && (
-            <button onClick={() => setConfirmAction('restore')} className="px-3 py-2 bg-indigo-500/10 text-indigo-400 text-xs font-medium rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer whitespace-nowrap">
-              Restore
-            </button>
-          )}
-        </div>
+
       </div>
 
       <div className="flex items-center gap-0.5 mb-6 border-b border-gray-800 overflow-x-auto">
@@ -547,47 +506,7 @@ export default function ClientDetailContent() {
         </div>
       )}
 
-      {confirmAction && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-gray-700 rounded-xl p-6 max-w-md w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
-                <i className="ri-alert-line"></i>
-              </div>
-              <div>
-                <h3 className="text-white font-semibold capitalize">Confirm {confirmAction}</h3>
-                <p className="text-sm text-gray-400">
-                  Are you sure you want to {confirmAction} <span className="text-white font-medium">{company.name}</span>?
-                </p>
-              </div>
-            </div>
-            <div className="bg-gray-800/40 rounded-lg p-3 mb-5 text-sm text-gray-400">
-              This action will be logged. Client data will be preserved.
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setConfirmAction(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const statusMap: Record<string, string> = {
-                    suspend: 'suspended',
-                    reactivate: 'active',
-                    cancel: 'cancelled',
-                    archive: 'archived',
-                    restore: 'active',
-                  };
-                  handleStatusChange(statusMap[confirmAction]);
-                }}
-                disabled={actionLoading}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {actionLoading ? 'Processing...' : 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

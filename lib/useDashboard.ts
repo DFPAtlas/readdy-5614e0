@@ -53,11 +53,20 @@ export function useDashboard(): DashboardData {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasLoaded = useRef(false);
 
   const fetchData = useCallback(async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      setLoading(false);
+      if (!hasLoaded.current) {
+        hasLoaded.current = true;
+      }
+      return;
+    }
     try {
-      setLoading(true);
+      if (!hasLoaded.current) {
+        setLoading(true);
+      }
       const result = await fetchDashboard(companyId);
       setKpis(result.kpis);
       setSites(result.sites);
@@ -75,6 +84,9 @@ export function useDashboard(): DashboardData {
       setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+      if (!hasLoaded.current) {
+        hasLoaded.current = true;
+      }
     }
   }, [companyId]);
 
@@ -95,15 +107,6 @@ export function useDashboard(): DashboardData {
       supabase
         .channel('dashboard-incidents')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents', filter: `company_id=eq.${companyId}` }, () => {
-          fetchData();
-        })
-        .subscribe()
-    );
-
-    channels.push(
-      supabase
-        .channel('dashboard-ob')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'occurrence_books', filter: `company_id=eq.${companyId}` }, () => {
           fetchData();
         })
         .subscribe()

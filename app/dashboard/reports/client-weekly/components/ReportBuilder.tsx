@@ -85,11 +85,11 @@ export default function ReportBuilder({ onPreview, onExportPDF, onExportCSV, onE
     const toISO = new Date(dateTo + 'T23:59:59').toISOString();
 
     const siteQuery = selectedSite
-      ? supabase.from('sites').select('site_name, address, risk_level, client_id').eq('id', selectedSite).single()
+      ? supabase.from('sites').select('site_name, address, risk_level, client_id').eq('id', selectedSite).maybeSingle()
       : { data: null, error: null };
 
     const clientQuery = selectedClient
-      ? supabase.from('clients').select('name, contact_email, contact_person').eq('id', selectedClient).single()
+      ? supabase.from('clients').select('name, contact_email, contact_person').eq('id', selectedClient).maybeSingle()
       : { data: null, error: null };
 
     let shiftsQuery = supabase.from('shifts').select('id, guard_id, start_time, end_time, status, site_id, shift_type').eq('company_id', companyId).gte('start_time', fromISO).lte('start_time', toISO);

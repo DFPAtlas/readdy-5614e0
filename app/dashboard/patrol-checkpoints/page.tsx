@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useSites } from '@/lib/useSites';
 import { QRCodeSVG } from 'qrcode.react';
+import { FeatureGate } from '@/lib/useEntitlements';
 
 interface CheckpointFormData {
   site_id: string;
@@ -243,6 +244,7 @@ export default function PatrolCheckpointsPage() {
   const inactiveCount = filteredCheckpoints.filter((c) => !c.is_active).length;
 
   return (
+    <FeatureGate feature="hasPatrolManagement">
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -844,5 +846,6 @@ export default function PatrolCheckpointsPage() {
         </div>
       )}
     </div>
+    </FeatureGate>
   );
 }

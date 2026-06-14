@@ -10,6 +10,9 @@ import type { Site } from '@/lib/useSites';
 import { saveSiteShiftPatterns } from '@/lib/useSiteShiftPatterns';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
+import { useEntitlements } from '@/lib/useEntitlements';
+import { isTitanOrUnlimited } from '@/lib/featureMap';
+import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 import { supabase } from '@/lib/supabase';
 import { SOP_TYPES } from '@/lib/sopTypes';
 
@@ -19,6 +22,7 @@ export default function SitesPage() {
   const { sites, loading, error, refetch, addSite, updateSite, deleteSite } = useSites();
   const { companyId, profile } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, companyId);
+  const { entitlements } = useEntitlements();
 
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState('all');
@@ -33,6 +37,11 @@ export default function SitesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Site | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+
+  const maxSites = entitlements?.maxSites ?? 0;
+  const sitesUnlimited = isTitanOrUnlimited(maxSites);
+  const atSiteLimit = !sitesUnlimited && sites.filter((s): s is Site => s != null && typeof s === 'object').length >= maxSites;
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -73,6 +82,10 @@ export default function SitesPage() {
   const paged = filtered.slice((safePage - 1) * 25, safePage * 25);
 
   const openAdd = () => {
+    if (atSiteLimit) {
+      setLimitModalOpen(true);
+      return;
+    }
     setEditingSite(null);
     setModalOpen(true);
   };
@@ -220,11 +233,19 @@ export default function SitesPage() {
         />
       )}
 
-      <DeleteDialog
-        site={deleteTarget}
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
-        deleting={deleting}
+      {deleteTarget && (
+        <DeleteDialog
+          site={deleteTarget}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          deleting={deleting}
+        />
+      )}
+
+      <UpgradeRequiredModal
+        isOpen={limitModalOpen}
+        onClose={() => setLimitModalOpen(false)}
+        featureName={`Add Site (limit: ${maxSites})`}
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

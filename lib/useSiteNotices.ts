@@ -138,7 +138,7 @@ export function useSiteNotices(siteId: string | null) {
         updated_by_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
       })
       .select()
-      .single();
+      .maybeSingle();
     if (!error) await load();
     return { data, error };
   }, [siteId, companyId, profile, load]);
@@ -155,7 +155,7 @@ export function useSiteNotices(siteId: string | null) {
       .eq('id', id)
       .eq('site_id', siteId)
       .select()
-      .single();
+      .maybeSingle();
     if (!error) await load();
     return { data, error };
   }, [siteId, profile, load]);

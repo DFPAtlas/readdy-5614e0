@@ -1,10 +1,41 @@
 'use client';
 
 import { useAdminActivity } from '@/lib/useSuperAdmin';
+import { useAuth } from '@/lib/auth';
+import { callAgent } from '@/lib/guardianhubAgents';
+import { useEffect, useState, useCallback } from 'react';
+import AgentStatusBar from '@/components/AgentStatusBar';
 import { EmptyState } from '../components/AdminUI';
 
 export default function AdminActivityPage() {
   const { logs, loading } = useAdminActivity();
+  const { profile } = useAuth();
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentData, setAgentData] = useState<any>(null);
+
+  const fetchAgent = useCallback(async () => {
+    if (!profile?.id) return;
+    setAgentLoading(true);
+    setAgentError(null);
+    try {
+      const result = await callAgent(
+        'super_admin_audit',
+        { total_logs: logs.length, recent_actions: logs.slice(0, 5).map((l: any) => l.action) },
+        { clientId: profile.company_id, userId: profile.id, requestedPage: '/admin/activity', requestedFeature: 'super_admin_audit' }
+      );
+      if (result.error) setAgentError(result.error);
+      setAgentData(result.data);
+    } catch (err: any) {
+      setAgentError(err.message || 'Agent call failed');
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [profile?.id, profile?.company_id, logs.length]);
+
+  useEffect(() => {
+    if (!loading && profile?.id) fetchAgent();
+  }, [loading, profile?.id]);
 
   const actionColors: Record<string, string> = {
     client_created: 'text-emerald-400 bg-emerald-500/10',
@@ -21,6 +52,14 @@ export default function AdminActivityPage() {
         <h1 className="text-2xl font-bold text-white">Activity Log</h1>
         <p className="text-sm text-gray-500 mt-0.5">All admin actions across the platform</p>
       </div>
+
+      <AgentStatusBar
+        agentKey="super_admin_audit"
+        loading={agentLoading}
+        error={agentError}
+        data={agentData}
+        onRetry={fetchAgent}
+      />
 
       <div className="bg-[#111827] border border-gray-800 rounded-xl">
         {loading ? (

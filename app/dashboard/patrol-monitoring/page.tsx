@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useSites } from '@/lib/useSites';
 import { supabase } from '@/lib/supabase';
+import { FeatureGate } from '@/lib/useEntitlements';
 
 interface PatrolScanSummary {
   id: string;
@@ -96,6 +97,7 @@ export default function DashboardPatrolMonitoringPage() {
   }
 
   return (
+    <FeatureGate feature="hasPatrolManagement">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><h1 className="text-2xl font-bold text-white">Patrol Monitoring</h1><p className="text-gray-400 text-sm mt-1">Company-wide patrol tracking with GPS verification</p></div>
@@ -117,5 +119,6 @@ export default function DashboardPatrolMonitoringPage() {
         <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b border-white/10"><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Site</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Checkpoint</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Guard</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Scheduled</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Scanned At</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">GPS</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Distance</th><th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">SOP</th></tr></thead><tbody className="divide-y divide-white/5">{scans.map(scan=>{const st=statusBadge(scan.status);return(<tr key={scan.id} className="hover:bg-white/[0.02] transition-colors"><td className="px-4 py-3"><span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${st.bg} ${st.border} ${st.color}`}>{st.label}</span></td><td className="px-4 py-3 text-sm text-white">{scan.site_name}</td><td className="px-4 py-3"><p className="text-sm text-white">{scan.checkpoint_name}</p><p className="text-xs text-gray-500 font-mono">{scan.checkpoint_code}</p></td><td className="px-4 py-3 text-sm text-gray-400">{scan.guard_name}</td><td className="px-4 py-3 text-sm text-gray-400">{scan.scheduled_patrol_time||'—'}</td><td className="px-4 py-3 text-sm text-gray-400">{formatScanTime(scan.scanned_at)}</td><td className="px-4 py-3 text-xs text-gray-400">{scan.gps_latitude!=null?(<span>{scan.gps_latitude.toFixed(4)}, {scan.gps_longitude?.toFixed(4)}</span>):(<span className="text-gray-600">No GPS</span>)}</td><td className="px-4 py-3 text-sm text-gray-400">{scan.distance_from_checkpoint!=null?(<span className={scan.distance_from_checkpoint>50?'text-amber-400':'text-emerald-400'}>{Math.round(scan.distance_from_checkpoint)}m</span>):'—'}</td><td className="px-4 py-3">{scan.sop_url?(<a href={scan.sop_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer">View SOP</a>):(<span className="text-xs text-gray-600">—</span>)}</td></tr>);})}</tbody></table></div></div>
       )}
     </div>
+    </FeatureGate>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 interface AIAlert {
   id: string;
@@ -11,38 +13,44 @@ interface AIAlert {
   bg: string;
 }
 
-const mockAlerts: AIAlert[] = [
-  {
-    id: '1',
-    icon: 'ri-user-3-line',
-    title: 'Staffing Risk',
-    detail: 'Saturday night at One Canada Square — 2 guards on holiday',
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-  },
-  {
-    id: '2',
-    icon: 'ri-alert-line',
-    title: 'Pattern Detected',
-    detail: '3 trespass incidents at Riverside Plaza this week',
-    color: 'text-red-600',
-    bg: 'bg-red-50',
-  },
-  {
-    id: '3',
-    icon: 'ri-id-card-line',
-    title: 'SIA Expiring',
-    detail: "J. Patel's licence expires in 14 days",
-    color: 'text-purple-600',
-    bg: 'bg-purple-50',
-  },
-];
-
 export default function AIAlertsPanel() {
-  const [alerts, setAlerts] = useState<AIAlert[]>(mockAlerts);
+  const [alerts, setAlerts] = useState<AIAlert[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const dismiss = (id: string) => {
+  useEffect(() => {
+    supabase
+      .from('ai_activity_logs')
+      .select('id, title, detail, icon, color, bg, dismissed')
+      .eq('dismissed', false)
+      .order('created_at', { ascending: false })
+      .limit(8)
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const mapped: AIAlert[] = data.map((row: any) => ({
+            id: row.id,
+            icon: row.icon || 'ri-sparkling-line',
+            title: row.title,
+            detail: row.detail,
+            color: row.color || 'text-amber-400',
+            bg: row.bg || 'bg-amber-500/10',
+          }));
+          setAlerts(mapped);
+        }
+        setLoading(false);
+      });
+  }, []);
+
+  const dismiss = async (id: string) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
+    supabase
+      .from('ai_activity_logs')
+      .update({ dismissed: true })
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error && process.env.NODE_ENV === 'development') {
+          console.error('Dismiss failed:', error.message);
+        }
+      });
   };
 
   return (
@@ -54,7 +62,15 @@ export default function AIAlertsPanel() {
         </div>
       </div>
 
-      {alerts.length === 0 ? (
+      {loading ? (
+        <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 shadow-sm rounded-xl p-8 flex items-center justify-center">
+          <div className="relative flex h-5 w-5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-5 w-5 bg-blue-500"></span>
+          </div>
+          <span className="ml-3 text-xs text-gray-500">Scanning for alerts...</span>
+        </div>
+      ) : alerts.length === 0 ? (
         <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 shadow-sm rounded-xl p-6 text-center text-gray-500 text-sm">
           No active alerts — all clear.
         </div>
@@ -80,9 +96,9 @@ export default function AIAlertsPanel() {
                 >
                   Dismiss
                 </button>
-                <span className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer font-medium">
+                <Link href="/dashboard/ai-automation" className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer font-medium">
                   View
-                </span>
+                </Link>
               </div>
             </div>
           ))}

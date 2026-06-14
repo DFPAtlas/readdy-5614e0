@@ -99,7 +99,7 @@ export function useShifts(weekStart: Date, weekEnd: Date) {
         notes: payload.notes || null,
       })
       .select()
-      .single();
+      .maybeSingle();
     return { data, error };
   };
 
@@ -117,7 +117,7 @@ export function useShifts(weekStart: Date, weekEnd: Date) {
       updates.start_time = startDate.toISOString();
       updates.end_time = endDate.toISOString();
     }
-    const { data, error } = await supabase.from('shifts').update(updates).eq('id', id).select().single();
+    const { data, error } = await supabase.from('shifts').update(updates).eq('id', id).select().maybeSingle();
     return { data, error };
   };
 
@@ -127,7 +127,7 @@ export function useShifts(weekStart: Date, weekEnd: Date) {
   };
 
   const assignGuard = async (shiftId: string, guardId: string | null) => {
-    const { data, error } = await supabase.from('shifts').update({ guard_id: guardId }).eq('id', shiftId).select().single();
+    const { data, error } = await supabase.from('shifts').update({ guard_id: guardId }).eq('id', shiftId).select().maybeSingle();
     return { data, error };
   };
 

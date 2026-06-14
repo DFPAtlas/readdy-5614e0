@@ -314,7 +314,7 @@ export function usePermissions(companyId: string | null) {
       description,
       is_system: false,
       is_default: false,
-    }).select().single();
+    }).select().maybeSingle();
 
     if (error || !data) { setSaving(false); return; }
 
@@ -410,7 +410,7 @@ export function usePermissions(companyId: string | null) {
     setSaving(true);
     const { data, error } = await supabase.from('user_roles').insert({
       user_id: userId, role_id: roleId, company_id: companyId, is_primary: isPrimary,
-    }).select('*, role:roles(*), user:users(id,first_name,last_name,email)').single();
+    }).select('*, role:roles(*), user:users(id,first_name,last_name,email)').maybeSingle();
     if (!error && data) setUserRoles(prev => [...prev, data]);
     setSaving(false);
   };
@@ -471,53 +471,61 @@ export function useMyPermissions(userId: string | null, companyId: string | null
   const check = useCallback(async () => {
     if (!userId || !companyId) { setMyPerms({}); setMyRoles([]); return; }
     setLoading(true);
-    const { data: userRoleData } = await supabase
-      .from('user_roles')
-      .select('role_id')
-      .eq('user_id', userId)
-      .eq('company_id', companyId);
+    try {
+      const { data: userRoleData } = await supabase
+        .from('user_roles')
+        .select('role_id')
+        .eq('user_id', userId)
+        .eq('company_id', companyId);
 
-    if (!userRoleData || userRoleData.length === 0) {
-      const { data: user } = await supabase.from('users').select('role').eq('id', userId).single();
-      const adminRoles = ['admin', 'owner', 'super_admin', 'company_admin', 'operations_manager'];
-      if (user?.role && adminRoles.includes(user.role)) {
-        setMyPerms({
-          dashboard: 'manage', staff: 'manage', sites: 'manage', rotas: 'manage',
-          shift_patterns: 'manage', book_on_off: 'manage', occurrence_book: 'manage',
-          incidents: 'manage', patrols: 'manage', check_calls: 'manage',
-          risk_assessments: 'manage', sop_documents: 'manage', assignment_instructions: 'manage',
-          client_portal: 'manage', reports: 'manage', ai_tools: 'manage',
-          billing: 'manage', settings: 'manage', roles: 'manage',
-        });
-      } else {
-        setMyPerms({});
+      if (!userRoleData || userRoleData.length === 0) {
+        const { data: user } = await supabase.from('users').select('role').eq('id', userId).maybeSingle();
+        const adminRoles = ['admin', 'owner', 'super_admin', 'company_admin', 'operations_manager'];
+        if (user?.role && adminRoles.includes(user.role)) {
+          setMyPerms({
+            dashboard: 'manage', staff: 'manage', sites: 'manage', rotas: 'manage',
+            shift_patterns: 'manage', book_on_off: 'manage', occurrence_book: 'manage',
+            incidents: 'manage', patrols: 'manage', check_calls: 'manage',
+            risk_assessments: 'manage', sop_documents: 'manage', assignment_instructions: 'manage',
+            client_portal: 'manage', reports: 'manage', ai_tools: 'manage',
+            billing: 'manage', settings: 'manage', roles: 'manage',
+          });
+        } else {
+          setMyPerms({});
+        }
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
+
+      const roleIds = userRoleData.map(ur => ur.role_id);
+      const { data: rpData } = await supabase
+        .from('role_permissions')
+        .select('permission_key,level')
+        .in('role_id', roleIds)
+        .eq('company_id', companyId);
+
+      const merged: Record<string, PermissionLevel> = {};
+      (rpData || []).forEach((p: any) => {
+        const existing = merged[p.permission_key];
+        if (!existing || LEVEL_WEIGHTS[p.level] > LEVEL_WEIGHTS[existing]) {
+          merged[p.permission_key] = p.level;
+        }
+      });
+
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('*')
+        .in('id', roleIds);
+
+      setMyPerms(merged);
+      setMyRoles(roleData || []);
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[useMyPermissions] check error:', err);
+      }
+      setMyPerms({});
+      setMyRoles([]);
     }
-
-    const roleIds = userRoleData.map(ur => ur.role_id);
-    const { data: rpData } = await supabase
-      .from('role_permissions')
-      .select('permission_key,level')
-      .in('role_id', roleIds)
-      .eq('company_id', companyId);
-
-    const merged: Record<string, PermissionLevel> = {};
-    (rpData || []).forEach((p: any) => {
-      const existing = merged[p.permission_key];
-      if (!existing || LEVEL_WEIGHTS[p.level] > LEVEL_WEIGHTS[existing]) {
-        merged[p.permission_key] = p.level;
-      }
-    });
-
-    const { data: roleData } = await supabase
-      .from('roles')
-      .select('*')
-      .in('id', roleIds);
-
-    setMyPerms(merged);
-    setMyRoles(roleData || []);
     setLoading(false);
   }, [userId, companyId]);
 

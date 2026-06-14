@@ -42,7 +42,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         router.replace('/admin');
       } else if (role === 'company_admin' || role === 'operations_manager') {
         if (onboardingStatus === 'pending_setup') {
-          router.replace('/dashboard/setup');
+          router.replace('/dashboard/setup-wizard');
         } else {
           router.replace('/dashboard');
         }

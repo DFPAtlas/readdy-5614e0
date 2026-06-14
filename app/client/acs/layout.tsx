@@ -1,15 +1,14 @@
-'use client';
-
-import { ACSProvider } from '@/lib/useACS';
+import Footer from '@/app/components/Footer';
 import ACSNav from './components/ACSNav';
 
 export default function ACSLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ACSProvider>
-      <div className="space-y-4">
-        <ACSNav />
+    <div className="min-h-screen bg-[#0a0e1a] flex flex-col">
+      <ACSNav />
+      <main className="flex-1">
         {children}
-      </div>
-    </ACSProvider>
+      </main>
+      <Footer />
+    </div>
   );
 }

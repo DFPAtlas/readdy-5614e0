@@ -16,7 +16,7 @@ export function useStripePortal() {
 
       if (sessionError || !sessionData.session) {
         setError('Please log in to manage billing');
-        router.push('/login?next=/dashboard/settings');
+        try { router.push('/login?next=/dashboard/settings'); } catch { window.location.href = '/login?next=/dashboard/settings'; }
         return;
       }
 

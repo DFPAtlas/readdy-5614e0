@@ -1,5 +1,6 @@
 import SuperAdminGate from '../../admin/components/SuperAdminGate';
 import AdminShell from '../../admin/components/AdminShell';
+import Footer from '@/app/components/Footer';
 
 export default function EmailImageLibraryLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function EmailImageLibraryLayout({ children }: { children: React.
           {children}
         </div>
       </AdminShell>
+      <Footer />
     </SuperAdminGate>
   );
 }

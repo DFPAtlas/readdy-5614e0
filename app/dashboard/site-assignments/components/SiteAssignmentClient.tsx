@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAssignmentMatrix } from '@/lib/useAssignmentMatrix';
 import { useGuards } from '@/lib/useGuards';
 import { useSites } from '@/lib/useSites';
+import { useAuth } from '@/lib/auth';
+import { callAgent } from '@/lib/guardianhubAgents';
+import AgentStatusBar from '@/components/AgentStatusBar';
+import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import SummaryCards from './SummaryCards';
 import AssignmentFilters from './AssignmentFilters';
 import AssignmentMatrix from './AssignmentMatrix';
@@ -16,10 +20,38 @@ export default function SiteAssignmentClient() {
   const { rows, columns, loading, error, refetch } = useAssignmentMatrix();
   const { guards } = useGuards();
   const { sites } = useSites();
-  const [filters, setFilters] = useState<any>();
+  const { profile, companyId } = useAuth();
+  const [filters, setFilters] = useState<any>({});
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailData, setDetailData] = useState<any>(null);
   const [assignModal, setAssignModal] = useState<any>(null);
+
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentData, setAgentData] = useState<any>(null);
+
+  const fetchAgent = useCallback(async () => {
+    if (!profile?.id || !companyId) return;
+    setAgentLoading(true);
+    setAgentError(null);
+    try {
+      const result = await callAgent(
+        'client_dashboard',
+        { total_guards: rows.length, total_sites: columns.length },
+        { clientId: companyId, userId: profile.id, requestedPage: '/dashboard/site-assignments', requestedFeature: 'site_assignments' }
+      );
+      if (result.error) setAgentError(result.error);
+      setAgentData(result.data);
+    } catch (err: any) {
+      setAgentError(err.message || 'Agent call failed');
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [profile?.id, companyId, rows.length, columns.length]);
+
+  useEffect(() => {
+    if (profile?.id && !loading) fetchAgent();
+  }, [profile?.id, loading]);
 
   const clientOptions = (sites || []).reduce((acc: any[], s: any) => {
     if (s.client_id && !acc.find((c) => c.id === s.client_id)) {
@@ -102,21 +134,37 @@ export default function SiteAssignmentClient() {
         </button>
       </div>
 
-      <SummaryCards {...counts} />
+      <WidgetBoundary widgetName="SiteAssignmentAgent" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
+        <AgentStatusBar
+          agentKey="client_dashboard"
+          loading={agentLoading}
+          error={agentError}
+          data={agentData}
+          onRetry={fetchAgent}
+        />
+      </WidgetBoundary>
+
+      <WidgetBoundary widgetName="AssignmentSummaryCards" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
+        <SummaryCards {...counts} />
+      </WidgetBoundary>
 
       <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-        <AssignmentFilters
-          clients={clientOptions}
-          sites={siteOptions}
-          guards={guardOptions}
-          filters={filters}
-          onChange={setFilters}
-          onClear={handleClear}
-        />
+        <WidgetBoundary widgetName="AssignmentFilters" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
+          <AssignmentFilters
+            clients={clientOptions}
+            sites={siteOptions}
+            guards={guardOptions}
+            filters={filters}
+            onChange={setFilters}
+            onClear={handleClear}
+          />
+        </WidgetBoundary>
       </div>
 
       <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-        <AssignmentMatrix rows={rows} columns={columns} filters={filters} onCellClick={handleCellClick} />
+        <WidgetBoundary widgetName="AssignmentMatrix" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
+          <AssignmentMatrix rows={rows} columns={columns} filters={filters} onCellClick={handleCellClick} />
+        </WidgetBoundary>
       </div>
 
       {detailOpen && detailData && (

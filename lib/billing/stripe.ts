@@ -1,3 +1,8 @@
+// SERVER-SIDE ONLY — DO NOT IMPORT IN BROWSER CODE.
+// This file uses process.env.STRIPE_SECRET_KEY and only works in Node.js / Supabase Edge Functions.
+// For static export builds, Stripe operations go through Supabase Edge Functions.
+// If you need to use this locally, run via: npx ts-node lib/billing/stripe.ts
+
 import Stripe from "stripe";
 
 let stripeInstance: Stripe | null = null;

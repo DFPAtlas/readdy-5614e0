@@ -144,7 +144,7 @@ export default function IncidentFlow({ todayShift, guardId, companyId, guardName
         occurred_at: new Date().toISOString(),
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !incidentData) {
       setSubmitting(false);

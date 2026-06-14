@@ -21,18 +21,25 @@ export default function LoginPage() {
     if (currentUser && profile) {
       const role = profile.role;
       const onboardingStatus = company?.onboarding_status;
-      if (role === 'super_admin') {
-        router.replace('/admin');
-      } else if (['company_admin', 'operations_manager'].includes(role || '')) {
-        if (onboardingStatus === 'pending_setup') {
-          router.replace('/dashboard/setup');
-        } else {
-          router.replace('/dashboard');
+      try {
+        if (role === 'super_admin') {
+          router.replace('/admin');
+        } else if (['company_admin', 'operations_manager'].includes(role || '')) {
+          if (onboardingStatus && onboardingStatus !== 'completed') {
+            router.replace('/dashboard/setup-wizard');
+          } else {
+            router.replace('/dashboard');
+          }
+        } else if (role === 'guard') {
+          router.replace('/guard');
+        } else if (role === 'client') {
+          router.replace('/client');
         }
-      } else if (role === 'guard') {
-        router.replace('/guard');
-      } else if (role === 'client') {
-        router.replace('/client');
+      } catch {
+        if (role === 'super_admin') window.location.href = '/admin';
+        else if (['company_admin', 'operations_manager'].includes(role || '')) window.location.href = onboardingStatus && onboardingStatus !== 'completed' ? '/dashboard/setup-wizard' : '/dashboard';
+        else if (role === 'guard') window.location.href = '/guard';
+        else if (role === 'client') window.location.href = '/client';
       }
     }
   }, [currentUser, profile, company, authLoading, router]);
@@ -234,6 +241,12 @@ export default function LoginPage() {
             Don't have an account?{' '}
             <Link href="/ops/signup" className="text-blue-400 hover:text-blue-300 transition-colors cursor-pointer">
               Sign up
+            </Link>
+          </div>
+
+          <div className="mt-5 pt-4 border-t border-gray-800 text-center">
+            <Link href="/setup-super-admin" className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer font-medium">
+              Super Admin Setup
             </Link>
           </div>
         </div>

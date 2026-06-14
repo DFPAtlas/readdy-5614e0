@@ -188,7 +188,7 @@ export default function ClientSignup() {
       setSubmitError(error.message || 'Something went wrong');
       setIsLoading(false);
     } else {
-      router.push('/onboarding');
+      router.push('/dashboard/setup-wizard');
     }
   };
 

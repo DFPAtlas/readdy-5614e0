@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAdminLeaveRequests } from '@/lib/useAdminLeaveRequests';
+import { FeatureGate } from '@/lib/useEntitlements';
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'All' },
@@ -36,6 +37,7 @@ export default function LeaveRequestsAdminPage() {
   const filtered = filter === 'all' ? requests : requests.filter((r) => r.status === filter);
 
   return (
+    <FeatureGate feature="hasLeaveAutomation">
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -165,5 +167,6 @@ export default function LeaveRequestsAdminPage() {
         </div>
       )}
     </div>
+    </FeatureGate>
   );
 }

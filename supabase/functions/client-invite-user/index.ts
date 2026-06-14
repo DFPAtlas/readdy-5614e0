@@ -61,7 +61,10 @@ Deno.serve(async (req) => {
     const companyId = callerProfile.company_id;
     const callerRole = callerClientUser.role;
 
-    const body = await req.json();
+    let body: any;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { action = 'invite', email, firstName, lastName, role, clientUserId } = body;
 
     if (action === 'remove') {

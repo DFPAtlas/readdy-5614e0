@@ -71,12 +71,12 @@ export function useSites() {
 
   const addSite = async (payload: Omit<Site, 'id' | 'company_id' | 'created_at'>) => {
     if (!companyId) return { error: new Error('No company') };
-    const { data, error } = await supabase.from('sites').insert({ ...payload, company_id: companyId }).select().single();
+    const { data, error } = await supabase.from('sites').insert({ ...payload, company_id: companyId }).select().maybeSingle();
     return { data, error };
   };
 
   const updateSite = async (id: string, payload: Partial<Omit<Site, 'id' | 'company_id' | 'created_at'>>) => {
-    const { data, error } = await supabase.from('sites').update(payload).eq('id', id).select().single();
+    const { data, error } = await supabase.from('sites').update(payload).eq('id', id).select().maybeSingle();
     return { data, error };
   };
 

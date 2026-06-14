@@ -341,7 +341,10 @@ serve(async (req) => {
   }
 
   try {
-    const body: CopilotRequest = await req.json();
+    let body: CopilotRequest;
+    try { body = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
     const { query, companyId, userRole, userId } = body;
 
     const isSuperAdmin = userRole === "super_admin";

@@ -153,11 +153,11 @@ export function useClientWeeklyReports() {
       const toISO = new Date(dateTo + 'T23:59:59').toISOString();
 
       const siteQuery = siteId
-        ? supabase.from('sites').select('site_name, address').eq('id', siteId).single()
+        ? supabase.from('sites').select('site_name, address').eq('id', siteId).maybeSingle()
         : { data: null, error: null };
 
       const clientQuery = clientId
-        ? supabase.from('clients').select('name, contact_email').eq('id', clientId).single()
+        ? supabase.from('clients').select('name, contact_email').eq('id', clientId).maybeSingle()
         : { data: null, error: null };
 
       let shiftsQuery = supabase.from('shifts').select('*').eq('company_id', companyId).gte('start_time', fromISO).lte('start_time', toISO);
@@ -275,13 +275,13 @@ export function useClientWeeklyReports() {
 
   const createSchedule = async (payload: Partial<WeeklyReportSchedule>) => {
     if (!companyId) return { data: null, error: new Error('No company') };
-    const { data, error } = await supabase.from('weekly_report_schedule').insert({ ...payload, company_id: companyId }).select().single();
+    const { data, error } = await supabase.from('weekly_report_schedule').insert({ ...payload, company_id: companyId }).select().maybeSingle();
     if (!error) loadSchedules();
     return { data, error };
   };
 
   const updateSchedule = async (id: string, payload: Partial<WeeklyReportSchedule>) => {
-    const { data, error } = await supabase.from('weekly_report_schedule').update(payload).eq('id', id).select().single();
+    const { data, error } = await supabase.from('weekly_report_schedule').update(payload).eq('id', id).select().maybeSingle();
     if (!error) loadSchedules();
     return { data, error };
   };
@@ -294,7 +294,7 @@ export function useClientWeeklyReports() {
 
   const logEmail = async (payload: Partial<ReportEmailLog>) => {
     if (!companyId) return { data: null, error: new Error('No company') };
-    const { data, error } = await supabase.from('report_email_log').insert({ ...payload, company_id: companyId }).select().single();
+    const { data, error } = await supabase.from('report_email_log').insert({ ...payload, company_id: companyId }).select().maybeSingle();
     if (!error) loadEmailLogs();
     return { data, error };
   };

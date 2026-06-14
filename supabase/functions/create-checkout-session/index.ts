@@ -56,35 +56,43 @@ serve(async (req) => {
       );
     }
 
-    const { plan, billing, returnUrl } = await req.json();
+    let checkoutBody: any;
+    try { checkoutBody = await req.json(); } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { plan, billing, returnUrl } = checkoutBody;
 
-    const priceKey = `STRIPE_PRICE_${plan.toUpperCase()}_${billing.toUpperCase()}`;
-    const priceId = Deno.env.get(priceKey);
-
-    if (!priceId) {
+    if (!plan || !billing) {
       return new Response(
-        JSON.stringify({ error: `Price not configured for ${plan} ${billing}. Ask your admin to set the ${priceKey} secret in Supabase.` }),
+        JSON.stringify({ error: "Missing plan or billing parameter" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
-    const origin = returnUrl || req.headers.get("origin") || "https://guardin-hub.uk";
+    const planLower = plan.toLowerCase();
+    const billingLower = billing.toLowerCase();
 
-    // Validate the price exists before creating a session
-    try {
-      await stripe.prices.retrieve(priceId);
-    } catch (priceErr: any) {
-      if (priceErr?.message?.includes("No such price")) {
-        return new Response(
-          JSON.stringify({
-            error: `The Stripe price ID "${priceId}" does not exist in your Stripe account. This usually means:\n1. The price was created in Test mode but your secret key is Live (or vice versa)\n2. The price was deleted from Stripe\n3. You're using the wrong Stripe account\n\nTo fix: go to your Stripe Dashboard → Products → find the product → copy the correct Price ID, then update the "${priceKey}" secret in Supabase Edge Function secrets.`,
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw priceErr;
+    const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
+
+    const lookupKey = `${planLower}-${billingLower}`;
+
+    const prices = await stripe.prices.list({
+      lookup_keys: [lookupKey],
+      active: true,
+      limit: 1,
+    });
+
+    if (!prices.data.length) {
+      return new Response(
+        JSON.stringify({
+          error: `No active price found for lookup_key "${lookupKey}". Please set this lookup_key on the Stripe price in your dashboard.`
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    const resolvedPriceId = prices.data[0].id;
+    const origin = returnUrl || req.headers.get("origin") || "https://guardin-hub.uk";
 
     const { data: company } = await supabase
       .from("companies")
@@ -92,24 +100,45 @@ serve(async (req) => {
       .eq("id", profile.company_id)
       .maybeSingle();
 
-    const customerId = company?.stripe_customer_id || undefined;
+    let customerId = company?.stripe_customer_id || undefined;
 
-    const session = await stripe.checkout.sessions.create({
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { company_id: profile.company_id, user_id: user.id },
+      });
+      customerId = customer.id;
+      await supabase
+        .from("companies")
+        .update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() })
+        .eq("id", profile.company_id);
+    }
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: resolvedPriceId, quantity: 1 }],
       success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout/cancel`,
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       customer: customerId,
-      customer_creation: customerId ? undefined : "always",
       metadata: {
         company_id: profile.company_id,
         user_id: user.id,
-        plan,
-        billing,
+        selected_plan: planLower,
+        billing_interval: billingLower,
+        stripe_price_id: resolvedPriceId,
+        stripe_customer_id: customerId,
       },
-    });
+    };
+
+    if (planLower === "sentinel-starter") {
+      sessionParams.subscription_data = {
+        trial_period_days: 14,
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     return new Response(
       JSON.stringify({ url: session.url }),

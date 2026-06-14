@@ -4,12 +4,15 @@ import { useState, useMemo } from 'react';
 import { useGuards, getDaysUntil, getSIAStatus, type Guard } from '@/lib/useGuards';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
+import { useEntitlements } from '@/lib/useEntitlements';
+import { isTitanOrUnlimited } from '@/lib/featureMap';
 import GuardsTable from './components/GuardsTable';
 import GuardModal from './components/GuardModal';
 import GuardProfileDrawer from './components/GuardProfileDrawer';
 import GuardDeleteDialog from './components/GuardDeleteDialog';
 import ExpiryAlertBanner from './components/ExpiryAlertBanner';
 import Toast from '@/app/sites/components/Toast';
+import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 
 const STATUS_OPTIONS = ['all', 'active', 'suspended', 'inactive'];
 const SIA_OPTIONS = ['all', 'valid', 'expiring_soon', 'expired'];
@@ -18,6 +21,7 @@ export default function GuardsPage() {
   const { guards, loading, error, refetch, addGuard, updateGuard, deleteGuard, setGuardStatus } = useGuards();
   const { profile } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, profile?.company_id || null);
+  const { entitlements } = useEntitlements();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -36,6 +40,13 @@ export default function GuardsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Guard | null>(null);
   const [processingDelete, setProcessingDelete] = useState(false);
+
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+
+  const maxGuards = entitlements?.maxGuards ?? 0;
+  const guardsUnlimited = isTitanOrUnlimited(maxGuards);
+  const activeGuards = guards.filter((g) => g.status === 'active').length;
+  const atGuardLimit = !guardsUnlimited && activeGuards >= maxGuards;
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -98,6 +109,10 @@ export default function GuardsPage() {
   const paged = filtered.slice((safePage - 1) * 25, safePage * 25);
 
   const openAdd = () => {
+    if (atGuardLimit) {
+      setLimitModalOpen(true);
+      return;
+    }
     setEditingGuard(null);
     setModalOpen(true);
   };
@@ -239,12 +254,20 @@ export default function GuardsPage() {
         onEdit={openEdit}
       />
 
-      <GuardDeleteDialog
-        guard={deleteTarget}
-        onSetInactive={handleSetInactive}
-        onDelete={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
-        processing={processingDelete}
+      {deleteTarget && (
+        <GuardDeleteDialog
+          guard={deleteTarget}
+          onSetInactive={handleSetInactive}
+          onDelete={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          processing={processingDelete}
+        />
+      )}
+
+      <UpgradeRequiredModal
+        isOpen={limitModalOpen}
+        onClose={() => setLimitModalOpen(false)}
+        featureName={`Add Guard (limit: ${maxGuards})`}
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

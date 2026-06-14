@@ -3,8 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSuperAdminCompanies, useAdminActivity } from '@/lib/useSuperAdmin';
-import { useAuth } from '@/lib/auth';
+import { useSuperAdminCompanies } from '@/lib/useSuperAdmin';
 import { StatusBadge, PlanBadge, SubscriptionStatusBadge, EmptyState } from '../components/AdminUI';
 
 const statusOptions = [
@@ -25,17 +24,14 @@ const planOptions = [
 ];
 
 export default function AdminClientsPage() {
-  const { companies, loading, error, refetch, updateCompany } = useSuperAdminCompanies();
-  const { logAction } = useAdminActivity();
-  const { profile } = useAuth();
+  const { companies, loading, error, refetch } = useSuperAdminCompanies();
   const router = useRouter();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [planFilter, setPlanFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'created' | 'name' | 'sites'>('created');
-  const [confirmAction, setConfirmAction] = useState<{ id: string; action: string; newStatus: string } | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+
 
   const filtered = useMemo(() => {
     let list = [...companies];
@@ -55,28 +51,7 @@ export default function AdminClientsPage() {
     return list;
   }, [companies, statusFilter, planFilter, search, sortBy]);
 
-  const handleStatusChange = async () => {
-    if (!confirmAction || !profile) return;
-    setActionLoading(true);
-    try {
-      const updates: any = { account_status: confirmAction.newStatus };
-      if (confirmAction.newStatus === 'suspended') updates.suspended_at = new Date().toISOString();
-      if (confirmAction.newStatus === 'active') updates.suspended_at = null;
-      if (confirmAction.newStatus === 'cancelled') updates.cancelled_at = new Date().toISOString();
-      if (confirmAction.newStatus === 'archived') updates.archived_at = new Date().toISOString();
 
-      await updateCompany(confirmAction.id, updates);
-      await logAction(
-        `client_${confirmAction.action}`,
-        `Client ${confirmAction.action}d. New status: ${confirmAction.newStatus}`,
-        confirmAction.id,
-        profile.id,
-        { previous_status: companies.find(c => c.id === confirmAction.id)?.account_status, new_status: confirmAction.newStatus }
-      );
-      setConfirmAction(null);
-    } catch {}
-    setActionLoading(false);
-  };
 
   const activeStatuses = ['pending_setup', 'active', 'suspended'];
   const visibleClients = filtered.filter(c => activeStatuses.includes(c.account_status) || statusFilter === c.account_status);
@@ -218,33 +193,6 @@ export default function AdminClientsPage() {
                         >
                           <i className="ri-eye-line text-xs"></i>
                         </button>
-                        {c.account_status === 'active' && (
-                          <button
-                            onClick={() => setConfirmAction({ id: c.id, action: 'suspend', newStatus: 'suspended' })}
-                            className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-amber-400 hover:bg-amber-500/10 rounded transition-colors cursor-pointer"
-                            title="Suspend"
-                          >
-                            <i className="ri-pause-circle-line text-xs"></i>
-                          </button>
-                        )}
-                        {c.account_status === 'suspended' && (
-                          <button
-                            onClick={() => setConfirmAction({ id: c.id, action: 'reactivate', newStatus: 'active' })}
-                            className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors cursor-pointer"
-                            title="Reactivate"
-                          >
-                            <i className="ri-play-circle-line text-xs"></i>
-                          </button>
-                        )}
-                        {c.account_status !== 'archived' && c.account_status !== 'cancelled' && (
-                          <button
-                            onClick={() => setConfirmAction({ id: c.id, action: 'archive', newStatus: 'archived' })}
-                            className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-400 hover:bg-gray-500/10 rounded transition-colors cursor-pointer"
-                            title="Archive"
-                          >
-                            <i className="ri-archive-line text-xs"></i>
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -255,41 +203,7 @@ export default function AdminClientsPage() {
         )}
       </div>
 
-      {confirmAction && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-gray-700 rounded-xl p-6 max-w-md w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
-                <i className="ri-alert-line"></i>
-              </div>
-              <div>
-                <h3 className="text-white font-semibold">Confirm {confirmAction.action}</h3>
-                <p className="text-sm text-gray-400">
-                  Are you sure you want to {confirmAction.action} this client?
-                </p>
-              </div>
-            </div>
-            <div className="bg-gray-800/40 rounded-lg p-3 mb-5 text-sm text-gray-400">
-              This action will be logged and the client status will change to <span className="text-white font-medium">{confirmAction.newStatus}</span>.
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleStatusChange}
-                disabled={actionLoading}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {actionLoading ? 'Processing...' : `Confirm ${confirmAction.action}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

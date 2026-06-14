@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export interface RotaFormData {
@@ -37,34 +37,72 @@ export default function FirstRotaStep({ data, onChange, companyId }: FirstRotaSt
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [guards, setGuards] = useState<GuardOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const defaultsSet = useRef(false);
 
   useEffect(() => {
     if (!companyId) return;
+    let cancelled = false;
     const load = async () => {
       setLoading(true);
-      const [{ data: siteData }, { data: guardData }] = await Promise.all([
-        supabase.from('sites').select('id, site_name').eq('company_id', companyId).order('created_at', { ascending: false }),
-        supabase.from('guards').select('id, first_name, last_name').eq('company_id', companyId).order('created_at', { ascending: false }),
-      ]);
-      setSites(siteData || []);
-      setGuards(guardData || []);
-      setLoading(false);
-      if (siteData?.[0] && !data.site_id) {
-        onChange({ ...data, site_id: siteData[0].id });
+      setLoadError('');
+      try {
+        const [{ data: siteData }, { data: guardData }] = await Promise.all([
+          supabase.from('sites').select('id, site_name').eq('company_id', companyId).order('created_at', { ascending: false }),
+          supabase.from('guards').select('id, first_name, last_name').eq('company_id', companyId).order('created_at', { ascending: false }),
+        ]);
+        if (cancelled) return;
+        setSites(siteData || []);
+        setGuards(guardData || []);
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e?.message || 'Failed to load data');
       }
-      if (guardData?.[0] && !data.guard_id) {
-        onChange({ ...data, guard_id: guardData[0].id });
-      }
+      if (!cancelled) setLoading(false);
     };
     load();
+    return () => { cancelled = true; };
   }, [companyId]);
 
   useEffect(() => {
-    if (!data.shift_date) {
+    if (defaultsSet.current) return;
+    if (!data.shift_date && !loading) {
+      defaultsSet.current = true;
       const today = new Date().toISOString().split('T')[0];
       onChange({ ...data, shift_date: today, shift_start: '08:00', shift_end: '20:00' });
     }
-  }, []);
+  }, [data.shift_date, loading, onChange, data]);
+
+  useEffect(() => {
+    if (defaultsSet.current) return;
+    if (sites.length > 0 && !data.site_id) {
+      defaultsSet.current = true;
+      onChange({ ...data, site_id: sites[0].id });
+    }
+    if (guards.length > 0 && !data.guard_id) {
+      if (!defaultsSet.current) defaultsSet.current = true;
+      onChange((prev: RotaFormData) => {
+        if (prev.guard_id) return prev;
+        return { ...prev, guard_id: guards[0].id };
+      });
+    }
+  }, [sites, guards, data.site_id, data.guard_id, onChange]);
+
+  if (loadError) {
+    return (
+      <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+        <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
+          <i className="ri-error-warning-line text-red-400 text-lg" />
+        </div>
+        <p className="text-sm text-red-400">{loadError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 text-sm text-red-300 hover:text-red-200 underline cursor-pointer"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

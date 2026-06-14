@@ -3,7 +3,7 @@
 import { useStripeCheckout } from '../../../lib/useStripeCheckout';
 
 interface CheckoutButtonProps {
-  plan: 'sentinel' | 'command';
+  plan: 'sentinel-starter' | 'sentinel' | 'command';
   billing: 'monthly' | 'yearly';
   children: React.ReactNode;
   className?: string;

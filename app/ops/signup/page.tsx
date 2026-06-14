@@ -180,7 +180,7 @@ export default function OpsSignup() {
       setSubmitError(error.message || 'Something went wrong');
       setIsLoading(false);
     } else {
-      router.push('/onboarding');
+      router.push('/dashboard/setup-wizard');
     }
   };
 

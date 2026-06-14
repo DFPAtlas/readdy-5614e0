@@ -18,13 +18,13 @@ export default function GuardPortalPage() {
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
-      router.replace('/login/guard');
+      try { router.replace('/login/guard'); } catch { window.location.href = '/login/guard'; }
     }
     if (!authLoading && profile && profile.role !== 'guard') {
       if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) {
-        router.replace('/dashboard');
+        try { router.replace('/dashboard'); } catch { window.location.href = '/dashboard'; }
       } else if (profile.role === 'client') {
-        router.replace('/client');
+        try { router.replace('/client'); } catch { window.location.href = '/client'; }
       }
     }
   }, [currentUser, profile, authLoading, router]);

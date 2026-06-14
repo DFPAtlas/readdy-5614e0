@@ -93,7 +93,7 @@ export function useSOPAcknowledgements(sopId?: string, guardId?: string) {
         ip_address: null,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (!err) await load();
     return { data, error: err };

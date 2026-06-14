@@ -5,6 +5,7 @@ import { useClientWeeklyReports } from '@/lib/useClientWeeklyReports';
 import ReportBuilder from './ReportBuilder';
 import LoadingState from './LoadingState';
 import { DashboardPageSkeleton } from '@/app/components/PageSkeleton';
+import { FeatureGate } from '@/lib/useEntitlements';
 
 export default function ClientWeeklyReportsClient() {
   const { loading, error, emailLogs, schedules } = useClientWeeklyReports();
@@ -21,6 +22,7 @@ export default function ClientWeeklyReportsClient() {
   }
 
   return (
+    <FeatureGate feature="hasAiReports">
     <div className="space-y-6">
       <ReportBuilder
         onPreview={() => setPreviewCount((c) => c + 1)}
@@ -93,38 +95,17 @@ export default function ClientWeeklyReportsClient() {
         </div>
       )}
 
-      {/* TODO Placeholder */}
-      <div className="bg-[#111827]/40 border border-gray-800 border-dashed rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
-            <div className="w-4 h-4 flex items-center justify-center text-yellow-400">
-              <i className="ri-tools-line"></i>
-            </div>
+      {/* No data state */}
+      {emailLogs.length === 0 && schedules.length === 0 && (
+        <div className="bg-[#111827]/40 border border-gray-800 rounded-xl p-8 text-center">
+          <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-lg bg-gray-800/50">
+            <i className="ri-mail-send-line text-gray-500 text-xl"></i>
           </div>
-          <h3 className="text-sm font-semibold text-white">Coming Soon: Automation</h3>
+          <h3 className="text-sm font-semibold text-white mb-1">No reports sent yet</h3>
+          <p className="text-sm text-gray-400">Build and preview a report above to start sending weekly updates to clients.</p>
         </div>
-        <p className="text-sm text-gray-400 mb-3">
-          The following features are planned for the automated weekly report system:
-        </p>
-        <ul className="space-y-2 text-sm text-gray-500">
-          <li className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-            <span>Weekly report schedule builder with automatic generation</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-            <span>Email delivery with PDF attachment via edge function</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-            <span>Client report templates with custom branding</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-            <span>Report history and delivery tracking</span>
-          </li>
-        </ul>
-      </div>
+      )}
     </div>
+    </FeatureGate>
   );
 }

@@ -59,7 +59,12 @@ export default function OnboardingTour() {
   useEffect(() => {
     const completed = localStorage.getItem(STORAGE_KEY);
     if (!completed) {
-      const timer = setTimeout(() => setIsVisible(true), 1000);
+      const timer = setTimeout(() => {
+        const hasContent = document.querySelector('[data-tour="welcome"]');
+        if (hasContent) {
+          setIsVisible(true);
+        }
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -100,6 +105,24 @@ export default function OnboardingTour() {
     };
   }, [isVisible]);
 
+  const handleNext = () => {
+    if (currentStep < TOUR_STEPS.length - 1) {
+      setCurrentStep((c) => c + 1);
+    } else {
+      localStorage.setItem(STORAGE_KEY, 'true');
+      setIsVisible(false);
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep((c) => Math.max(0, c - 1));
+  };
+
+  const handleSkip = () => {
+    localStorage.setItem(STORAGE_KEY, 'true');
+    setIsVisible(false);
+  };
+
   if (!isVisible || !step) return null;
 
   const tooltipWidth = 320;
@@ -136,24 +159,6 @@ export default function OnboardingTour() {
     tooltipLeft = Math.max(8, Math.min(tooltipLeft, window.innerWidth - tooltipWidth - 8));
   }
 
-  const handleNext = () => {
-    if (currentStep < TOUR_STEPS.length - 1) {
-      setCurrentStep((c) => c + 1);
-    } else {
-      localStorage.setItem(STORAGE_KEY, 'true');
-      setIsVisible(false);
-    }
-  };
-
-  const handleBack = () => {
-    setCurrentStep((c) => Math.max(0, c - 1));
-  };
-
-  const handleSkip = () => {
-    localStorage.setItem(STORAGE_KEY, 'true');
-    setIsVisible(false);
-  };
-
   const arrowClass =
     position === 'bottom'
       ? 'top-[-6px] left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-b-[#111827]'
@@ -165,6 +170,10 @@ export default function OnboardingTour() {
 
   return (
     <>
+      <div
+        className="fixed inset-0 z-[59] cursor-pointer"
+        onClick={handleSkip}
+      />
       {targetRect && (
         <div
           className="fixed z-[60] rounded-lg pointer-events-none"

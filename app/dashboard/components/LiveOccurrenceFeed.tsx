@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { LiveOccurrence } from '@/lib/useDashboard';
+import { useAuth } from '@/lib/auth';
+import { useLiveOccurrences } from '@/lib/useLiveOccurrences';
 
 interface LiveOccurrenceFeedProps {
   occurrences: LiveOccurrence[];
@@ -47,20 +49,14 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export default function LiveOccurrenceFeed({ occurrences }: LiveOccurrenceFeedProps) {
-  const [animatedIds, setAnimatedIds] = useState<Set<string>>(new Set());
-  const prevCountRef = useRef(occurrences.length);
+export default function LiveOccurrenceFeed({ occurrences: baseOccurrences }: LiveOccurrenceFeedProps) {
+  const { companyId } = useAuth();
+  const { occurrences, newIds } = useLiveOccurrences(companyId, baseOccurrences);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (occurrences.length > prevCountRef.current) {
-      const newIds = occurrences.slice(0, occurrences.length - prevCountRef.current).map((o) => o.id);
-      setAnimatedIds(new Set(newIds));
-      const timer = setTimeout(() => setAnimatedIds(new Set()), 1500);
-      prevCountRef.current = occurrences.length;
-      return () => clearTimeout(timer);
-    }
-    prevCountRef.current = occurrences.length;
-  }, [occurrences]);
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <div>
@@ -72,7 +68,7 @@ export default function LiveOccurrenceFeed({ occurrences }: LiveOccurrenceFeedPr
             Live
           </span>
         </div>
-        <Link href="/occurrence-book" className="text-sm text-blue-400 hover:text-blue-300 font-medium cursor-pointer">
+        <Link href="/occurrence-book" className="text-sm text-blue-400 hover:text-blue-300 font-medium cursor-pointer whitespace-nowrap">
           View all
         </Link>
       </div>
@@ -83,34 +79,60 @@ export default function LiveOccurrenceFeed({ occurrences }: LiveOccurrenceFeedPr
         </div>
       ) : (
         <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 shadow-sm rounded-xl overflow-hidden">
-          {occurrences.map((o, i) => {
-            const isAnimated = animatedIds.has(o.id);
+          {occurrences.slice(0, 8).map((o, i) => {
+            const isAnimated = newIds.has(o.id);
+            const isExpanded = expandedId === o.id;
             const icon = typeIcons[o.entry_type || ''] || 'ri-more-line';
             const color = typeColors[o.entry_type || ''] || 'bg-gray-500/10 text-gray-400';
             const guardName = o.guard_first_name ? `${o.guard_first_name} ${o.guard_last_name || ''}` : 'Unknown';
+            const isLast = i === Math.min(occurrences.length, 8) - 1;
 
             return (
               <div
                 key={o.id}
-                className={`px-4 py-3.5 transition-all ${i !== occurrences.length - 1 ? 'border-b border-white/5' : ''} ${isAnimated ? 'bg-blue-500/10' : ''}`}
+                className={`transition-all ${!isLast ? 'border-b border-white/5' : ''} ${isAnimated ? 'bg-blue-500/10' : ''}`}
                 style={isAnimated ? { animation: 'slideIn 0.6s ease-out' } : undefined}
               >
-                <div className="flex items-start gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      <i className={`${icon} text-sm`}></i>
+                <div
+                  onClick={() => toggleExpand(o.id)}
+                  className="px-4 py-3.5 cursor-pointer hover:bg-white/[0.03] transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+                      <div className="w-4 h-4 flex items-center justify-center">
+                        <i className={`${icon} text-sm`}></i>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-medium text-gray-500">{o.site_name}</span>
-                      <span className="text-xs text-gray-600">|</span>
-                      <span className="text-xs text-gray-500">{guardName}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs font-medium text-gray-500">{o.site_name}</span>
+                        <span className="text-xs text-gray-600">|</span>
+                        <span className="text-xs text-gray-500">{guardName}</span>
+                      </div>
+                      <p className={`text-sm text-gray-300 ${isExpanded ? '' : 'line-clamp-2'}`}>{o.entry}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-gray-500">{timeAgo(o.occurred_at || o.created_at)}</p>
+                        <div className="w-4 h-4 flex items-center justify-center text-gray-600">
+                          <i className={`text-xs transition-transform ${isExpanded ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'}`}></i>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-300 line-clamp-2">{o.entry}</p>
-                    <p className="text-xs text-gray-500 mt-1">{timeAgo(o.occurred_at || o.created_at)}</p>
                   </div>
                 </div>
+
+                {isExpanded && o.ai_summary && (
+                  <div className="px-4 pb-3.5 -mt-1">
+                    <div className="ml-11 bg-blue-500/5 border border-blue-500/10 rounded-lg px-3 py-2.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          <i className="ri-robot-line text-blue-400 text-xs"></i>
+                        </div>
+                        <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">AI Summary</span>
+                      </div>
+                      <p className="text-xs text-gray-400 leading-relaxed">{o.ai_summary}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

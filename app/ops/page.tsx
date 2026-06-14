@@ -9,10 +9,15 @@ export default function OpsRedirect() {
   const { role } = useAuth();
 
   useEffect(() => {
-    if (role === 'super_admin') {
-      router.replace('/admin');
-    } else {
-      router.replace('/dashboard');
+    try {
+      if (role === 'super_admin') {
+        router.replace('/admin');
+      } else {
+        router.replace('/dashboard');
+      }
+    } catch {
+      if (role === 'super_admin') window.location.href = '/admin';
+      else window.location.href = '/dashboard';
     }
   }, [router, role]);
 

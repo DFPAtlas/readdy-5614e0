@@ -2,6 +2,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ============================================================================
+// SOLE ACTIVE STRIPE WEBHOOK — PRODUCTION
+// ============================================================================
+// This is the ONLY Stripe webhook endpoint configured for live/production use.
+// There is no "enhanced-stripe-webhook" — that name does not exist in this
+// codebase. Do NOT create a second webhook endpoint in the Stripe dashboard
+// unless you also deploy its matching edge function here first.
+//
+// The stripe-webhook-test function is an admin-only testing tool (protected by
+// SuperAdminGate on the frontend) and is NOT a real webhook receiver.
+// ============================================================================
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
@@ -59,6 +71,107 @@ serve(async (req) => {
     });
   }
 
+  let planSlugCache: Map<string, string> = new Map();
+
+  async function getPlanSlugFromPriceId(priceId: string): Promise<string | null> {
+    if (planSlugCache.has(priceId)) return planSlugCache.get(priceId) || null;
+    const { data: plans } = await admin.from("plans").select("slug, stripe_price_id_monthly, stripe_price_id_yearly");
+    if (!plans) return null;
+    for (const p of plans) {
+      if (p.stripe_price_id_monthly === priceId) {
+        planSlugCache.set(priceId, p.slug);
+        return p.slug;
+      }
+      if (p.stripe_price_id_yearly === priceId) {
+        planSlugCache.set(priceId, p.slug);
+        return p.slug;
+      }
+    }
+    planSlugCache.set(priceId, "");
+    return null;
+  }
+
+  function planSlugToLabel(slug: string): string {
+    switch (slug) {
+      case 'sentinel-starter': return 'Sentinel Starter';
+      case 'sentinel': return 'GuardianHub Sentinel';
+      case 'command': return 'GuardianHub Command';
+      case 'titan': return 'GuardianHub Titan';
+      default: return slug.charAt(0).toUpperCase() + slug.slice(1);
+    }
+  }
+
+  async function syncCompanyModules(companyId: string, planSlug: string) {
+    if (!companyId || !planSlug) return;
+
+    const { data: planData } = await admin
+      .from("plans")
+      .select("id")
+      .eq("slug", planSlug)
+      .maybeSingle();
+
+    if (!planData) return;
+
+    const { data: features } = await admin
+      .from("plan_features")
+      .select("feature_key, included")
+      .eq("plan_id", planData.id);
+
+    const moduleFeatures = (features || []).filter((f) => f.feature_key.startsWith("module_"));
+
+    const { data: modules } = await admin.from("modules").select("id, slug");
+
+    if (!modules) return;
+
+    for (const mf of moduleFeatures) {
+      const moduleSlug = mf.feature_key.replace("module_", "");
+      const module = modules.find((m) => m.slug === moduleSlug);
+      if (!module) continue;
+
+      const { data: existing } = await admin
+        .from("company_enabled_modules")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("module_id", module.id)
+        .maybeSingle();
+
+      if (mf.included) {
+        if (!existing) {
+          await admin.from("company_enabled_modules").insert({
+            company_id: companyId,
+            module_id: module.id,
+            enabled: true,
+            enabled_at: new Date().toISOString(),
+          });
+        } else {
+          await admin.from("company_enabled_modules")
+            .update({ enabled: true, enabled_at: new Date().toISOString() })
+            .eq("id", existing.id);
+        }
+      } else {
+        if (existing) {
+          await admin.from("company_enabled_modules")
+            .update({ enabled: false })
+            .eq("id", existing.id);
+        }
+      }
+    }
+  }
+
+  async function disablePremiumModules(companyId: string) {
+    if (!companyId) return;
+    const premiumSlugs = ['ai_assistant', 'client_portal', 'patrols', 'sop_builder'];
+    const { data: modules } = await admin.from("modules").select("id, slug");
+    if (!modules) return;
+    const premiumIds = modules.filter((m) => premiumSlugs.includes(m.slug)).map((m) => m.id);
+    if (premiumIds.length === 0) return;
+    await admin
+      .from("company_enabled_modules")
+      .update({ enabled: false })
+      .eq("company_id", companyId)
+      .in("module_id", premiumIds);
+  }
+
   try {
     const logRow = {
       stripe_event_id: event.id,
@@ -85,6 +198,7 @@ serve(async (req) => {
       if (!company) return;
       const { error } = await admin.from("companies").update(updates).eq("id", company.id);
       if (error) throw error;
+      return company.id;
     };
 
     const handleInvoice = async (inv: any) => {
@@ -119,6 +233,8 @@ serve(async (req) => {
 
       if (inv.subscription && inv.status === "open" && (inv.attempt_count ?? 0) > 0) {
         await updateCompanySubscription(inv.customer, { subscription_status: "past_due", updated_at: new Date().toISOString() });
+        const cid = await companyLookup(inv.customer);
+        if (cid) await disablePremiumModules(cid);
       }
       if (inv.subscription && inv.status === "paid") {
         await updateCompanySubscription(inv.customer, { subscription_status: "active", updated_at: new Date().toISOString() });
@@ -192,6 +308,8 @@ serve(async (req) => {
     const handleSubscriptionEvent = async (sub: any, type: string) => {
       const companyId = sub.customer ? await companyLookup(sub.customer) : null;
       const prev = (event.data as any).previous_attributes || {};
+      const priceId = sub.items?.data?.[0]?.plan?.id || null;
+
       await admin.from("billing_subscription_events").insert({
         stripe_event_id: event.id,
         stripe_subscription_id: sub.id,
@@ -201,7 +319,7 @@ serve(async (req) => {
         previous_status: prev.status || null,
         new_status: sub.status || null,
         previous_plan: prev.plan?.id || null,
-        new_plan: sub.items?.data?.[0]?.plan?.id || null,
+        new_plan: priceId,
         cancel_at: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
         canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
         notes: null,
@@ -213,24 +331,72 @@ serve(async (req) => {
         const updates: Record<string, any> = {
           subscription_status: sub.status,
           stripe_subscription_id: sub.id,
+          stripe_customer_id: sub.customer,
           updated_at: new Date().toISOString(),
         };
         const interval = sub.items?.data?.[0]?.plan?.interval;
         if (interval) {
           updates.subscription_billing = interval;
         }
+        if (sub.current_period_end) {
+          updates.subscription_period_end = new Date(sub.current_period_end * 1000).toISOString();
+        }
+        if (sub.cancel_at) {
+          updates.subscription_cancel_at = new Date(sub.cancel_at * 1000).toISOString();
+        }
+        if (priceId) {
+          const slug = await getPlanSlugFromPriceId(priceId);
+          if (slug) {
+            updates.subscription_plan = slug;
+            updates.plan_name = planSlugToLabel(slug);
+          }
+        }
         await updateCompanySubscription(sub.customer, updates);
+
+        if (priceId) {
+          const slug = await getPlanSlugFromPriceId(priceId);
+          if (slug && companyId) {
+            if (sub.status === 'active' || sub.status === 'trialing') {
+              await syncCompanyModules(companyId, slug);
+            } else if (sub.status === 'canceled' || sub.status === 'past_due' || sub.status === 'unpaid') {
+              await disablePremiumModules(companyId);
+            }
+          }
+        }
       }
     };
 
     const handleCheckoutSession = async (session: any) => {
       if (session.customer && session.subscription) {
+        const meta = session.metadata || {};
         const updates: Record<string, any> = {
           stripe_subscription_id: session.subscription,
+          stripe_customer_id: session.customer,
           subscription_status: "active",
           updated_at: new Date().toISOString(),
         };
+        if (meta.selected_plan) {
+          updates.subscription_plan = meta.selected_plan;
+          updates.plan_name = planSlugToLabel(meta.selected_plan);
+        }
+        if (meta.billing_interval) {
+          updates.subscription_billing = meta.billing_interval;
+        }
+
+        const sub = await stripe.subscriptions.retrieve(session.subscription);
+        if (sub.current_period_end) {
+          updates.subscription_period_end = new Date(sub.current_period_end * 1000).toISOString();
+        }
+        if (sub.cancel_at) {
+          updates.subscription_cancel_at = new Date(sub.cancel_at * 1000).toISOString();
+        }
+
         await updateCompanySubscription(session.customer, updates);
+
+        const companyId = await companyLookup(session.customer);
+        if (companyId && meta.selected_plan) {
+          await syncCompanyModules(companyId, meta.selected_plan);
+        }
       }
     };
 

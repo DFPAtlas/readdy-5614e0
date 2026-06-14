@@ -48,7 +48,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const { ticketId, companyId, affectedUserId } = body;
 
     if (!ticketId || !companyId) {
@@ -58,44 +63,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch safe account data
     const results: any = {};
 
-    // Company info
     const { data: company } = await supabaseAdmin.from('companies').select('*').eq('id', companyId).maybeSingle();
     results.company = company ? { id: company.id, name: company.name, status: company.account_status || 'active', subscription_plan: company.subscription_plan || 'none' } : null;
 
-    // Company users
     const { data: companyUsers } = await supabaseAdmin.from('users').select('id, first_name, last_name, email, role, status, created_at').eq('company_id', companyId);
     results.users = (companyUsers || []).map((u: any) => ({ id: u.id, name: `${u.first_name || ''} ${u.last_name || ''}`.trim(), email: u.email, role: u.role, status: u.status }));
 
-    // Affected user if specified
     if (affectedUserId) {
       const { data: affected } = await supabaseAdmin.from('users').select('*').eq('id', affectedUserId).maybeSingle();
       results.affected_user = affected ? { id: affected.id, email: affected.email, role: affected.role, status: affected.status, company_id: affected.company_id } : null;
 
-      // Check role assignment
       const { data: userRoles } = await supabaseAdmin.from('user_roles').select('*').eq('user_id', affectedUserId);
       results.affected_user_roles = userRoles || [];
 
-      // Check site access
       const { data: siteAccess } = await supabaseAdmin.from('user_site_access').select('site_id, sites(site_name)').eq('user_id', affectedUserId);
       results.affected_user_site_access = (siteAccess || []).map((s: any) => ({ site_id: s.site_id, site_name: s.sites?.site_name }));
     }
 
-    // Sites for company
     const { data: sites } = await supabaseAdmin.from('sites').select('id, site_name, address, status').eq('company_id', companyId);
     results.sites = (sites || []).map((s: any) => ({ id: s.id, name: s.site_name, status: s.status }));
 
-    // Recent incidents
     const { data: incidents } = await supabaseAdmin.from('incidents').select('id, title, status, created_at').eq('company_id', companyId).order('created_at', { ascending: false }).limit(5);
     results.recent_incidents = (incidents || []).map((i: any) => ({ id: i.id, title: i.title, status: i.status }));
 
-    // Billing check
     const { data: subscriptions } = await supabaseAdmin.from('billing_subscription_events').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(3);
     results.recent_billing_events = (subscriptions || []).map((s: any) => ({ type: s.event_type, status: s.status, created_at: s.created_at }));
 
-    // AI analysis
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
     let aiResult: any = {};
 
@@ -140,7 +135,7 @@ Be concise and factual.`;
 
       if (aiResponse.ok) {
         const aiData = await aiResponse.json();
-        const content = aiData.choices?.[0]?.message?.content || '{}';
+        const content = aiData.choices?.[0]?.message?.content || '';
         try {
           const cleaned = content.replace(/```json\n?|\n?```/g, '').trim();
           aiResult = JSON.parse(cleaned);
@@ -154,7 +149,6 @@ Be concise and factual.`;
         }
       }
     } else {
-      // Fallback without OpenAI
       const affected = results.affected_user;
       const hasRole = results.affected_user_roles?.length > 0;
       const hasSiteAccess = results.affected_user_site_access?.length > 0;

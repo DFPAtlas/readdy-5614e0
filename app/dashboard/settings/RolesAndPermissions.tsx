@@ -46,7 +46,7 @@ export default function RolesAndPermissions() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
-      const { data: userData } = await supabase.from('users').select('company_id').eq('id', user.id).single();
+      const { data: userData } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle();
       if (userData?.company_id) setCompanyId(userData.company_id);
     }
     init();

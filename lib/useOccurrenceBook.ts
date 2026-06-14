@@ -178,7 +178,7 @@ export function useOccurrenceBook(siteId: string | null, filters?: OBFilters) {
       .from('occurrence_books')
       .insert({ company_id: companyId, ...payload })
       .select()
-      .single();
+      .maybeSingle();
     return { data, error };
   };
 
@@ -188,7 +188,7 @@ export function useOccurrenceBook(siteId: string | null, filters?: OBFilters) {
       .update({ ...payload, edited_at: new Date().toISOString() })
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
     return { data, error };
   };
 
