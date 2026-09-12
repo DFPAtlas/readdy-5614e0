@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useStripeCheckout } from '../../../lib/useStripeCheckout';
+import { useRouter } from 'next/navigation';
+import { startSubscriptionCheckout, type SubscriptionPlanKey, type BillingInterval } from '../../../lib/stripeSubscriptionCheckout';
 
 interface ChangePlanModalProps {
   isOpen: boolean;
@@ -144,11 +145,16 @@ const plans = [
 ];
 
 export default function ChangePlanModal({ isOpen, onClose, currentPlan, onPlanChanged }: ChangePlanModalProps) {
-  const [selectedKey, setSelectedKey] = useState<PlanKey>(
-    (currentPlan.toLowerCase().replace('guardianhub ', '').replace(' starter', '') as PlanKey) || 'sentinel'
-  );
+  const router = useRouter();
+  const [selectedKey, setSelectedKey] = useState<PlanKey>(() => {
+    const norm = currentPlan.toLowerCase().replace('guardian-hub ', '').replace(' starter', '').replace('-starter', '');
+    if ((plans as any).find((p: any) => p.key === norm)) return norm as PlanKey;
+    if (norm === 'sentinel starter') return 'sentinel-starter';
+    return 'sentinel';
+  });
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
-  const { checkout, loading, error: checkoutError } = useStripeCheckout();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const selectedPlan = plans.find((p) => p.key === selectedKey)!;
   const s = planStyles[selectedKey];
@@ -156,15 +162,31 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan, onPlanCh
   const isStarter = selectedKey === 'sentinel-starter';
   const isCurrent = currentPlan.toLowerCase().includes(selectedKey) || (isStarter && currentPlan.toLowerCase().includes('starter'));
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (isCustom) {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/contact';
-      }
+      router.push('/contact');
       return;
     }
     if (!isCurrent) {
-      checkout(selectedKey, isStarter ? 'monthly' : billingPeriod, onPlanChanged);
+      setCheckoutLoading(true);
+      setCheckoutError(null);
+
+      const billing: BillingInterval = isStarter ? 'monthly' : billingPeriod;
+      const result = await startSubscriptionCheckout(selectedKey as SubscriptionPlanKey, billing);
+
+      if (result.success && result.url) {
+        if (onPlanChanged) onPlanChanged();
+        try { window.open(result.url, '_top'); } catch { window.location.href = result.url; }
+        return;
+      }
+
+      setCheckoutError(result.error || 'Checkout failed');
+
+      if (result.code === 'AUTH_REQUIRED') {
+        try { router.push('/login?next=/dashboard/settings'); } catch { window.location.href = '/login?next=/dashboard/settings'; }
+      }
+
+      setCheckoutLoading(false);
     } else {
       onClose();
     }
@@ -353,14 +375,14 @@ export default function ChangePlanModal({ isOpen, onClose, currentPlan, onPlanCh
             </button>
             <button
               onClick={handleConfirm}
-              disabled={loading}
+              disabled={checkoutLoading}
               className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap disabled:opacity-50 ${
                 isCurrent
                   ? 'bg-gray-100 text-gray-500 border border-gray-200'
                   : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
               }`}
             >
-              {loading ? (
+              {checkoutLoading ? (
                 <span className="inline-flex items-center gap-2">
                   <i className="ri-loader-4-line animate-spin" />
                   Redirecting...

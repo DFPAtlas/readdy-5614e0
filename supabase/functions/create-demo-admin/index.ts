@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
 
     const isFirstSetup = !existingSuperAdmins || existingSuperAdmins.length === 0;
 
-    // Secret required for additional admins, optional for first setup
     if (!isFirstSetup && (!secret || body.secret !== secret)) {
       return new Response(
         JSON.stringify({ error: 'Invalid or missing setup secret' }),
@@ -67,7 +66,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!isFirstSetup) {
+    if (!isFirstSetup && !body.secret) {
       const admin = await verifySuperAdmin(req);
       if (!admin) {
         return new Response(
@@ -129,7 +128,7 @@ Deno.serve(async (req) => {
           phone: '+44 20 7946 0958',
           address: 'London, UK',
           account_status: 'active',
-          onboarding_status: 'complete',
+          onboarding_status: 'completed',
           plan_name: 'Enterprise',
           subscription_plan: 'titan',
           subscription_status: 'active',

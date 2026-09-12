@@ -4,42 +4,33 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { getRoleHome, getOnboardingRoute } from '@/lib/redirect';
 
 export default function ClientLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const { signIn, currentUser, profile, isLoading: authLoading } = useAuth();
+  const { signIn, currentUser, profile, company, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (authLoading) return;
     if (currentUser && profile) {
-      try {
-        if (profile.role === 'client') {
-          router.replace('/client');
-        } else if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) {
-          router.replace('/dashboard');
-        } else if (profile.role === 'guard') {
-          router.replace('/guard');
-        }
-      } catch {
-        if (profile.role === 'client') window.location.href = '/client';
-        else if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) window.location.href = '/dashboard';
-        else if (profile.role === 'guard') window.location.href = '/guard';
-      }
+      const onboardingRoute = getOnboardingRoute(profile.role, company?.onboarding_status);
+      router.replace(onboardingRoute || getRoleHome(profile.role));
     }
-  }, [currentUser, profile, authLoading, router]);
+  }, [currentUser, profile, company, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError('');
     const { error: signInError } = await signIn(email, password);
     if (signInError) {
       setError('Invalid email or password');
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -99,12 +90,17 @@ export default function ClientLoginPage() {
                 placeholder="Enter your password"
               />
             </div>
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer">
+                Forgot password?
+              </Link>
+            </div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <i className="ri-loader-4-line animate-spin"></i>
                   Signing in...

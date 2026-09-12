@@ -8,14 +8,12 @@ const SelectButton = ({
   onChange,
   icon,
   label,
-  activeLabel,
 }: {
   value: string;
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
   icon: string;
   label: string;
-  activeLabel?: string;
 }) => {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -25,7 +23,7 @@ const SelectButton = ({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer whitespace-nowrap"
+        className="flex items-center gap-2 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
       >
         <div className="w-4 h-4 flex items-center justify-center text-gray-500">
           <i className={`${icon} text-sm`}></i>
@@ -38,7 +36,7 @@ const SelectButton = ({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-48 bg-[#0f172a] border border-white/10 rounded-lg shadow-lg z-50 overflow-hidden">
+          <div className="absolute top-full left-0 mt-1 w-48 bg-[#1a1f2e] border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
             {options.map((o) => (
               <button
                 key={o.value}
@@ -47,7 +45,7 @@ const SelectButton = ({
                   setOpen(false);
                 }}
                 className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${
-                  value === o.value ? 'bg-blue-500/10 text-blue-400' : 'text-gray-300 hover:bg-white/5'
+                  value === o.value ? 'bg-blue-600/20 text-blue-300' : 'text-gray-300 hover:bg-gray-800/40'
                 }`}
               >
                 {o.label}
@@ -76,7 +74,7 @@ export default function AssignmentFilters({
   onClear: () => void;
 }) {
   const [showMore, setShowMore] = useState(false);
-  const activeCount = Object.values(filters || {}).filter((v) => v && v !== 'all').length;
+  const activeCount = Object.values(filters || {}).filter((v) => v && v !== 'all' && v !== '').length;
 
   const update = (key: string, value: string) => onChange({ ...(filters || {}), [key]: value });
 
@@ -117,9 +115,17 @@ export default function AssignmentFilters({
           placeholder="Search guard or site..."
           value={filters?.search || ''}
           onChange={(e) => update('search', e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 w-48"
+          className="bg-gray-800/60 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 w-48"
         />
       </div>
+
+      <SelectButton
+        value={filters?.client || 'all'}
+        options={clientOptions}
+        onChange={(v) => update('client', v)}
+        icon="ri-briefcase-line"
+        label="All Clients"
+      />
 
       <SelectButton
         value={filters?.site || 'all'}
@@ -137,14 +143,6 @@ export default function AssignmentFilters({
         label="All Guards"
       />
 
-      <SelectButton
-        value={filters?.client || 'all'}
-        options={clientOptions}
-        onChange={(v) => update('client', v)}
-        icon="ri-briefcase-line"
-        label="All Clients"
-      />
-
       <button
         onClick={() => setShowMore(!showMore)}
         className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg cursor-pointer whitespace-nowrap"
@@ -154,21 +152,22 @@ export default function AssignmentFilters({
         </div>
         More Filters
         {activeCount > 0 && (
-          <span className="bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">{activeCount}</span>
+          <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">{activeCount}</span>
         )}
       </button>
 
       {activeCount > 0 && (
         <button
           onClick={onClear}
-          className="text-sm text-gray-500 hover:text-white transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg border border-gray-700 cursor-pointer whitespace-nowrap"
         >
-          Clear all
+          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-circle-line"></i></div>
+          Reset Filters
         </button>
       )}
 
       {showMore && (
-        <div className="w-full flex flex-wrap gap-3 mt-1">
+        <div className="w-full flex flex-wrap gap-3 mt-1 pt-3 border-t border-gray-800">
           <SelectButton
             value={filters?.licence || 'all'}
             options={licenceOptions}

@@ -145,8 +145,8 @@ export function useEvidenceVault(filters?: EvidenceFilters) {
         .from('incident_media')
         .select(`
           *,
-          incidents!inner(incident_type, status, site_id, company_id),
-          sites!incidents(site_name)
+          incidents!incident_media_incident_id_fkey(incident_type, status, site_id, company_id),
+          sites!incidents_site_id_fkey(site_name)
         `)
         .eq('incidents.company_id', companyId)
         .order('created_at', { ascending: false }),
@@ -230,19 +230,26 @@ export function useEvidenceVault(filters?: EvidenceFilters) {
       latest_review: reviewsMap[row.id]?.[0] || null,
     }));
 
-    let mappedIncidentMedia: IncidentMediaItem[] = (incidentMediaRes.data || []).map((row: any) => ({
-      id: row.id,
-      incident_id: row.incident_id,
-      file_url: row.file_url,
-      media_type: row.media_type,
-      filename: row.filename,
-      uploaded_by: row.uploaded_by,
-      created_at: row.created_at,
-      incident_status: row.incidents?.status || null,
-      incident_type: row.incidents?.incident_type || null,
-      site_name: row.sites?.site_name || null,
-      client_name: null,
-      source: 'incident_media',
+    let mappedIncidentMedia: IncidentMediaItem[] = await Promise.all((incidentMediaRes.data || []).map(async (row: any) => {
+      let fileUrl = row.file_url;
+      if (row.storage_path) {
+        const { data: signed } = await supabase.storage.from('incident-media').createSignedUrl(row.storage_path, 3600);
+        if (signed?.signedUrl) fileUrl = signed.signedUrl;
+      }
+      return {
+        id: row.id,
+        incident_id: row.incident_id,
+        file_url: fileUrl,
+        media_type: row.media_type,
+        filename: row.filename,
+        uploaded_by: row.uploaded_by,
+        created_at: row.created_at,
+        incident_status: row.incidents?.status || null,
+        incident_type: row.incidents?.incident_type || null,
+        site_name: row.sites?.site_name || null,
+        client_name: null,
+        source: 'incident_media',
+      };
     }));
 
     if (filters?.search) {

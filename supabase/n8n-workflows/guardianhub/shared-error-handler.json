@@ -1,0 +1,60 @@
+{
+  "name": "GuardianHub — Shared: Error Handler (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Shared error handler v1.0.0\n\nAttach as the error workflow for every agent workflow (Settings > Error Workflow). Normalises the error and reports it to the GuardianHub callback as a failed execution, which marks it dead-lettered."
+      },
+      "id": "a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a301",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": {},
+      "id": "a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a302",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_CALLBACK_SIGNING_SECRET||$env.N8N_GUARDIANHUB_SIGNING_SECRET;const e=$json.error||'';const last=$json.lastNodeData||'';const cb={run_id:(e.run_id||''),agent_key:(e.agent_key||''),company_id:(e.company_id||null),event_type:(e.event_type||''),status:'failed',error:(e.message||'Workflow error').slice(0,500)};const sig=s?crypto.createHmac('sha256',s).update(JSON.stringify(cb)).digest('hex'):'';return[{json:{callback:cb,signature:sig,timestamp:String(Date.now()),nonce:(e.nonce||''),correlation_id:(e.correlation_id||'')}}];"
+      },
+      "id": "a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a303",
+      "name": "Normalise Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GUARDIANHUB_CALLBACK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-GH-Signature", "value": "={{ $json.signature }}" },
+          { "name": "X-GH-Timestamp", "value": "={{ $json.timestamp }}" },
+          { "name": "X-GH-Nonce", "value": "={{ $json.nonce }}" },
+          { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.callback) }}"
+      },
+      "id": "a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a304",
+      "name": "Report Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Error Trigger": { "main": [[{ "node": "Normalise Error", "type": "main", "index": 0 }]] },
+    "Normalise Error": { "main": [[{ "node": "Report Failure", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

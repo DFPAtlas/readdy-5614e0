@@ -35,6 +35,9 @@ const INITIAL_FORM = {
   contractType: 'Full-time',
 };
 
+const inputClass = 'w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500';
+const labelClass = 'block text-sm font-medium text-gray-300 mb-1.5';
+
 export default function CreateTemplateModal({ onClose, onCreated }: CreateTemplateModalProps) {
   const { companyId } = useAuth();
   const [formData, setFormData] = useState(INITIAL_FORM);
@@ -123,204 +126,191 @@ export default function CreateTemplateModal({ onClose, onCreated }: CreateTempla
     }
   };
 
+  function DropdownButton({ open, onToggle, value }: { open: boolean; onToggle: () => void; value: string }) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full px-3 py-2 border border-gray-700 bg-gray-800/60 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:border-blue-500 pr-8 cursor-pointer"
+      >
+        {value}
+        <div className="w-4 h-4 flex items-center justify-center"><i className="ri-arrow-down-s-line text-gray-400"></i></div>
+      </button>
+    );
+  }
+
+  function DropdownMenu({ options, onSelect }: { options: string[]; onSelect: (v: string) => void }) {
+    return (
+      <div className="absolute top-full left-0 right-0 mt-1 bg-[#1f2937] border border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+        {options.map(o => (
+          <button key={o} type="button" onClick={() => onSelect(o)} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white transition-colors cursor-pointer">{o}</button>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg z-10">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-[#111827] border border-gray-800 rounded-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-[#111827] border-b border-gray-800 px-6 py-4 rounded-t-xl z-10">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Create Staff Template</h2>
-            <button onClick={onClose} disabled={saving} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded transition-colors cursor-pointer">
-              <i className="ri-close-line text-gray-500 text-xl"></i>
+            <h2 className="text-xl font-bold text-white">Create Staff Template</h2>
+            <button onClick={onClose} disabled={saving} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer">
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-line"></i></div>
             </button>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
-            <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
+            <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex items-center justify-between">
               <span>{error}</span>
               <button type="button" onClick={() => setError(null)} className="w-6 h-6 flex items-center justify-center cursor-pointer">
-                <i className="ri-close-line text-red-500"></i>
+                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-line text-red-400"></i></div>
               </button>
             </div>
           )}
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Template Information</h3>
+            <h3 className="text-lg font-semibold text-white">Template Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Template Name *</label>
-                <input type="text" name="templateName" value={formData.templateName} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="e.g., Senior Security Officer Template" required />
+                <label className={labelClass}>Template Name *</label>
+                <input type="text" name="templateName" value={formData.templateName} onChange={handleInputChange} className={inputClass} placeholder="e.g., Senior Security Officer Template" required />
               </div>
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                <button type="button" onClick={() => setDepartmentOpen(!departmentOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8">
-                  {formData.department}
-                  <i className="ri-arrow-down-s-line text-gray-400"></i>
-                </button>
-                {departmentOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                    {DEPARTMENTS.map(d => (
-                      <button key={d} type="button" onClick={() => { setFormData(prev => ({ ...prev, department: d })); setDepartmentOpen(false); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">{d}</button>
-                    ))}
-                  </div>
-                )}
+                <label className={labelClass}>Department</label>
+                <DropdownButton open={departmentOpen} onToggle={() => setDepartmentOpen(!departmentOpen)} value={formData.department} />
+                {departmentOpen && <DropdownMenu options={DEPARTMENTS} onSelect={(d) => { setFormData(prev => ({ ...prev, department: d })); setDepartmentOpen(false); }} />}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Template Description</label>
-              <textarea name="templateDescription" value={formData.templateDescription} onChange={handleInputChange} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Describe this template and when to use it" />
+              <label className={labelClass}>Template Description</label>
+              <textarea name="templateDescription" value={formData.templateDescription} onChange={handleInputChange} rows={3} className={`${inputClass} resize-none`} placeholder="Describe this template and when to use it" />
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Template Photo</h3>
+          <div className="border-t border-gray-800 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Template Photo</h3>
             <div className="flex items-center space-x-6">
               <div className="relative">
                 {photoPreview ? (
                   <img src={photoPreview} alt="Template" className="w-24 h-24 rounded-full object-cover object-top border-4 border-blue-500" />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-4 border-gray-300">
-                    <i className="ri-user-line text-gray-500 text-3xl"></i>
+                  <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center border-4 border-gray-700">
+                    <div className="w-10 h-10 flex items-center justify-center"><i className="ri-user-line text-gray-500 text-3xl"></i></div>
                   </div>
                 )}
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors cursor-pointer">
-                  <i className="ri-camera-line text-white text-sm"></i>
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-500 transition-colors cursor-pointer">
+                  <div className="w-4 h-4 flex items-center justify-center"><i className="ri-camera-line text-white text-sm"></i></div>
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
               </div>
               <div>
-                <h4 className="text-md font-medium text-gray-900">Default Profile Photo</h4>
+                <h4 className="text-md font-medium text-white">Default Profile Photo</h4>
                 <p className="text-sm text-gray-500">{photoFile ? photoFile.name : 'Optional: Upload a default photo for this template'}</p>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Position Details</h3>
+          <div className="border-t border-gray-800 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Position Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
-                <button type="button" onClick={() => setPositionOpen(!positionOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8">
-                  {formData.position}
-                  <i className="ri-arrow-down-s-line text-gray-400"></i>
-                </button>
-                {positionOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                    {POSITIONS.map(p => (
-                      <button key={p} type="button" onClick={() => { setFormData(prev => ({ ...prev, position: p })); setPositionOpen(false); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">{p}</button>
-                    ))}
-                  </div>
-                )}
+                <label className={labelClass}>Position *</label>
+                <DropdownButton open={positionOpen} onToggle={() => setPositionOpen(!positionOpen)} value={formData.position} />
+                {positionOpen && <DropdownMenu options={POSITIONS} onSelect={(p) => { setFormData(prev => ({ ...prev, position: p })); setPositionOpen(false); }} />}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Default Salary (Annual)</label>
-                <input type="number" name="salary" value={formData.salary} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="30000" />
+                <label className={labelClass}>Default Salary (Annual)</label>
+                <input type="number" name="salary" value={formData.salary} onChange={handleInputChange} className={inputClass} placeholder="30000" />
               </div>
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Default Shift</label>
-                <button type="button" onClick={() => setShiftOpen(!shiftOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8">
-                  {formData.shift}
-                  <i className="ri-arrow-down-s-line text-gray-400"></i>
-                </button>
-                {shiftOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                    {SHIFT_OPTIONS.map(s => (
-                      <button key={s} type="button" onClick={() => { setFormData(prev => ({ ...prev, shift: s })); setShiftOpen(false); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">{s}</button>
-                    ))}
-                  </div>
-                )}
+                <label className={labelClass}>Default Shift</label>
+                <DropdownButton open={shiftOpen} onToggle={() => setShiftOpen(!shiftOpen)} value={formData.shift} />
+                {shiftOpen && <DropdownMenu options={SHIFT_OPTIONS} onSelect={(s) => { setFormData(prev => ({ ...prev, shift: s })); setShiftOpen(false); }} />}
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Requirements</h3>
+          <div className="border-t border-gray-800 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Requirements</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Experience (Years)</label>
-                <input type="number" name="minimumExperience" value={formData.minimumExperience} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" min="0" />
+                <label className={labelClass}>Minimum Experience (Years)</label>
+                <input type="number" name="minimumExperience" value={formData.minimumExperience} onChange={handleInputChange} className={inputClass} min="0" />
               </div>
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contract Type</label>
-                <button type="button" onClick={() => setContractOpen(!contractOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8">
-                  {formData.contractType}
-                  <i className="ri-arrow-down-s-line text-gray-400"></i>
-                </button>
-                {contractOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                    {CONTRACT_TYPES.map(c => (
-                      <button key={c} type="button" onClick={() => { setFormData(prev => ({ ...prev, contractType: c })); setContractOpen(false); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">{c}</button>
-                    ))}
-                  </div>
-                )}
+                <label className={labelClass}>Contract Type</label>
+                <DropdownButton open={contractOpen} onToggle={() => setContractOpen(!contractOpen)} value={formData.contractType} />
+                {contractOpen && <DropdownMenu options={CONTRACT_TYPES} onSelect={(c) => { setFormData(prev => ({ ...prev, contractType: c })); setContractOpen(false); }} />}
               </div>
             </div>
             <div className="mt-4 space-y-3">
               <label className="flex items-center cursor-pointer">
-                <input type="checkbox" name="siaLicenseRequired" checked={formData.siaLicenseRequired} onChange={handleInputChange} className="mr-3" />
-                <span className="text-sm text-gray-700">SIA License Required</span>
+                <input type="checkbox" name="siaLicenseRequired" checked={formData.siaLicenseRequired} onChange={handleInputChange} className="mr-3 accent-blue-500" />
+                <span className="text-sm text-gray-300">SIA License Required</span>
               </label>
               <label className="flex items-center cursor-pointer">
-                <input type="checkbox" name="backgroundCheckRequired" checked={formData.backgroundCheckRequired} onChange={handleInputChange} className="mr-3" />
-                <span className="text-sm text-gray-700">Background Check Required</span>
+                <input type="checkbox" name="backgroundCheckRequired" checked={formData.backgroundCheckRequired} onChange={handleInputChange} className="mr-3 accent-blue-500" />
+                <span className="text-sm text-gray-300">Background Check Required</span>
               </label>
               <label className="flex items-center cursor-pointer">
-                <input type="checkbox" name="uniformRequired" checked={formData.uniformRequired} onChange={handleInputChange} className="mr-3" />
-                <span className="text-sm text-gray-700">Uniform Required</span>
+                <input type="checkbox" name="uniformRequired" checked={formData.uniformRequired} onChange={handleInputChange} className="mr-3 accent-blue-500" />
+                <span className="text-sm text-gray-300">Uniform Required</span>
               </label>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Skills & Certifications</h3>
+          <div className="border-t border-gray-800 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Skills & Certifications</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Required Certifications</label>
-                <textarea name="certifications" value={formData.certifications} onChange={handleInputChange} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="e.g., First Aid, Fire Safety, CCTV Operation" />
+                <label className={labelClass}>Required Certifications</label>
+                <textarea name="certifications" value={formData.certifications} onChange={handleInputChange} rows={3} className={`${inputClass} resize-none`} placeholder="e.g., First Aid, Fire Safety, CCTV Operation" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Required Skills</label>
-                <textarea name="skillsRequired" value={formData.skillsRequired} onChange={handleInputChange} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="e.g., Excellent communication, Physical fitness, Attention to detail" />
+                <label className={labelClass}>Required Skills</label>
+                <textarea name="skillsRequired" value={formData.skillsRequired} onChange={handleInputChange} rows={3} className={`${inputClass} resize-none`} placeholder="e.g., Excellent communication, Physical fitness, Attention to detail" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Training Required</label>
-                <textarea name="trainingRequired" value={formData.trainingRequired} onChange={handleInputChange} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="e.g., Company security procedures, Emergency response protocols" />
+                <label className={labelClass}>Training Required</label>
+                <textarea name="trainingRequired" value={formData.trainingRequired} onChange={handleInputChange} rows={2} className={`${inputClass} resize-none`} placeholder="e.g., Company security procedures, Emergency response protocols" />
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Job Details</h3>
+          <div className="border-t border-gray-800 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Job Details</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Work Location</label>
-                <input type="text" name="workLocation" value={formData.workLocation} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="e.g., Various client sites, Office building" />
+                <label className={labelClass}>Work Location</label>
+                <input type="text" name="workLocation" value={formData.workLocation} onChange={handleInputChange} className={inputClass} placeholder="e.g., Various client sites, Office building" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Key Responsibilities</label>
-                <textarea name="responsibilities" value={formData.responsibilities} onChange={handleInputChange} rows={4} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="e.g., Monitor CCTV systems, Conduct regular patrols, Check visitor credentials" />
+                <label className={labelClass}>Key Responsibilities</label>
+                <textarea name="responsibilities" value={formData.responsibilities} onChange={handleInputChange} rows={4} className={`${inputClass} resize-none`} placeholder="e.g., Monitor CCTV systems, Conduct regular patrols, Check visitor credentials" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Benefits Package</label>
-                <textarea name="benefits" value={formData.benefits} onChange={handleInputChange} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="e.g., Health insurance, Pension scheme, Paid holidays" />
+                <label className={labelClass}>Benefits Package</label>
+                <textarea name="benefits" value={formData.benefits} onChange={handleInputChange} rows={3} className={`${inputClass} resize-none`} placeholder="e.g., Health insurance, Pension scheme, Paid holidays" />
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Medical Requirements</h3>
+          <div className="border-t border-gray-800 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Medical Requirements</h3>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Medical Fitness Requirements</label>
-              <textarea name="medicalConditions" value={formData.medicalConditions} onChange={handleInputChange} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="e.g., Must be physically fit, No serious medical conditions that affect work" />
+              <label className={labelClass}>Medical Fitness Requirements</label>
+              <textarea name="medicalConditions" value={formData.medicalConditions} onChange={handleInputChange} rows={2} className={`${inputClass} resize-none`} placeholder="e.g., Must be physically fit, No serious medical conditions that affect work" />
             </div>
           </div>
 
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-            <button type="button" onClick={onClose} disabled={saving} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-800">
+            <button type="button" onClick={onClose} disabled={saving} className="px-6 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
               Cancel
             </button>
-            <button type="submit" disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
+            <button type="submit" disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
               {saving && <i className="ri-loader-4-line animate-spin"></i>}
               <span>{saving ? 'Creating...' : 'Create Template'}</span>
             </button>

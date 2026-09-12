@@ -14,30 +14,90 @@ interface StatusCardsProps {
 }
 
 export default function StatusCards({ activeSites, totalSites, guardsOnDuty, lateGuards, missingGuards, openIncidents, missedPatrols, highRiskSites }: StatusCardsProps) {
+  const lateMissing = lateGuards + missingGuards;
+
   const cards = [
-    { label: 'Active Sites', value: activeSites, total: totalSites, color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: 'ri-building-line', href: '/sites' },
-    { label: 'Guards On Duty', value: guardsOnDuty, color: 'text-blue-400', bg: 'bg-blue-500/10', icon: 'ri-shield-user-line', href: '/guards' },
-    { label: 'Late / Missing', value: lateGuards + missingGuards, color: (lateGuards + missingGuards) > 0 ? 'text-red-400' : 'text-gray-400', bg: (lateGuards + missingGuards) > 0 ? 'bg-red-500/10' : 'bg-gray-500/10', icon: 'ri-time-line', href: '/guards' },
-    { label: 'Open Incidents', value: openIncidents, color: openIncidents > 0 ? 'text-red-400' : 'text-gray-400', bg: openIncidents > 0 ? 'bg-red-500/10' : 'bg-gray-500/10', icon: 'ri-alarm-warning-line', href: '/incidents' },
-    { label: 'Missed Patrols', value: missedPatrols, color: missedPatrols > 0 ? 'text-amber-400' : 'text-gray-400', bg: missedPatrols > 0 ? 'bg-amber-500/10' : 'bg-gray-500/10', icon: 'ri-route-line', href: '/dashboard/patrol-monitoring' },
-    { label: 'High Risk Sites', value: highRiskSites, color: highRiskSites > 0 ? 'text-orange-400' : 'text-gray-400', bg: highRiskSites > 0 ? 'bg-orange-500/10' : 'bg-gray-500/10', icon: 'ri-error-warning-line', href: '/sites' },
+    {
+      label: 'Sites Active',
+      value: activeSites,
+      sub: `/ ${totalSites}`,
+      accent: 'border-l-emerald-500',
+      valueColor: 'text-emerald-400',
+      icon: 'ri-building-line',
+      iconColor: 'text-emerald-400',
+      href: '/sites',
+    },
+    {
+      label: 'Guards On Duty',
+      value: guardsOnDuty,
+      sub: '',
+      accent: 'border-l-blue-500',
+      valueColor: 'text-blue-400',
+      icon: 'ri-shield-user-line',
+      iconColor: 'text-blue-400',
+      href: '/guards',
+    },
+    {
+      label: 'Late / Missing',
+      value: lateMissing,
+      sub: '',
+      accent: lateMissing > 0 ? 'border-l-red-500' : 'border-l-white/10',
+      valueColor: lateMissing > 0 ? 'text-red-400' : 'text-gray-400',
+      icon: 'ri-time-line',
+      iconColor: lateMissing > 0 ? 'text-red-400' : 'text-gray-500',
+      href: '/guards',
+    },
+    {
+      label: 'Open Incidents',
+      value: openIncidents,
+      sub: '',
+      accent: openIncidents > 0 ? 'border-l-red-500' : 'border-l-white/10',
+      valueColor: openIncidents > 0 ? 'text-red-400' : 'text-gray-400',
+      icon: 'ri-alarm-warning-line',
+      iconColor: openIncidents > 0 ? 'text-red-400' : 'text-gray-500',
+      href: '/incidents',
+    },
+    {
+      label: 'Missed Patrols',
+      value: missedPatrols,
+      sub: '',
+      accent: missedPatrols > 0 ? 'border-l-amber-500' : 'border-l-white/10',
+      valueColor: missedPatrols > 0 ? 'text-amber-400' : 'text-gray-400',
+      icon: 'ri-route-line',
+      iconColor: missedPatrols > 0 ? 'text-amber-400' : 'text-gray-500',
+      href: '/dashboard/patrol-monitoring',
+    },
+    {
+      label: 'High-Risk Sites',
+      value: highRiskSites,
+      sub: '',
+      accent: highRiskSites > 0 ? 'border-l-orange-500' : 'border-l-white/10',
+      valueColor: highRiskSites > 0 ? 'text-orange-400' : 'text-gray-400',
+      icon: 'ri-error-warning-line',
+      iconColor: highRiskSites > 0 ? 'text-orange-400' : 'text-gray-500',
+      href: '/sites',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
       {cards.map((card) => (
-        <Link key={card.label} href={card.href} className="block cursor-pointer">
-          <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:border-blue-500/30 transition-all">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${card.bg} mb-3`}>
-              <div className="w-5 h-5 flex items-center justify-center">
-                <i className={`${card.icon} ${card.color}`}></i>
-              </div>
+        <Link
+          key={card.label}
+          href={card.href}
+          className={`bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 border-l-2 ${card.accent} rounded-lg px-3 py-2.5 hover:bg-white/5 transition-colors cursor-pointer`}
+        >
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="w-3.5 h-3.5 flex items-center justify-center">
+              <i className={`${card.icon} ${card.iconColor} text-xs`}></i>
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-2xl font-bold ${card.color}`}>{card.value}</span>
-              {card.total !== undefined && <span className="text-xs text-gray-500">/ {card.total}</span>}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">{card.label}</p>
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              {card.label}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className={`text-2xl font-bold leading-none ${card.valueColor}`}>{card.value}</span>
+            {card.sub && <span className="text-[10px] text-gray-600">{card.sub}</span>}
           </div>
         </Link>
       ))}

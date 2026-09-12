@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Attendance Exceptions",
+  "version": "1.0.0",
+  "description": "Monitors attendance for late/missed check-ins, early checkouts, geofence mismatches, and unassigned shifts",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "attendance-exceptions", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Attendance Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { event_type, guard_id, company_id, site_id, shift_id, exception_type } = body;\n\nreturn {\n  json: {\n    exception_type: exception_type || event_type,\n    guard_id,\n    company_id,\n    site_id,\n    shift_id,\n    detected_at: new Date().toISOString(),\n    requires_follow_up: true,\n    recommended_action: 'Notify control room and request guard confirmation',\n    dedup_key: `${guard_id}:${shift_id}:${exception_type || event_type}`\n  }\n};"
+      },
+      "id": "process-exception",
+      "name": "Process Exception",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "attendance_exceptions" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "={{ $json.exception_type }}" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Attendance Event Webhook": { "main": [[ { "node": "Process Exception", "type": "main", "index": 0 } ]] },
+    "Process Exception": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

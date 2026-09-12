@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { getRoleHome, getOnboardingRoute } from '@/lib/redirect';
+import { checkAccountAccess } from '@/lib/accountStatus';
 import { TablePageSkeleton } from './PageSkeleton';
 
 export default function AuthGate({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
@@ -13,24 +15,20 @@ export default function AuthGate({ children, allowedRoles }: { children: React.R
   useEffect(() => {
     if (isLoading) return;
 
-    if (!currentUser) {
+    if (!currentUser || !profile) {
       router.replace('/login');
       return;
     }
 
-    if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-      const onboardingStatus = company?.onboarding_status;
-      if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role)) {
-        if (onboardingStatus === 'pending_setup') {
-          router.replace('/dashboard/setup-wizard');
-        } else {
-          router.replace('/dashboard');
-        }
-      } else if (profile.role === 'guard') {
-        router.replace('/guard');
-      } else if (profile.role === 'client') {
-        router.replace('/client');
-      }
+    const accountCheck = checkAccountAccess(profile.status, company?.account_status);
+    if (!accountCheck.allowed) {
+      router.replace(accountCheck.redirectTo || '/login');
+      return;
+    }
+
+    if (allowedRoles && !allowedRoles.includes(profile.role)) {
+      const onboardingRoute = getOnboardingRoute(profile.role, company?.onboarding_status);
+      router.replace(onboardingRoute || getRoleHome(profile.role));
       return;
     }
 

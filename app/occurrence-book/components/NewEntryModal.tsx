@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { OB_ENTRY_TYPES } from '@/lib/useOccurrenceBook';
+import { OB_ENTRY_TYPES, OB_ENTRY_TYPE_LABELS } from '@/lib/useOccurrenceBook';
 import type { OBEntry } from '@/lib/useOccurrenceBook';
 
 interface Props {
@@ -23,9 +23,12 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
   const [guards, setGuards] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
   const [siteId, setSiteId] = useState(preselectedSiteId || '');
   const [guardId, setGuardId] = useState('');
-  const [entryType, setEntryType] = useState('Note');
+  const [entryType, setEntryType] = useState('general_note');
   const [occurredAt, setOccurredAt] = useState(format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'));
   const [entryText, setEntryText] = useState('');
+  const [entryTitle, setEntryTitle] = useState('');
+  const [clientVisible, setClientVisible] = useState(false);
+  const [visibility, setVisibility] = useState('internal');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAiToggle, setShowAiToggle] = useState(false);
 
@@ -49,7 +52,10 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
     } else {
       setSiteId(preselectedSiteId || '');
       setGuardId('');
-      setEntryType('Note');
+      setEntryType('general_note');
+      setEntryTitle('');
+      setClientVisible(false);
+      setVisibility('internal');
       setOccurredAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       setEntryText('');
     }
@@ -76,7 +82,10 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
       guard_id: guardId || null,
       entry_type: entryType,
       entry: entryText.trim(),
+      title: entryTitle.trim() || null,
       occurred_at: new Date(occurredAt).toISOString(),
+      client_visible: clientVisible,
+      visibility: clientVisible ? 'client_visible' : visibility,
     });
   };
 
@@ -124,9 +133,20 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
               onChange={(e) => setEntryType(e.target.value)}
               className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
             >
-              {OB_ENTRY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {OB_ENTRY_TYPES.map((t) => <option key={t} value={t}>{OB_ENTRY_TYPE_LABELS[t] || t}</option>)}
             </select>
             {errors.entryType && <p className="text-red-400 text-xs mt-1">{errors.entryType}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
+            <input
+              type="text"
+              value={entryTitle}
+              onChange={(e) => setEntryTitle(e.target.value)}
+              placeholder="Short summary..."
+              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
           </div>
 
           <div>
@@ -157,7 +177,16 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={clientVisible}
+                onChange={(e) => setClientVisible(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span className="text-sm text-gray-400">Visible to client</span>
+            </label>
             <button
               type="button"
               onClick={() => setShowAiToggle(!showAiToggle)}

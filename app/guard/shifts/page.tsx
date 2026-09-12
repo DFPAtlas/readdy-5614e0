@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 import { useGuardLeaveRequests } from '@/lib/useGuardLeaveRequests';
 import GuardTopBar from '../components/GuardTopBar';
 import GuardBottomNav from '../components/GuardBottomNav';
@@ -43,11 +43,11 @@ function statusBadge(status: string) {
 }
 
 export default function GuardShiftsPage() {
-  const { currentUser, profile } = useAuth();
+  const g = useGuardAuth();
   const router = useRouter();
   const { futureShifts, leaveRequests, loading, submitting, requestLeave, refetch } = useGuardLeaveRequests(
-    currentUser?.id || null,
-    profile?.company_id || null
+    g.currentUser?.id || null,
+    g.companyId
   );
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -94,15 +94,21 @@ export default function GuardShiftsPage() {
   };
 
   const now = Date.now();
-
   const upcomingShifts = futureShifts.filter((s) => new Date(s.start_time).getTime() > now);
   const pastShifts = futureShifts.filter((s) => new Date(s.end_time).getTime() <= now);
+
+  if (g.loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <i className="ri-loader-4-line animate-spin text-[#3b82f6] text-2xl"></i>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       <GuardTopBar siteName="My Shifts" />
       <main className="flex-1 pt-14 pb-[72px] overflow-y-auto max-w-lg mx-auto w-full">
-        {/* Toast */}
         {toast && (
           <div className="px-4 pt-4">
             <div
@@ -120,7 +126,6 @@ export default function GuardShiftsPage() {
           </div>
         )}
 
-        {/* Upcoming Shifts */}
         <div className="px-4 pt-4 pb-2">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <div className="w-5 h-5 flex items-center justify-center">
@@ -211,7 +216,6 @@ export default function GuardShiftsPage() {
           </div>
         )}
 
-        {/* Leave Request History */}
         {leaveRequests.length > 0 && (
           <div className="px-4 pt-6 pb-2">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -250,7 +254,6 @@ export default function GuardShiftsPage() {
 
       <GuardBottomNav />
 
-      {/* Request Leave Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-end justify-center">
           <div className="bg-[#1a1a1a] border border-white/10 rounded-t-3xl w-full max-w-lg mx-auto p-6 animate-in slide-in-from-bottom duration-200">

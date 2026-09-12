@@ -28,6 +28,12 @@ export default function SignupPage() {
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
 
+    const hpValue = (formData.get('mobile_alt') as string)?.trim();
+    if (hpValue) {
+      setSubmitStatus('success');
+      return;
+    }
+
     try {
       const response = await fetch('https://readdy.ai/api/form/d7uef1ob7i54bnk8qprg', {
         method: 'POST',
@@ -66,7 +72,7 @@ export default function SignupPage() {
                 Get Started
               </span>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                Start your <span className="text-blue-400">14-day free trial</span>
+                Start your <span className="text-blue-400">15-day free trial</span>
               </h1>
               <p className="text-lg text-gray-400 leading-relaxed mb-8 max-w-2xl mx-auto">
                 Join hundreds of UK security companies already using GuardianHub to run smarter operations. No credit card required.
@@ -290,6 +296,16 @@ export default function SignupPage() {
                       />
                     </div>
 
+                    <input
+                      type="text"
+                      name="mobile_alt"
+                      data-hp-field
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      readOnly
+                    />
+
                     {submitStatus === 'error' && (
                       <div className="flex items-center gap-2 text-red-400 text-sm">
                         <i className="ri-error-warning-line"></i>
@@ -330,7 +346,7 @@ export default function SignupPage() {
             <div className="flex flex-wrap justify-center gap-8 text-gray-500 text-sm font-medium">
               <span className="flex items-center gap-2">
                 <i className="ri-shield-check-line text-blue-400"></i>
-                SOC 2 Type II
+                SIA-Aligned Workflows
               </span>
               <span className="flex items-center gap-2">
                 <i className="ri-lock-2-line text-blue-400"></i>

@@ -1,11 +1,23 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useDashboard } from '@/lib/useDashboard';
 import { usePanicMode } from './components/PanicModeContext';
 import CommandCentreHeader from './components/CommandCentreHeader';
 import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
+import OperationalStatusRow from './components/OperationalStatusRow';
+import AttentionPanel from './components/AttentionPanel';
+import GuardCoveragePanel from './components/GuardCoveragePanel';
+import AIOperationsPanel from './components/AIOperationsPanel';
+import WeeklySummary from './components/WeeklySummary';
+import SiteStatusGrid from './components/SiteStatusGrid';
+import RecentIncidentsFeed from './components/RecentIncidentsFeed';
+import LiveOccurrenceFeed from './components/LiveOccurrenceFeed';
+import ACSReadinessCard from './components/ACSReadinessCard';
+import { useACSCompliance } from '@/lib/useACSCompliance';
 
 export default function DashboardPage() {
   const { currentUser, profile, company, isLoading: authLoading } = useAuth();
@@ -26,6 +38,13 @@ export default function DashboardPage() {
     lastUpdated,
     refetch,
   } = useDashboard();
+
+  const {
+    overallScore: acsScore,
+    auditFindings,
+    governanceItems,
+    loading: acsLoading,
+  } = useACSCompliance();
 
   usePanicMode();
 
@@ -62,16 +81,25 @@ export default function DashboardPage() {
     );
   }
 
+  const onboardingComplete = company?.onboarding_status === 'completed';
+  const companyName = company?.name || 'Your Company';
+
+  const wrap = (widgetName: string, node: ReactNode) => (
+    <WidgetBoundary widgetName={widgetName} pagePath="/dashboard" clientId={profile?.company_id || null} userId={profile?.id || null}>
+      {node}
+    </WidgetBoundary>
+  );
+
   return (
     <div className="min-h-screen bg-[#0a0e1a]">
       <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-6">
-        <WidgetBoundary widgetName="CommandCentreHeader" pagePath="/dashboard" clientId={profile?.company_id || null} userId={profile?.id || null}>
+        {wrap('CommandCentreHeader', (
           <CommandCentreHeader
             kpis={kpis}
             lastUpdated={lastUpdated}
             onRefresh={refetch}
           />
-        </WidgetBoundary>
+        ))}
 
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-sm text-red-400">
@@ -82,10 +110,83 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="mt-8 p-8 bg-[#0f172a]/50 border border-white/10 rounded-xl text-center">
-          <p className="text-gray-400 text-sm">Dashboard shell loaded successfully.</p>
-          <p className="text-gray-500 text-xs mt-1">Hooks: OK. Auth: OK. KPIs: {kpis ? 'loaded' : 'pending'}. Sites: {sites?.length || 0}. Ready to add widgets.</p>
+        {!onboardingComplete && (
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <i className="ri-rocket-line text-amber-400 text-sm"></i>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-400">Finish setting up {companyName}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Complete your company profile, add your first site, and invite guards.</p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/setup-wizard"
+              className="bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Continue Setup
+            </Link>
+          </div>
+        )}
+
+        {wrap('OperationalStatusRow', (
+          <OperationalStatusRow
+            kpis={kpis}
+            sites={sites}
+            aiAlerts={aiAlerts}
+            patrolSummary={patrolSummary}
+            weekShifts={weekShifts}
+            missingGuards={missingGuards}
+          />
+        ))}
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+          <div className="xl:col-span-2 space-y-6">
+            {wrap('LiveOccurrenceFeed', (
+              <LiveOccurrenceFeed occurrences={liveOccurrences} />
+            ))}
+
+            {wrap('RecentIncidentsFeed', (
+              <RecentIncidentsFeed incidents={recentIncidents} />
+            ))}
+
+            {wrap('SiteStatusGrid', (
+              <SiteStatusGrid sites={sites} />
+            ))}
+          </div>
+
+          <div className="space-y-6">
+            {wrap('AttentionPanel', (
+              <AttentionPanel
+                missingGuards={missingGuards}
+                staffingAlerts={staffingAlerts}
+                aiAlerts={aiAlerts}
+                patrolSummary={patrolSummary}
+              />
+            ))}
+
+            {wrap('GuardCoveragePanel', (
+              <GuardCoveragePanel guardsOnShift={guardsOnShift} missingGuards={missingGuards} />
+            ))}
+
+            {wrap('AIOperationsPanel', (
+              <AIOperationsPanel aiAlerts={aiAlerts} />
+            ))}
+
+            <ACSReadinessCard
+              overallScore={acsScore}
+              topIssues={auditFindings.filter(f => f.status === 'open').slice(0, 3).map(f => f.finding || f.title || f.category)}
+              nextExpiryLabel={governanceItems.find(g => g.expiry_date)?.title || null}
+              nextExpiryDate={governanceItems.find(g => g.expiry_date)?.expiry_date || null}
+              loading={acsLoading}
+            />
+          </div>
         </div>
+
+        {wrap('WeeklySummary', (
+          <WeeklySummary weekShifts={weekShifts} kpis={kpis} />
+        ))}
       </div>
     </div>
   );

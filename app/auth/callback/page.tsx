@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-type UserRole = 'super_admin' | 'company_admin' | 'operations_manager' | 'guard' | 'client' | string;
+type UserRole = 'super_admin' | 'company_admin' | 'operations_manager' | 'guard' | 'client';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -12,18 +12,22 @@ export default function AuthCallbackPage() {
   const [message, setMessage] = useState('Signing you in...');
 
   useEffect(() => {
+    let cancelled = false;
+
     const handleCallback = async () => {
       try {
         const url = new URL(window.location.href);
         const code = url.searchParams.get('code');
         const error = url.searchParams.get('error');
         const errorDescription = url.searchParams.get('error_description');
+        const type = url.searchParams.get('type');
 
         if (error) {
+          if (cancelled) return;
           setStatus('error');
           setMessage(errorDescription || 'Authentication failed. Please try again.');
           setTimeout(() => {
-            router.push(`/login?error=${encodeURIComponent(errorDescription || error)}`);
+            if (!cancelled) router.push('/login');
           }, 2000);
           return;
         }
@@ -31,22 +35,30 @@ export default function AuthCallbackPage() {
         if (code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeError) {
+            if (cancelled) return;
             setStatus('error');
             setMessage('This sign-in link has expired or already been used. Please request a new one.');
             setTimeout(() => {
-              router.push('/login?error=code_expired');
+              if (!cancelled) router.push('/login');
             }, 2500);
             return;
           }
         }
 
+        if (type === 'recovery') {
+          if (cancelled) return;
+          router.replace('/reset-password');
+          return;
+        }
+
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError || !session) {
+          if (cancelled) return;
           setStatus('error');
           setMessage('Unable to verify your session. Please sign in again.');
           setTimeout(() => {
-            router.push('/login?error=session_not_found');
+            if (!cancelled) router.push('/login');
           }, 2000);
           return;
         }
@@ -54,15 +66,27 @@ export default function AuthCallbackPage() {
         const userId = session.user.id;
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('role')
+          .select('role, status')
           .eq('id', userId)
           .maybeSingle();
 
         if (userError || !userData) {
+          if (cancelled) return;
           setStatus('error');
           setMessage('Unable to load your profile. Please sign in again.');
           setTimeout(() => {
-            router.push('/login?error=profile_not_found');
+            if (!cancelled) router.push('/login');
+          }, 2000);
+          return;
+        }
+
+        if (userData.status === 'suspended' || userData.status === 'removed') {
+          if (cancelled) return;
+          setStatus('error');
+          setMessage('Your account is not active. Please contact your administrator.');
+          await supabase.auth.signOut();
+          setTimeout(() => {
+            if (!cancelled) router.push('/login');
           }, 2000);
           return;
         }
@@ -75,13 +99,9 @@ export default function AuthCallbackPage() {
             break;
           case 'company_admin':
           case 'operations_manager':
-          case 'manager':
-          case 'client_admin':
-          case 'account_holder':
             router.replace('/dashboard');
             break;
           case 'guard':
-          case 'officer':
             router.replace('/guard');
             break;
           case 'client':
@@ -90,16 +110,18 @@ export default function AuthCallbackPage() {
           default:
             router.replace('/dashboard');
         }
-      } catch (err) {
+      } catch {
+        if (cancelled) return;
         setStatus('error');
         setMessage('Something went wrong. Please sign in again.');
         setTimeout(() => {
-          router.push('/login?error=unknown');
+          if (!cancelled) router.push('/login');
         }, 2000);
       }
     };
 
     handleCallback();
+    return () => { cancelled = true; };
   }, [router]);
 
   return (

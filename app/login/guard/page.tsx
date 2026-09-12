@@ -4,36 +4,33 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { getRoleHome, getOnboardingRoute } from '@/lib/redirect';
 
 export default function GuardLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const { signIn, currentUser, profile, isLoading: authLoading } = useAuth();
+  const { signIn, currentUser, profile, company, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (authLoading) return;
     if (currentUser && profile) {
-      if (profile.role === 'guard') {
-        router.replace('/guard');
-      } else if (['super_admin', 'company_admin', 'operations_manager'].includes(profile.role || '')) {
-        router.replace('/dashboard');
-      } else if (profile.role === 'client') {
-        router.replace('/client');
-      }
+      const onboardingRoute = getOnboardingRoute(profile.role, company?.onboarding_status);
+      router.replace(onboardingRoute || getRoleHome(profile.role));
     }
-  }, [currentUser, profile, authLoading, router]);
+  }, [currentUser, profile, company, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError('');
     const { error: signInError } = await signIn(email, password);
     if (signInError) {
       setError('Invalid email or password');
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -98,10 +95,10 @@ export default function GuardLoginPage() {
           </div>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isSubmitting}
             className="w-full h-16 bg-[#3b82f6] hover:bg-blue-500 disabled:opacity-50 text-white text-lg font-semibold rounded-xl transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 mt-6"
           >
-            {isLoading ? (
+            {isSubmitting ? (
               <i className="ri-loader-4-line animate-spin text-xl"></i>
             ) : (
               'Sign In'

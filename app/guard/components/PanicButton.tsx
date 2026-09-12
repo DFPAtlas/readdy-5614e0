@@ -58,24 +58,50 @@ export default function PanicButton({ companyId, siteId, guardId, guardName }: P
     setConfirming(false);
     setSent(true);
 
-    // Log panic in occurrence books
     const { supabase } = await import('@/lib/supabase');
+
+    let loc: { lat: number; lng: number } | null = null;
+    try {
+      const pos: GeolocationPosition = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+      });
+      loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    } catch {}
+
     await supabase.from('occurrence_books').insert({
       company_id: companyId,
       site_id: siteId,
       guard_id: guardId,
-      entry_type: 'Incident',
-      entry: `PANIC ALARM activated by ${guardName} at ${new Date().toLocaleTimeString('en-GB')}. Immediate response required.`,
+      entry_type: 'SOS / Emergency',
+      entry: `EMERGENCY SOS ALERT: Panic alarm activated by ${guardName} at ${new Date().toLocaleTimeString('en-GB')}. GPS: ${loc ? `${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}` : 'Not available'}.`,
       occurred_at: new Date().toISOString(),
     });
 
-    // Also log to ai_activity_logs as critical alert
     await supabase.from('ai_activity_logs').insert({
       company_id: companyId,
       guard_id: guardId,
-      action_type: 'panic_alarm_triggered',
-      details: { site_id: siteId, guard_name: guardName, time: new Date().toISOString() },
+      action_type: 'sos_panic_alarm',
+      details: { site_id: siteId, guard_name: guardName, gps: loc, time: new Date().toISOString() },
     });
+
+    const sosUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sos-emergency-notify`;
+    const sessionData = await supabase.auth.getSession();
+    const token = sessionData.data.session?.access_token;
+    fetch(sosUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        company_id: companyId,
+        site_id: siteId,
+        guard_id: guardId,
+        guard_name: guardName,
+        lat: loc?.lat || null,
+        lng: loc?.lng || null,
+      }),
+    }).catch(() => {});
   }
 
   function cancelPanic() {

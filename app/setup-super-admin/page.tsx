@@ -6,9 +6,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function SetupSuperAdminPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'checking' | 'ready' | 'needs_login' | 'done'>('checking');
-  const [hasSuperAdmin, setHasSuperAdmin] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [step, setStep] = useState<'checking' | 'ready' | 'done' | 'disabled'>('checking');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,38 +16,28 @@ export default function SetupSuperAdminPage() {
 
   useEffect(() => {
     const check = async () => {
-      const { data: superAdmins } = await supabase
-        .from('users')
-        .select('id')
-        .eq('role', 'super_admin')
-        .limit(1);
-
-      const superAdminExists = !!(superAdmins && superAdmins.length > 0);
-      setHasSuperAdmin(superAdminExists);
-
-      if (!superAdminExists) {
-        setStep('ready');
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setStep('needs_login');
+
+      if (session) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profile?.role === 'super_admin') {
+          setStep('ready');
+          return;
+        }
+      }
+
+      const { error: rpcError } = await supabase.rpc('is_super_admin_exists');
+      if (rpcError) {
+        setStep('ready');
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      if (profile?.role === 'super_admin') {
-        setIsSuperAdmin(true);
-        setStep('ready');
-      } else {
-        setStep('needs_login');
-      }
+      setStep('ready');
     };
     check();
   }, []);
@@ -66,7 +54,19 @@ export default function SetupSuperAdminPage() {
       setError('Password must be at least 12 characters');
       return;
     }
-    if (hasSuperAdmin && !setupSecret.trim()) {
+    if (!/[A-Z]/.test(password)) {
+      setError('Password must contain at least one uppercase letter');
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError('Password must contain at least one lowercase letter');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError('Password must contain at least one number');
+      return;
+    }
+    if (!setupSecret.trim()) {
       setError('Setup secret is required');
       return;
     }
@@ -89,7 +89,7 @@ export default function SetupSuperAdminPage() {
             password,
             first_name: 'Platform',
             last_name: 'Owner',
-            ...(hasSuperAdmin ? { secret: setupSecret } : {}),
+            secret: setupSecret,
           }),
         }
       );
@@ -117,29 +117,23 @@ export default function SetupSuperAdminPage() {
       <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-          <p className="text-xs text-gray-500">Checking platform status...</p>
+          <p className="text-xs text-gray-500">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (step === 'needs_login') {
+  if (step === 'disabled') {
     return (
       <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
-          <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center mx-auto mb-5">
-            <i className="ri-shield-user-line text-amber-400 text-xl"></i>
+          <div className="w-14 h-14 bg-gray-500/10 border border-gray-500/20 rounded-xl flex items-center justify-center mx-auto mb-5">
+            <i className="ri-lock-line text-gray-400 text-xl"></i>
           </div>
-          <h1 className="text-xl font-bold text-white mb-2">Authentication Required</h1>
-          <p className="text-sm text-gray-400 mb-6">
-            A super admin already exists. You must be logged in as an existing super admin to create additional accounts.
+          <h1 className="text-xl font-bold text-white mb-2">Setup Unavailable</h1>
+          <p className="text-sm text-gray-400">
+            This page is not available.
           </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-          >
-            Log In as Super Admin
-          </button>
         </div>
       </div>
     );
@@ -152,9 +146,7 @@ export default function SetupSuperAdminPage() {
           <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-5">
             <i className="ri-check-line text-emerald-400 text-xl"></i>
           </div>
-          <h1 className="text-xl font-bold text-white mb-2">
-            {hasSuperAdmin ? 'Super Admin Created' : 'Platform Owner Created'}
-          </h1>
+          <h1 className="text-xl font-bold text-white mb-2">Super Admin Created</h1>
           <p className="text-sm text-gray-400 mb-2">
             The account is ready.
           </p>
@@ -173,13 +165,9 @@ export default function SetupSuperAdminPage() {
           <div className="w-14 h-14 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <i className="ri-shield-star-line text-white text-2xl"></i>
           </div>
-          <h1 className="text-xl font-bold text-white mb-1">
-            {hasSuperAdmin ? 'Add Super Admin' : 'Platform Owner Setup'}
-          </h1>
+          <h1 className="text-xl font-bold text-white mb-1">Super Admin Setup</h1>
           <p className="text-sm text-gray-400">
-            {hasSuperAdmin
-              ? 'Create an additional super admin account.'
-              : 'Create your super admin account to manage Guardian Hub.'}
+            Create your super admin account to manage GuardianHub.
           </p>
         </div>
 
@@ -228,20 +216,18 @@ export default function SetupSuperAdminPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Setup Secret {hasSuperAdmin && <span className="text-amber-400">*</span>}
+              Setup Secret <span className="text-amber-400">*</span>
             </label>
             <input
               type="password"
-              required={hasSuperAdmin}
+              required
               value={setupSecret}
               onChange={(e) => setSetupSecret(e.target.value)}
-              placeholder={hasSuperAdmin ? 'Your ADMIN_SETUP_SECRET' : 'Optional for first setup'}
+              placeholder="Your ADMIN_SETUP_SECRET"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
             />
             <p className="mt-1.5 text-xs text-gray-500">
-              {hasSuperAdmin
-                ? 'This is the secret you configured in your Supabase Edge Function secrets.'
-                : 'Not required for first-time platform setup.'}
+              This is the secret configured in your Supabase Edge Function secrets.
             </p>
           </div>
 
@@ -265,7 +251,7 @@ export default function SetupSuperAdminPage() {
                 Creating...
               </span>
             ) : (
-              hasSuperAdmin ? 'Create Super Admin Account' : 'Create Platform Owner Account'
+              'Create Super Admin Account'
             )}
           </button>
         </form>

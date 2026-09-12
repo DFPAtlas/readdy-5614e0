@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSupportTickets, getStatusBadge, getPriorityBadge, getCategoryLabel, CATEGORIES, PRIORITIES } from '@/lib/useSupportTickets';
 import { useAuth } from '@/lib/auth';
+import { useClientAuth } from '@/lib/useClientAuth';
 
 export default function ClientSupportPage() {
-  const { tickets, loading, error, refresh } = useSupportTickets();
+  const { isClientUser } = useClientAuth();
+  const { tickets, loading, error, refresh } = useSupportTickets(isClientUser ? true : false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { profile } = useAuth();
 
@@ -23,6 +25,11 @@ export default function ClientSupportPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Support</h1>
           <p className="text-sm text-gray-400 mt-1">Raise tickets for account issues, billing, sites, guards or anything else.</p>
+          {!isClientUser && (
+            <p className="text-xs text-amber-400 mt-1 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-0.5 inline-block">
+              Viewing all company tickets as administrator
+            </p>
+          )}
         </div>
         <Link
           href="/client/support/new"

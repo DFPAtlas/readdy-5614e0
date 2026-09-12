@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Dead Letter Recovery",
+  "version": "1.0.0",
+  "description": "Manual recovery workflow for dead-letter events. Requires admin authorization.",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "dead-letter-recovery", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Recovery Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { event_id, agent_key, event_type, original_payload, admin_id } = body;\n\nreturn {\n  json: {\n    event_id,\n    agent_key,\n    event_type,\n    recovery_status: 'replayed',\n    original_payload,\n    replayed_at: new Date().toISOString(),\n    replayed_by: admin_id,\n    note: 'Dead letter manually replayed by admin'\n  }\n};"
+      },
+      "id": "recover",
+      "name": "Recover Dead Letter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "={{ $json.agent_key }}" },
+            { "name": "company_id", "value": "={{ $json.company_id || '' }}" },
+            { "name": "event_type", "value": "dead_letter.recovered" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Recovery Webhook": { "main": [[ { "node": "Recover Dead Letter", "type": "main", "index": 0 } ]] },
+    "Recover Dead Letter": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

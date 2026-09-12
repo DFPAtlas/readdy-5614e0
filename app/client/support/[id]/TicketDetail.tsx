@@ -4,11 +4,13 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useTicketDetail, getStatusBadge, getPriorityBadge, getCategoryLabel } from '@/lib/useSupportTickets';
 import { useAuth } from '@/lib/auth';
+import { useClientAuth } from '@/lib/useClientAuth';
 import { supabase } from '@/lib/supabase';
 
 export default function TicketDetail({ ticketId }: { ticketId: string }) {
   const { profile } = useAuth();
-  const { ticket, messages, attachments, loading, error, refresh, addMessage, uploadAttachment } = useTicketDetail(ticketId);
+  const { isClientUser } = useClientAuth();
+  const { ticket, messages, attachments, loading, error, refresh, addMessage, uploadAttachment } = useTicketDetail(ticketId, isClientUser);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

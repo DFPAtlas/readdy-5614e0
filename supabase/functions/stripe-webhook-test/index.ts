@@ -21,9 +21,8 @@ serve(async (req) => {
 
   const authHeader = req.headers.get("authorization");
   if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Unauthorized — JWT required" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -35,9 +34,8 @@ serve(async (req) => {
   const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
 
   if (userError || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized — invalid token" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -49,8 +47,7 @@ serve(async (req) => {
 
   if (!profile || profile.role !== "super_admin") {
     return new Response(JSON.stringify({ error: "Forbidden — super_admin role required" }), {
-      status: 403,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -59,19 +56,14 @@ serve(async (req) => {
   });
 
   let body: any = {};
-  try {
-    body = await req.json();
-  } catch {
-    // allow empty body
-  }
+  try { body = await req.json(); } catch {}
 
   const companyId = body.company_id;
   const testEvent = body.test_event || "checkout.session.completed";
 
   if (!companyId) {
     return new Response(JSON.stringify({ error: "company_id is required" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -83,15 +75,13 @@ serve(async (req) => {
 
   if (companyErr) {
     return new Response(JSON.stringify({ error: companyErr.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   if (!company) {
     return new Response(JSON.stringify({ error: "Company not found" }), {
-      status: 404,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -111,11 +101,10 @@ serve(async (req) => {
     expectedSubId = "sub_test_" + crypto.randomUUID().slice(0, 8);
     notes.push("Simulated checkout.session.completed");
   } else if (testEvent === "customer.subscription.updated") {
-    const newStatus = body.new_status || "active";
-    expectedStatus = newStatus;
+    expectedStatus = body.new_status || "active";
     expectedSubId = company.stripe_subscription_id || "sub_test_" + crypto.randomUUID().slice(0, 8);
     expectedBilling = body.subscription_billing || company.subscription_billing || "month";
-    notes.push(`Simulated subscription updated to ${newStatus}`);
+    notes.push(`Simulated subscription updated to ${expectedStatus}`);
   } else if (testEvent === "invoice.payment_failed") {
     expectedStatus = "past_due";
     notes.push("Simulated invoice.payment_failed");
@@ -137,10 +126,17 @@ serve(async (req) => {
 
   if (updateErr) {
     return new Response(JSON.stringify({ error: updateErr.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  await admin.from("admin_activity_log").insert({
+    action: "webhook_test",
+    description: `Test webhook "${testEvent}" applied to ${company.name}`,
+    company_id: companyId,
+    performed_by: user.id,
+    metadata: { test_event: testEvent, before, updates },
+  });
 
   const { data: after } = await admin
     .from("companies")
@@ -165,8 +161,6 @@ serve(async (req) => {
         after?.subscription_status === expectedStatus &&
         after?.stripe_subscription_id === expectedSubId,
     }, null, 2),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });

@@ -84,12 +84,12 @@ export default function SiteSelector({ siteId, onSelect }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <div className="w-12 h-12 mx-auto flex items-center justify-center text-gray-600 mb-3">
-          <i className="ri-book-open-line text-3xl"></i>
+      <div className="text-center max-w-lg mx-auto mb-8">
+        <div className="w-14 h-14 mx-auto flex items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/20 mb-4">
+          <i className="ri-book-open-line text-2xl text-blue-400"></i>
         </div>
-        <h2 className="text-lg font-semibold text-white mb-1">Select a site to view its occurrence book</h2>
-        <p className="text-sm text-gray-500">Choose from your managed sites below</p>
+        <h2 className="text-xl font-bold text-white mb-2 tracking-wide">SELECT A SITE</h2>
+        <p className="text-sm text-gray-400">Choose a site to open its digital occurrence book</p>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {sites.map((site) => (

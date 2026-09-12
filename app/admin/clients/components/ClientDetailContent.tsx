@@ -45,7 +45,6 @@ export default function ClientDetailContent() {
   const [noteText, setNoteText] = useState('');
   const [noteCategory, setNoteCategory] = useState('support');
 
-
   const company = companies.find(c => c.id === clientId);
 
   useEffect(() => {
@@ -76,7 +75,6 @@ export default function ClientDetailContent() {
             email: u.email,
             role: u.role,
             status: u.status,
-            last_sign_in_at: null,
             created_at: u.created_at,
           })));
           setUsersLoading(false);
@@ -99,8 +97,6 @@ export default function ClientDetailContent() {
       </div>
     );
   }
-
-
 
   const handleAddNote = async () => {
     if (!noteText.trim() || !profile) return;
@@ -139,7 +135,6 @@ export default function ClientDetailContent() {
             <SubscriptionStatusBadge status={company.subscription_status} />
           </div>
         </div>
-
       </div>
 
       <div className="flex items-center gap-0.5 mb-6 border-b border-gray-800 overflow-x-auto">
@@ -363,22 +358,31 @@ export default function ClientDetailContent() {
               {notes.length === 0 && (
                 <div className="px-5 py-8 text-center text-sm text-gray-500">No admin notes yet.</div>
               )}
-              {notes.map((n: any) => (
-                <div key={n.id} className="px-5 py-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
-                      { sales: 'bg-blue-500/10 text-blue-400', onboarding: 'bg-emerald-500/10 text-emerald-400', billing: 'bg-amber-500/10 text-amber-400', support: 'bg-purple-500/10 text-purple-400', technical: 'bg-red-500/10 text-red-400' }[n.category] || 'bg-gray-500/10 text-gray-400'
-                    }`}>{n.category}</span>
-                    <span className="text-xs text-gray-600">
-                      {n.created_by_profile ? `${n.created_by_profile.first_name} ${n.created_by_profile.last_name}` : 'Admin'}
-                    </span>
-                    <span className="text-xs text-gray-700">
-                      {new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+              {notes.map((n: any) => {
+                const categoryStyles: Record<string, string> = {
+                  sales: 'bg-blue-500/10 text-blue-400',
+                  onboarding: 'bg-emerald-500/10 text-emerald-400',
+                  billing: 'bg-amber-500/10 text-amber-400',
+                  support: 'bg-purple-500/10 text-purple-400',
+                  technical: 'bg-red-500/10 text-red-400',
+                };
+                return (
+                  <div key={n.id} className="px-5 py-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
+                        categoryStyles[String(n.category)] || 'bg-gray-500/10 text-gray-400'
+                      }`}>{n.category}</span>
+                      <span className="text-xs text-gray-600">
+                        {n.created_by_profile ? `${n.created_by_profile.first_name} ${n.created_by_profile.last_name}` : 'Admin'}
+                      </span>
+                      <span className="text-xs text-gray-700">
+                        {new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-300">{n.note}</p>
                   </div>
-                  <p className="text-sm text-gray-300">{n.note}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -505,8 +509,6 @@ export default function ClientDetailContent() {
           )}
         </div>
       )}
-
-
     </div>
   );
 }

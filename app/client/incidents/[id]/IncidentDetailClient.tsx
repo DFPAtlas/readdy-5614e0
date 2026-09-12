@@ -2,88 +2,163 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useClientPortal } from '@/lib/useClientPortal';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
 
 interface IncidentDetail {
   id: string;
   site_id: string;
   guard_id: string;
+  incident_number: string | null;
   incident_type: string;
   severity: string;
-  description: string;
+  description: string | null;
   ai_rewritten_report: string | null;
   status: string;
+  client_visible: boolean;
   created_at: string;
   occurred_at: string;
   resolved_at: string | null;
-  site_name: string;
-  officer_name: string;
+  site_name: string | null;
+  officer_name: string | null;
   officer_sia: string | null;
   media: { id: string; file_url: string; media_type: string; client_visible: boolean }[];
   timeline: { id: string; status: string; changed_at: string; notes: string | null }[];
 }
 
 export default function ClientIncidentDetailPage({ incidentId }: { incidentId: string }) {
-  const { sites, incidents, sendMessage } = useClientPortal();
+  const { profile, companyId } = useAuth();
+
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgSubject, setMsgSubject] = useState('');
   const [msgBody, setMsgBody] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      const base = incidents.find((i) => i.id === incidentId);
-      if (!base) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: mediaData } = await supabase
-        .from('incident_media')
-        .select('id, file_url, media_type, client_visible')
-        .eq('incident_id', incidentId);
-
-      const { data: timelineData } = await supabase
-        .from('incident_timeline')
-        .select('id, status, changed_at, notes')
-        .eq('incident_id', incidentId)
-        .order('changed_at', { ascending: true });
-
-      setDetail({
-        ...base,
-        media: (mediaData || []).filter((m) => m.client_visible),
-        timeline: timelineData || [],
-      });
+    if (!profile?.id || !companyId) {
       setLoading(false);
+      return;
+    }
+
+    async function load() {
+      setLoading(true);
+      setAccessDenied(false);
+      setNotFound(false);
+      setError(null);
+
+      try {
+        const { data: cu } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('user_id', profile!.id)
+          .eq('company_id', companyId)
+          .maybeSingle();
+
+        if (!cu?.client_id) {
+          setAccessDenied(true);
+          setLoading(false);
+          return;
+        }
+
+        const { data: allSites } = await supabase
+          .from('sites')
+          .select('id')
+          .eq('client_id', cu.client_id)
+          .eq('company_id', companyId);
+
+        const siteIds = (allSites || []).map((s) => s.id);
+
+        const { data: incident } = await supabase
+          .from('incidents')
+          .select('id, site_id, guard_id, incident_type, severity, description, ai_rewritten_report, status, created_at, occurred_at, resolved_at, client_visible, incident_number')
+          .eq('id', incidentId)
+          .eq('client_visible', true)
+          .maybeSingle();
+
+        if (!incident) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+
+        if (!siteIds.includes(incident.site_id)) {
+          setAccessDenied(true);
+          setLoading(false);
+          return;
+        }
+
+        const siteName = allSites?.find((s) => s.id === incident.site_id) as any;
+        const { data: guardData } = incident.guard_id
+          ? await supabase.from('guards').select('first_name, last_name, sia_licence').eq('id', incident.guard_id).maybeSingle()
+          : { data: null };
+
+        const { data: mediaData } = await supabase
+          .from('incident_media')
+          .select('id, file_url, media_type, client_visible, storage_path')
+          .eq('incident_id', incidentId)
+          .eq('client_visible', true);
+
+        const mediaRows = await Promise.all((mediaData || []).map(async (m: any) => {
+          if (m.storage_path) {
+            const { data: signed } = await supabase.storage.from('incident-media').createSignedUrl(m.storage_path, 3600);
+            if (signed?.signedUrl) return { ...m, file_url: signed.signedUrl };
+          }
+          return m;
+        }));
+
+        const { data: timelineData } = await supabase
+          .from('incident_timeline')
+          .select('id, status, changed_at, notes')
+          .eq('incident_id', incidentId)
+          .in('event_type', ['created', 'status_change', 'severity_change', 'media_upload'])
+          .order('changed_at', { ascending: true });
+
+        setDetail({
+          ...incident,
+          officer_sia: guardData?.sia_licence || null,
+          officer_name: guardData ? `${guardData.first_name} ${guardData.last_name}` : null,
+          site_name: siteName?.site_name || null,
+          media: mediaRows || [],
+          timeline: timelineData || [],
+        });
+      } catch (err: any) {
+        setError(err.message || 'Failed to load incident data');
+      } finally {
+        setLoading(false);
+      }
     }
     load();
-  }, [incidentId, incidents]);
-
-  function severityStyle(severity: string) {
-    switch (severity) {
-      case 'critical': return 'bg-red-500/10 border-red-500/20 text-red-400';
-      case 'high': return 'bg-orange-500/10 border-orange-500/20 text-orange-400';
-      case 'medium': return 'bg-amber-500/10 border-amber-500/20 text-amber-400';
-      default: return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
-    }
-  }
-
-  function clientStatusLabel(status: string) {
-    switch (status) {
-      case 'open': return 'New';
-      case 'under_review': return 'Under Review';
-      case 'resolved': return 'Resolved';
-      default: return status;
-    }
-  }
+  }, [incidentId, profile?.id, companyId]);
 
   async function handleSendMessage() {
-    if (!msgSubject.trim() || !msgBody.trim()) return;
+    if (!msgSubject.trim() || !msgBody.trim() || !profile?.id) return;
     setSending(true);
-    await sendMessage({ subject: msgSubject, body: msgBody, incident_id: incidentId });
+    try {
+      const { data: cu } = await supabase
+        .from('client_users')
+        .select('client_id')
+        .eq('user_id', profile.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      await supabase.from('client_messages').insert({
+        company_id: companyId,
+        client_id: cu?.client_id,
+        site_id: detail?.site_id || null,
+        incident_id: incidentId,
+        from_user_id: profile.id,
+        subject: msgSubject.trim(),
+        body: msgBody.trim(),
+        is_from_client: true,
+        status: 'unread',
+      });
+    } catch {}
     setSending(false);
     setMsgOpen(false);
     setMsgSubject('');
@@ -98,13 +173,51 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
     );
   }
 
-  if (!detail) {
+  if (error) {
     return (
-      <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-12 text-center">
-        <p className="text-gray-400">Incident not found or not accessible.</p>
-        <Link href="/client/incidents" className="text-blue-400 text-sm mt-2 inline-block cursor-pointer">
-          Back to incidents
-        </Link>
+      <div className="max-w-lg mx-auto">
+        <div className="bg-red-500/[0.06] backdrop-blur-sm border border-red-500/20 rounded-xl p-10 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+            <i className="ri-error-warning-line text-2xl text-red-400"></i>
+          </div>
+          <h2 className="text-lg font-semibold text-white mb-1">Something went wrong</h2>
+          <p className="text-sm text-gray-400">{error}</p>
+          <Link href="/client/incidents" className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap mt-4">
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-arrow-left-line"></i></div>
+            Back to incidents
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <div className="bg-red-500/[0.06] backdrop-blur-sm border border-red-500/20 rounded-xl p-10 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+            <i className="ri-shield-keyhole-line text-2xl text-red-400"></i>
+          </div>
+          <h2 className="text-lg font-semibold text-white mb-1">Access Denied</h2>
+          <p className="text-sm text-gray-400 mb-6">This incident belongs to a site not assigned to your account.</p>
+          <Link href="/client/incidents" className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap">
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-arrow-left-line"></i></div>
+            Back to incidents
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !detail) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-12 text-center">
+          <p className="text-gray-400">Incident not found or not accessible.</p>
+          <Link href="/client/incidents" className="text-blue-400 text-sm mt-2 inline-block cursor-pointer">
+            Back to incidents
+          </Link>
+        </div>
       </div>
     );
   }
@@ -120,24 +233,31 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
         <span className="text-white font-medium">{detail.incident_type}</span>
       </div>
 
-      {/* Header */}
       <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-6">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div>
             <h1 className="text-xl font-semibold text-white">{detail.incident_type}</h1>
-            <p className="text-sm text-gray-400 mt-0.5">{detail.site_name}</p>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {detail.site_name}
+              {detail.incident_number && <span className="text-gray-600 ml-2">#{detail.incident_number}</span>}
+            </p>
           </div>
-          <span className={`text-xs px-3 py-1 rounded border font-medium ${severityStyle(detail.severity)}`}>
+          <span className={`text-xs px-3 py-1 rounded border font-medium ${
+            detail.severity === 'critical' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+            detail.severity === 'high' ? 'bg-orange-500/10 border-orange-500/20 text-orange-400' :
+            detail.severity === 'medium' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+            'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+          }`}>
             {detail.severity} severity
           </span>
         </div>
 
-        {/* Status journey */}
         <div className="mb-6">
           <div className="flex items-center gap-1">
             {statusSteps.map((step, idx) => {
               const isDone = idx <= currentStep;
               const isCurrent = idx === currentStep;
+              const statusLabel = step === 'open' ? 'New' : step === 'under_review' ? 'Under Review' : 'Resolved';
               return (
                 <div key={step} className="flex items-center flex-1">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
@@ -148,7 +268,7 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
                   <div className={`flex-1 h-0.5 mx-1 ${isDone && idx < currentStep ? 'bg-blue-600' : 'bg-white/10'}`}></div>
                   <div className="text-center min-w-[80px]">
                     <p className={`text-xs font-medium ${isCurrent ? 'text-blue-400' : isDone ? 'text-white' : 'text-gray-500'}`}>
-                      {clientStatusLabel(step)}
+                      {statusLabel}
                     </p>
                     {detail.timeline.find((t) => t.status === step) && (
                       <p className="text-[10px] text-gray-500">
@@ -180,7 +300,6 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
         </div>
       </div>
 
-      {/* AI Report */}
       <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-6">
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-text-line text-blue-400"></i></div>
@@ -195,7 +314,6 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
         )}
       </div>
 
-      {/* Evidence */}
       {detail.media.length > 0 && (
         <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-white mb-3">Evidence</h2>
@@ -215,7 +333,6 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
         </div>
       )}
 
-      {/* Contact ops */}
       <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl p-6">
         <h2 className="text-sm font-semibold text-white mb-2">Need to discuss this incident?</h2>
         <p className="text-sm text-gray-400 mb-4">Send a message directly to your operations manager.</p>
@@ -241,6 +358,7 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
               onChange={(e) => setMsgBody(e.target.value)}
               placeholder="Your message..."
               rows={4}
+              maxLength={500}
               className="w-full px-3 py-2.5 text-sm bg-[#0f172a]/60 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
             />
             <div className="flex gap-2">

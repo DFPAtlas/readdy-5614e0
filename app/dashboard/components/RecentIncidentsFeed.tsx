@@ -9,20 +9,20 @@ interface RecentIncidentsFeedProps {
 
 function severityColor(sev: string): { dot: string; text: string } {
   switch (sev) {
-    case 'low': return { dot: 'bg-emerald-500', text: 'text-emerald-600' };
-    case 'medium': return { dot: 'bg-amber-500', text: 'text-amber-600' };
-    case 'high': return { dot: 'bg-orange-500', text: 'text-orange-600' };
-    case 'critical': return { dot: 'bg-red-500', text: 'text-red-600' };
-    default: return { dot: 'bg-gray-400', text: 'text-gray-500' };
+    case 'low': return { dot: 'bg-emerald-500', text: 'text-emerald-400' };
+    case 'medium': return { dot: 'bg-amber-500', text: 'text-amber-400' };
+    case 'high': return { dot: 'bg-orange-500', text: 'text-orange-400' };
+    case 'critical': return { dot: 'bg-red-500', text: 'text-red-400' };
+    default: return { dot: 'bg-gray-400', text: 'text-gray-400' };
   }
 }
 
 function statusPill(status: string): string {
   switch (status) {
-    case 'open': return 'bg-red-100 text-red-700';
-    case 'reviewing': return 'bg-amber-100 text-amber-700';
-    case 'closed': return 'bg-emerald-100 text-emerald-700';
-    default: return 'bg-gray-100 text-gray-600';
+    case 'open': return 'bg-red-500/10 text-red-400 border border-red-500/20';
+    case 'reviewing': return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    case 'closed': return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    default: return 'bg-gray-500/10 text-gray-400 border border-white/10';
   }
 }
 

@@ -34,6 +34,33 @@ interface DetailPanelProps {
   onRefresh: () => void;
 }
 
+const statusColors: Record<string, string> = {
+  assigned: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  approved: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  not_trained: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  blocked: 'bg-red-500/15 text-red-400 border-red-500/30',
+  expired_docs: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+  available: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+};
+
+const statusLabels: Record<string, string> = {
+  assigned: 'Assigned',
+  approved: 'Approved',
+  not_trained: 'Not Trained',
+  blocked: 'Blocked',
+  expired_docs: 'Expired Docs',
+  available: 'Available',
+};
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-4">
+      <div className="text-[11px] text-gray-500 mb-2.5 font-semibold uppercase tracking-wider">{title}</div>
+      {children}
+    </div>
+  );
+}
+
 export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: DetailPanelProps) {
   const { updateAssignment, removeAssignment, addAssignment } = useSiteAssignments();
   const { guards } = useGuards();
@@ -45,23 +72,7 @@ export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: D
     ? Math.ceil((new Date(guard.sia_expiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  const statusColors: Record<string, string> = {
-    assigned: 'bg-emerald-500 text-white',
-    approved: 'bg-blue-500 text-white',
-    not_trained: 'bg-orange-500 text-white',
-    blocked: 'bg-red-500 text-white',
-    expired_docs: 'bg-rose-500 text-white',
-    available: 'bg-gray-500 text-white',
-  };
-
-  const statusLabels: Record<string, string> = {
-    assigned: 'Assigned',
-    approved: 'Approved',
-    not_trained: 'Not Trained',
-    blocked: 'Blocked',
-    expired_docs: 'Expired Docs',
-    available: 'Available',
-  };
+  const missingSkills = (site.required_skills || []).filter((skill) => !(guard.skills || []).includes(skill));
 
   const handleApprove = async () => {
     setSaving(true);
@@ -119,7 +130,7 @@ export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: D
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-md h-full bg-[#0f172a] border-l border-white/10 overflow-y-auto">
+      <div className="relative w-full max-w-md h-full bg-[#0f172a] border-l border-gray-800 overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-white">Guard-Site Detail</h2>
@@ -131,42 +142,43 @@ export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: D
             </button>
           </div>
 
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-5">
             <div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 font-semibold">
               {guard.guard_initials}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="font-medium text-white">{guard.guard_name}</div>
               <div className="text-sm text-gray-500">{site.site_name}</div>
             </div>
+            <div className="ml-auto">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[cell.status] || statusColors.available}`}>
+                {statusLabels[cell.status] || 'Unknown'}
+              </span>
+            </div>
           </div>
 
-          <div className="mb-6">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusColors[cell.status] || 'bg-gray-500 text-white'}`}>
-              <div className="w-3 h-3 flex items-center justify-center">
-                <i className={`${
-                  cell.status === 'assigned' ? 'ri-check-line' :
-                  cell.status === 'blocked' ? 'ri-forbid-line' :
-                  cell.status === 'not_trained' ? 'ri-alert-line' :
-                  cell.status === 'expired_docs' ? 'ri-file-warning-line' :
-                  cell.status === 'approved' ? 'ri-shield-check-line' :
-                  'ri-question-line'
-                } text-xs`}></i>
-              </div>
-              {statusLabels[cell.status] || 'Unknown'}
-            </span>
-          </div>
+          <div className="space-y-3 mb-5">
+            <Section title="Guard">
+              <div className="text-sm text-white">{guard.guard_name}</div>
+              <div className="text-xs text-gray-500 mt-1">{guardRecord?.phone || '—'} · {guardRecord?.email || '—'}</div>
+              {guard.guard_status && (
+                <div className="text-xs text-gray-400 mt-1 capitalize">Status: {guard.guard_status}</div>
+              )}
+            </Section>
 
-          <div className="space-y-4 mb-6">
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">SIA Licence</div>
+            <Section title="Site">
+              <div className="text-sm text-white">{site.site_name}</div>
+              <div className="text-xs text-gray-500 mt-1">{site.client_name || 'No client'}</div>
+            </Section>
+
+            <Section title="Eligibility">
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${
                   guard.sia_status === 'valid' ? 'bg-emerald-400' :
-                  guard.sia_status === 'expiring' ? 'bg-orange-400' : 'bg-red-400'
+                  guard.sia_status === 'expiring' ? 'bg-amber-400' : 'bg-red-400'
                 }`} />
                 <span className="text-sm text-white">
-                  {guard.sia_status === 'valid' ? 'Valid' : guard.sia_status === 'expiring' ? 'Expiring' : 'Expired'}
+                  {guard.sia_status === 'valid' ? 'SIA Valid' : guard.sia_status === 'expiring' ? 'SIA Expiring' : 'SIA Expired'}
                 </span>
                 {siaDays !== null && (
                   <span className="text-xs text-gray-500 ml-auto">
@@ -174,33 +186,9 @@ export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: D
                   </span>
                 )}
               </div>
-              {guard.sia_expiry && (
-                <div className="text-xs text-gray-500 mt-1">Expires: {new Date(guard.sia_expiry).toLocaleDateString()}</div>
-              )}
-            </div>
-
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Site Induction</div>
-              <div className="text-sm text-white">{cell.induction_status === 'complete' ? 'Complete' : 'Not Started'}</div>
-            </div>
-
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Last Worked</div>
-              <div className="text-sm text-white">
-                {cell.last_worked_at
-                  ? new Date(cell.last_worked_at).toLocaleDateString()
-                  : 'Never'}
-              </div>
-              {cell.shift_count && cell.shift_count > 0 && (
-                <div className="text-xs text-gray-500 mt-1">{cell.shift_count} shifts in last 30 days</div>
-              )}
-            </div>
-
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Skills</div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 mt-3">
                 {(guard.skills || []).map((skill) => (
-                  <span key={skill} className="text-xs bg-white/10 text-gray-300 px-2 py-0.5 rounded-full">
+                  <span key={skill} className="text-xs bg-gray-800/60 text-gray-300 px-2 py-0.5 rounded-full">
                     {skill}
                   </span>
                 ))}
@@ -208,44 +196,54 @@ export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: D
                   <span className="text-xs text-gray-500">No skills listed</span>
                 )}
               </div>
-            </div>
+            </Section>
 
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Site Requirements</div>
-              <div className="flex flex-wrap gap-1.5">
-                {(site.required_skills || []).map((skill) => (
-                  <span
-                    key={skill}
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      (guard.skills || []).includes(skill)
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-red-500/10 text-red-400'
-                    }`}
-                  >
-                    {skill}
-                  </span>
-                ))}
-                {(!site.required_skills || site.required_skills.length === 0) && (
-                  <span className="text-xs text-gray-500">No required skills</span>
+            {(cell.block_reason || missingSkills.length > 0) && (
+              <Section title="Blockers">
+                {cell.block_reason && (
+                  <div className="text-sm text-red-300">{cell.block_reason}</div>
                 )}
-              </div>
-            </div>
-
-            {cell.block_reason && (
-              <div className="bg-red-500/5 rounded-xl p-4 border border-red-500/20">
-                <div className="text-xs text-red-400 mb-1 font-medium uppercase tracking-wide">Block Reason</div>
-                <div className="text-sm text-red-300">{cell.block_reason}</div>
-              </div>
+                {missingSkills.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1">Missing required skills:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {missingSkills.map((skill) => (
+                        <span key={skill} className="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Section>
             )}
+
+            <Section title="Current Assignment">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Induction</div>
+                  <div className="text-sm text-white">{cell.induction_status === 'complete' ? 'Complete' : 'Not Started'}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Last Worked</div>
+                  <div className="text-sm text-white">
+                    {cell.last_worked_at ? new Date(cell.last_worked_at).toLocaleDateString() : 'Never'}
+                  </div>
+                </div>
+              </div>
+              {cell.shift_count != null && cell.shift_count > 0 && (
+                <div className="text-xs text-gray-500 mt-2">{cell.shift_count} shifts in last 30 days</div>
+              )}
+            </Section>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-5">
             <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Notes</div>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Add notes about this assignment..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 min-h-[80px] resize-none"
+              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg p-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 min-h-[80px] resize-none"
             />
             <button
               onClick={handleSaveNote}
@@ -273,7 +271,7 @@ export default function DetailPanel({ guard, site, cell, onClose, onRefresh }: D
               <button
                 onClick={handleRemove}
                 disabled={saving}
-                className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 rounded-lg px-3 py-2.5 text-sm transition-colors disabled:opacity-50 cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-gray-800/60 hover:bg-gray-800 border border-gray-700 text-gray-400 rounded-lg px-3 py-2.5 text-sm transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <div className="w-4 h-4 flex items-center justify-center">
                   <i className="ri-close-line text-sm"></i>

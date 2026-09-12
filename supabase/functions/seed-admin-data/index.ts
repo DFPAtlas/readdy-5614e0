@@ -6,16 +6,16 @@ const corsHeaders = {
 };
 
 const DEMO_COMPANIES = [
-  { name: 'SecureOps UK Ltd', contact_email: 'admin@secureops.uk', phone: '+44 20 7946 0958', address: '123 Security Lane, London, EC2A 4NE', plan: 'titan', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_001' },
-  { name: 'Atlas Guard Services', contact_email: 'ops@atlasguard.co.uk', phone: '+44 161 496 0343', address: '45 Deansgate, Manchester, M3 2BR', plan: 'command', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_002' },
-  { name: 'Sentinel Protection Group', contact_email: 'info@sentinelgroup.co.uk', phone: '+44 113 496 0343', address: '12 Wellington Street, Leeds, LS1 4AP', plan: 'sentinel', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_003' },
-  { name: 'Vanguard Security Solutions', contact_email: 'contact@vanguardsec.com', phone: '+44 121 496 0343', address: '88 Broad Street, Birmingham, B15 1AU', plan: 'titan', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_004' },
-  { name: 'Phoenix Protective Services', contact_email: 'team@phoenixprotect.co.uk', phone: '+44 131 496 0343', address: '22 Castle Street, Edinburgh, EH2 3DN', plan: 'command', status: 'suspended', onboarding: 'complete', stripe_customer: 'cus_demo_005', suspended_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() },
-  { name: 'Shield Guard Management', contact_email: 'hello@shieldguard.uk', phone: '+44 141 496 0343', address: '56 Renfield Street, Glasgow, G2 1NF', plan: 'sentinel', status: 'pending_setup', onboarding: 'incomplete', stripe_customer: null },
-  { name: 'NorthStar Security', contact_email: 'admin@northstarsec.com', phone: '+44 2920 123 456', address: '77 Queen Street, Cardiff, CF10 2AH', plan: 'titan', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_006' },
-  { name: 'IronGate Protective', contact_email: 'info@irongate.uk', phone: '+44 117 496 0343', address: '34 Park Street, Bristol, BS1 5JG', plan: 'sentinel', status: 'cancelled', onboarding: 'complete', stripe_customer: 'cus_demo_007', cancelled_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString() },
-  { name: 'Defence Force Ltd', contact_email: 'ops@defenceforce.co.uk', phone: '+44 20 7946 0959', address: '99 Victoria Street, London, SW1H 0HW', plan: 'command', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_008' },
-  { name: 'Titan Security Group', contact_email: 'team@titansg.com', phone: '+44 20 7946 0960', address: '77 Fenchurch Street, London, EC3M 4BS', plan: 'titan', status: 'active', onboarding: 'complete', stripe_customer: 'cus_demo_009' },
+  { name: 'SecureOps UK Ltd', contact_email: 'admin@secureops.uk', phone: '+44 20 7946 0958', address: '123 Security Lane, London, EC2A 4NE', plan: 'titan', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_001' },
+  { name: 'Atlas Guard Services', contact_email: 'ops@atlasguard.co.uk', phone: '+44 161 496 0343', address: '45 Deansgate, Manchester, M3 2BR', plan: 'command', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_002' },
+  { name: 'Sentinel Protection Group', contact_email: 'info@sentinelgroup.co.uk', phone: '+44 113 496 0343', address: '12 Wellington Street, Leeds, LS1 4AP', plan: 'sentinel', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_003' },
+  { name: 'Vanguard Security Solutions', contact_email: 'contact@vanguardsec.com', phone: '+44 121 496 0343', address: '88 Broad Street, Birmingham, B15 1AU', plan: 'titan', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_004' },
+  { name: 'Phoenix Protective Services', contact_email: 'team@phoenixprotect.co.uk', phone: '+44 131 496 0343', address: '22 Castle Street, Edinburgh, EH2 3DN', plan: 'command', status: 'suspended', onboarding: 'completed', stripe_customer: 'cus_demo_005', suspended_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() },
+  { name: 'Shield Guard Management', contact_email: 'hello@shieldguard.uk', phone: '+44 141 496 0343', address: '56 Renfield Street, Glasgow, G2 1NF', plan: 'sentinel', status: 'pending_setup', onboarding: 'pending_setup', stripe_customer: null },
+  { name: 'NorthStar Security', contact_email: 'admin@northstarsec.com', phone: '+44 2920 123 456', address: '77 Queen Street, Cardiff, CF10 2AH', plan: 'titan', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_006' },
+  { name: 'IronGate Protective', contact_email: 'info@irongate.uk', phone: '+44 117 496 0343', address: '34 Park Street, Bristol, BS1 5JG', plan: 'sentinel', status: 'cancelled', onboarding: 'completed', stripe_customer: 'cus_demo_007', cancelled_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString() },
+  { name: 'Defence Force Ltd', contact_email: 'ops@defenceforce.co.uk', phone: '+44 20 7946 0959', address: '99 Victoria Street, London, SW1H 0HW', plan: 'command', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_008' },
+  { name: 'Titan Security Group', contact_email: 'team@titansg.com', phone: '+44 20 7946 0960', address: '77 Fenchurch Street, London, EC3M 4BS', plan: 'titan', status: 'active', onboarding: 'completed', stripe_customer: 'cus_demo_009' },
 ];
 
 const DEMO_SITES = [

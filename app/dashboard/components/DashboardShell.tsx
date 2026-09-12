@@ -5,46 +5,111 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import RaiseTicketModal from './RaiseTicketModal';
 import TrialBanner from './TrialBanner';
+import PlanIndicator from './PlanIndicator';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
 import { useEntitlements } from '@/lib/useEntitlements';
+import type { PlanEntitlements } from '@/lib/entitlements';
 import SOPAssistantWidget from '@/app/components/SOPAssistantWidget';
 import NotificationBell from '@/app/components/NotificationBell';
 import { DashboardPageSkeleton } from '@/app/components/PageSkeleton';
 import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: 'ri-dashboard-line', perm: 'dashboard' },
-  { label: 'Command Centre', href: '/dashboard/command-centre', icon: 'ri-command-line', perm: 'dashboard' },
-  { label: 'Guard Welfare', href: '/dashboard/guard-welfare', icon: 'ri-heart-pulse-line', perm: 'dashboard' },
-  { label: 'Evidence Vault', href: '/dashboard/evidence-vault', icon: 'ri-folder-shield-line', perm: 'incidents' },
-  { label: 'Site Assignments', href: '/dashboard/site-assignments', icon: 'ri-grid-line', perm: 'staff' },
-  { label: 'Setup Wizard', href: '/dashboard/setup-wizard', icon: 'ri-magic-line', perm: 'settings' },
-  { label: 'Compliance', href: '/dashboard/compliance/documents', icon: 'ri-file-shield-line', perm: 'dashboard', feature: 'hasCompliance' },
-  { label: 'Client SLA', href: '/dashboard/client-sla', icon: 'ri-line-chart-line', perm: 'dashboard' },
-  { label: 'Admin', href: '/dashboard/admin', icon: 'ri-user-settings-line', perm: 'settings' },
-  { label: 'Sites', href: '/sites', icon: 'ri-building-line', perm: 'sites' },
-  { label: 'Clients', href: '/dashboard/clients', icon: 'ri-briefcase-line', perm: 'client_portal', feature: 'hasClientPortal' },
-  { label: 'Patrol Checkpoints', href: '/dashboard/patrol-checkpoints', icon: 'ri-qr-code-line', perm: 'sites', feature: 'hasPatrolManagement' },
-  { label: 'Patrol Monitoring', href: '/dashboard/patrol-monitoring', icon: 'ri-route-line', perm: 'sites', feature: 'hasPatrolManagement' },
-  { label: 'Notices', href: '/dashboard/notices', icon: 'ri-notification-3-line', perm: 'sites' },
-  { label: 'Incidents', href: '/incidents', icon: 'ri-alarm-warning-line', perm: 'incidents' },
-  { label: 'Occurrence Book', href: '/occurrence-book', icon: 'ri-book-line', perm: 'occurrence_book' },
-  { label: 'Guards', href: '/guards', icon: 'ri-shield-user-line', perm: 'staff' },
-  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-calendar-close-line', perm: 'staff', feature: 'hasLeaveAutomation' },
-  { label: 'Rotas', href: '/rotas', icon: 'ri-calendar-event-line', perm: 'rotas' },
-  { label: 'Pattern Builder', href: '/rotas/patterns', icon: 'ri-stack-line', perm: 'shift_patterns' },
-  { label: 'Reports', href: '/reports', icon: 'ri-bar-chart-box-line', perm: 'reports' },
-  { label: 'Weekly Reports', href: '/dashboard/reports/client-weekly', icon: 'ri-file-chart-line', perm: 'reports', feature: 'hasAiReports' },
-  { label: 'SOP Builder', href: '/sop-builder', icon: 'ri-draft-line', perm: 'sop_documents' },
-  { label: 'SOP Library', href: '/sops', icon: 'ri-book-open-line', perm: 'sop_documents' },
-  { label: 'AI Automation Hub', href: '/dashboard/ai-automation', icon: 'ri-robot-2-line', perm: 'ai_tools', feature: 'hasAiRota' },
-  { label: 'Staff', href: '/dashboard/staff', icon: 'ri-team-line', perm: 'staff' },
-  { label: 'Settings', href: '/dashboard/settings', icon: 'ri-settings-3-line', perm: 'settings' },
-];
+interface LockedFeatureInfo {
+  label: string;
+  featureKey?: keyof PlanEntitlements;
+}
 
-const adminNavItems = [
-  { label: 'Roles & Permissions', href: '/dashboard/settings/roles', icon: 'ri-shield-user-line', perm: 'roles' },
+interface NavItem {
+  label: string;
+  href: string;
+  icon: string;
+  perm?: string;
+  feature?: keyof PlanEntitlements;
+  checkMode?: 'view' | 'manage';
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    label: 'Overview',
+    items: [
+      { label: 'Dashboard', href: '/dashboard', icon: 'ri-dashboard-line', perm: 'dashboard' },
+      { label: 'Command Centre', href: '/dashboard/command-centre', icon: 'ri-command-line', perm: 'dashboard' },
+      { label: 'Getting Started', href: '/dashboard/getting-started', icon: 'ri-rocket-2-line', perm: 'dashboard' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { label: 'Sites', href: '/sites', icon: 'ri-building-line', perm: 'sites' },
+      { label: 'Site Assignments', href: '/dashboard/site-assignments', icon: 'ri-grid-line', perm: 'staff' },
+      { label: 'Guards', href: '/guards', icon: 'ri-shield-user-line', perm: 'staff' },
+      { label: 'Staff', href: '/dashboard/staff', icon: 'ri-team-line', perm: 'staff' },
+      { label: 'Rotas', href: '/rotas', icon: 'ri-calendar-event-line', perm: 'rotas' },
+      { label: 'Pattern Builder', href: '/rotas/patterns', icon: 'ri-stack-line', perm: 'shift_patterns' },
+      { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-calendar-close-line', perm: 'staff', feature: 'hasLeaveAutomation' as keyof PlanEntitlements },
+      { label: 'Workforce Hub', href: '/dashboard/workforce', icon: 'ri-group-line', perm: 'workforce.view' },
+      { label: 'Finance', href: '/dashboard/finance', icon: 'ri-money-pound-circle-line', perm: 'dashboard' },
+    ],
+  },
+  {
+    label: 'Live Security',
+    items: [
+      { label: 'Incidents', href: '/incidents', icon: 'ri-alarm-warning-line', perm: 'incidents' },
+      { label: 'Occurrence Book', href: '/occurrence-book', icon: 'ri-book-line', perm: 'occurrence_book' },
+      { label: 'Patrol Monitoring', href: '/dashboard/patrol-monitoring', icon: 'ri-route-line', perm: 'sites', feature: 'hasPatrolManagement' as keyof PlanEntitlements },
+      { label: 'Patrol Checkpoints', href: '/dashboard/patrol-checkpoints', icon: 'ri-qr-code-line', perm: 'sites', feature: 'hasPatrolManagement' as keyof PlanEntitlements },
+      { label: 'Guard Welfare', href: '/dashboard/guard-welfare', icon: 'ri-heart-pulse-line', perm: 'dashboard' },
+      { label: 'Notices', href: '/dashboard/notices', icon: 'ri-notification-3-line', perm: 'sites' },
+      { label: 'Notifications', href: '/dashboard/notifications', icon: 'ri-notification-2-line', perm: 'dashboard' },
+    ],
+  },
+  {
+    label: 'Clients',
+    items: [
+      { label: 'Clients', href: '/dashboard/clients', icon: 'ri-briefcase-line', perm: 'client_portal', feature: 'hasClientPortal' as keyof PlanEntitlements },
+      { label: 'Client Management', href: '/dashboard/client-management', icon: 'ri-building-2-line', perm: 'client_portal', feature: 'hasClientPortal' as keyof PlanEntitlements },
+      { label: 'Client SLA', href: '/dashboard/client-sla', icon: 'ri-line-chart-line', perm: 'dashboard' },
+      { label: 'Weekly Reports', href: '/dashboard/reports/client-weekly', icon: 'ri-file-chart-line', perm: 'reports', feature: 'hasAiReports' as keyof PlanEntitlements },
+    ],
+  },
+  {
+    label: 'Compliance',
+    items: [
+      { label: 'Compliance', href: '/dashboard/compliance/documents', icon: 'ri-file-shield-line', perm: 'dashboard', feature: 'hasCompliance' as keyof PlanEntitlements },
+      { label: 'ACS Centre', href: '/dashboard/acs-compliance', icon: 'ri-shield-star-line', perm: 'dashboard' },
+      { label: 'Training', href: '/dashboard/training', icon: 'ri-graduation-cap-line', perm: 'dashboard', feature: 'hasCompliance' as keyof PlanEntitlements },
+      { label: 'Evidence Vault', href: '/dashboard/evidence-vault', icon: 'ri-folder-shield-line', perm: 'incidents' },
+      { label: 'SOP Builder', href: '/sop-builder', icon: 'ri-draft-line', perm: 'sop_documents' },
+      { label: 'SOP Library', href: '/sops', icon: 'ri-book-open-line', perm: 'sop_documents' },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { label: 'AI Automation Hub', href: '/dashboard/ai-automation', icon: 'ri-robot-2-line', perm: 'ai_tools', feature: 'hasAiRota' as keyof PlanEntitlements },
+      { label: 'Agent Control', href: '/dashboard/agent-control', icon: 'ri-cpu-line', perm: 'settings' },
+      { label: 'Reports', href: '/reports', icon: 'ri-bar-chart-box-line', perm: 'reports' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { label: 'Setup Wizard', href: '/dashboard/setup-wizard', icon: 'ri-magic-line', perm: 'settings' },
+      { label: 'Admin', href: '/dashboard/admin', icon: 'ri-user-settings-line', perm: 'settings' },
+      { label: 'Settings', href: '/dashboard/settings', icon: 'ri-settings-3-line', perm: 'settings' },
+      { label: 'Roles & Permissions', href: '/dashboard/settings/roles', icon: 'ri-shield-keyhole-line', perm: 'roles', checkMode: 'manage' },
+      { label: 'Integrations', href: '/dashboard/integrations', icon: 'ri-plug-line', perm: 'integrations.view' },
+      { label: 'Support', href: '/dashboard/support', icon: 'ri-customer-service-2-line', perm: 'dashboard' },
+      { label: 'Academy', href: '/academy', icon: 'ri-graduation-cap-line', perm: 'dashboard' },
+      { label: 'Help Centre', href: '/help', icon: 'ri-question-line', perm: 'dashboard' },
+    ],
+  },
 ];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -53,10 +118,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isMobile, setIsMobile] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showTicketModal, setShowTicketModal] = useState(false);
-  const [lockedFeature, setLockedFeature] = useState<string | null>(null);
+  const [lockedFeature, setLockedFeature] = useState<LockedFeatureInfo | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut, isLoading } = useAuth();
+  const { profile, company, signOut, isLoading } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, profile?.company_id || null);
   const { canAccess } = useEntitlements();
 
@@ -84,7 +149,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return pathname.startsWith(href + '/');
   };
 
-  const isSetupPage = pathname ? (pathname === '/dashboard/setup' || pathname === '/dashboard/setup-wizard') : false;
+  const isSetupPage = pathname ? pathname === '/dashboard/setup-wizard' : false;
 
   useEffect(() => {
     if (!isLoading && profile?.role === 'client') {
@@ -93,6 +158,64 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       }, 0);
     }
   }, [isLoading, profile?.role, router]);
+
+  const renderNavItem = (item: NavItem) => {
+    if (item.href === '/dashboard/setup-wizard' && company?.onboarding_status === 'completed') return null;
+    if (item.perm && !can(item.perm, item.checkMode || 'view') && !isAdminUser) return null;
+    const active = isActive(item.href);
+    const isLocked = item.feature ? !canAccess(item.feature) : false;
+
+    if (isLocked) {
+      return (
+        <button
+          key={item.href}
+          onClick={() => setLockedFeature({ label: item.label, featureKey: item.feature })}
+          title={`${item.label} requires upgrade`}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap w-full text-left opacity-40 cursor-pointer hover:opacity-60 hover:bg-gray-800/30 group relative"
+        >
+          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+            <i className={item.icon}></i>
+          </div>
+          <span className={`transition-opacity flex items-center gap-1.5 ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
+            {item.label}
+            <span className="w-3.5 h-3.5 flex items-center justify-center text-amber-400">
+              <i className="ri-lock-line text-[10px]"></i>
+            </span>
+          </span>
+          {!sidebarOpen && (
+            <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700">
+              {item.label} — Upgrade required
+            </span>
+          )}
+        </button>
+      );
+    }
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setMobileOpen(false)}
+        className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+          active
+            ? 'bg-blue-600/15 text-blue-400'
+            : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+        }`}
+      >
+        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+          <i className={item.icon}></i>
+        </div>
+        <span className={`transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
+          {item.label}
+        </span>
+        {!sidebarOpen && (
+          <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700 shadow-lg">
+            {item.label}
+          </span>
+        )}
+      </Link>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -170,64 +293,25 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </Link>
           </div>
 
-          <nav className="dash-sidebar-scroll flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navItems.map((item) => {
-              if (item.perm && !can(item.perm, 'view') && !isAdminUser) return null;
-              const active = isActive(item.href);
-              const isLocked = item.feature ? !canAccess(item.feature) : false;
-
-              if (isLocked) {
-                return (
-                  <button
-                    key={item.href}
-                    onClick={() => setLockedFeature(item.label)}
-                    title={`${item.label} requires upgrade`}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap w-full text-left opacity-40 cursor-pointer hover:opacity-60 hover:bg-gray-800/30 group relative"
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                      <i className={item.icon}></i>
-                    </div>
-                    <span className={`transition-opacity flex items-center gap-1.5 ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
-                      {item.label}
-                      <span className="w-3.5 h-3.5 flex items-center justify-center text-amber-400">
-                        <i className="ri-lock-line text-[10px]"></i>
-                      </span>
-                    </span>
-                    {!sidebarOpen && (
-                      <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700">
-                        {item.label} — Upgrade required
-                      </span>
-                    )}
-                  </button>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                    active
-                      ? 'bg-blue-600/15 text-blue-400'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                  }`}
-                >
-                  <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                    <i className={item.icon}></i>
+          <nav className="dash-sidebar-scroll flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+            {navSections.map((section) => (
+              <div key={section.label}>
+                {sidebarOpen ? (
+                  <div className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap select-none">
+                    {section.label}
                   </div>
-                  <span className={`transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
+                ) : (
+                  <div className="mx-3 my-2.5 border-t border-white/5" />
+                )}
+                {section.items.map((item) => renderNavItem(item))}
+              </div>
+            ))}
 
             {isSuperAdmin && (
               <Link
                 href="/admin"
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   pathname?.startsWith('/admin')
                     ? 'bg-indigo-600/15 text-indigo-400'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
@@ -239,38 +323,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <span className={`transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
                   Super Admin
                 </span>
+                {!sidebarOpen && (
+                  <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700 shadow-lg">
+                    Super Admin
+                  </span>
+                )}
               </Link>
             )}
-
-            {adminNavItems.map((item) => {
-              if (item.perm && !can(item.perm, 'manage') && !isAdminUser) return null;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                    active
-                      ? 'bg-blue-600/15 text-blue-400'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                  }`}
-                >
-                  <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                    <i className={item.icon}></i>
-                  </div>
-                  <span className={`transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
           </nav>
 
           <div className="px-3 py-4 border-t border-gray-800">
             <button
               onClick={signOut}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-gray-800/50 transition-all w-full whitespace-nowrap"
+              className="group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-gray-800/50 transition-all w-full whitespace-nowrap"
             >
               <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                 <i className="ri-logout-box-line"></i>
@@ -278,6 +343,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               <span className={`transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'}`}>
                 Sign Out
               </span>
+              {!sidebarOpen && (
+                <span className="absolute left-16 bg-[#1f2937] text-white text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-gray-700 shadow-lg">
+                  Sign Out
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -299,6 +369,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <i className="ri-shield-check-line"></i>
               </div>
               Control Room
+            </div>
+            <div className="hidden md:block">
+              <PlanIndicator />
             </div>
           </div>
 
@@ -363,14 +436,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                       Settings
                     </Link>
                     <Link
-                      href="/dashboard/ops-room"
+                      href="/dashboard/command-centre"
                       onClick={() => setShowUserMenu(false)}
                       className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-white rounded-md cursor-pointer"
                     >
                       <div className="w-4 h-4 flex items-center justify-center">
-                        <i className="ri-dashboard-line text-gray-500"></i>
+                        <i className="ri-command-line text-gray-500"></i>
                       </div>
-                      Ops Room
+                      Command Centre
                     </Link>
                     <button
                       onClick={() => {
@@ -400,7 +473,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <UpgradeRequiredModal
         isOpen={lockedFeature !== null}
         onClose={() => setLockedFeature(null)}
-        featureName={lockedFeature || undefined}
+        featureName={lockedFeature?.label || undefined}
+        featureKey={lockedFeature?.featureKey}
       />
     </div>
   );

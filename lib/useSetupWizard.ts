@@ -320,8 +320,28 @@ export function useSetupWizard() {
     setSaving(true);
 
     try {
+      const { data: existingSites } = await supabase
+        .from('sites')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(1);
+
+      if (!existingSites || existingSites.length === 0) {
+        const { error: siteErr } = await supabase.from('sites').insert({
+          company_id: companyId,
+          site_name: 'Default Site',
+          address: company?.address || '',
+          risk_level: 'medium',
+          check_call_interval: 60,
+        });
+        if (siteErr) {
+          console.warn('Failed to create default site during setup:', siteErr.message);
+        }
+      }
+
       const { error: err } = await supabase.from('companies').update({
         onboarding_status: 'completed',
+        account_status: company?.account_status === 'trial' ? 'trial' : (company?.account_status || 'active'),
       }).eq('id', companyId);
 
       if (err) {
@@ -351,13 +371,27 @@ export function useSetupWizard() {
         }));
 
       if (newModules.length > 0) {
-        const { error: moduleErr } = await supabase
-          .from('company_enabled_modules')
-          .insert(newModules);
+        await supabase.from('company_enabled_modules').insert(newModules);
+      }
 
-        if (moduleErr) {
-          console.warn('Failed to enable default modules:', moduleErr.message);
-        }
+      const { data: existingPrefs } = await supabase
+        .from('notification_preferences')
+        .select('id')
+        .eq('company_id', companyId)
+        .limit(1);
+
+      if (!existingPrefs || existingPrefs.length === 0) {
+        await supabase.from('notification_preferences').insert({
+          company_id: companyId,
+          email_alerts: true,
+          sms_alerts: false,
+          push_alerts: true,
+          incident_alert: true,
+          check_call_alert: true,
+          patrol_alert: false,
+          billing_alert: true,
+          system_alert: true,
+        });
       }
 
       const res = await saveProgress(6, { is_completed: true, completed_at: new Date().toISOString() });
@@ -367,7 +401,7 @@ export function useSetupWizard() {
       setSaving(false);
       return { error: e || new Error('Failed to finish setup') };
     }
-  }, [companyId, saveProgress]);
+  }, [companyId, company, saveProgress]);
 
   return {
     progress,

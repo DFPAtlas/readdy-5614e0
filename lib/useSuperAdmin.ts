@@ -71,6 +71,44 @@ export interface PlatformStats {
   failedBilling: number;
 }
 
+export interface AdminGuard {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  sia_licence: string | null;
+  sia_expiry: string | null;
+  hourly_rate: number | null;
+  position: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  user_id: string | null;
+  created_at: string;
+}
+
+export interface SystemHealth {
+  totalCompanies: number;
+  activeCompanies: number;
+  totalUsers: number;
+  activeUsersToday: number;
+  totalGuards: number;
+  totalSites: number;
+  totalTickets: number;
+  openTickets: number;
+  urgentTickets: number;
+  webhookTotal: number;
+  webhookFailed: number;
+  webhookLast24h: number;
+  webhookFailed24h: number;
+  failedBilling: number;
+  overdueAmount: number;
+  edgeFunctions: { name: string; slug: string }[];
+  dbResponseMs: number | null;
+  healthScore: number;
+}
+
 export function useSuperAdminCompanies() {
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -373,4 +411,208 @@ export function useAdminModules(companyId: string | null) {
   }, [companyId]);
 
   return { modules, loading, toggleModule, refetch: fetchModules };
+}
+
+export function useSuperAdminGuards() {
+  const [guards, setGuards] = useState<AdminGuard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchGuards = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase
+        .from('guards')
+        .select('*, company:company_id(name)')
+        .order('created_at', { ascending: false });
+
+      if (err) throw err;
+
+      setGuards(
+        (data || []).map((g: any) => ({
+          id: g.id,
+          first_name: g.first_name,
+          last_name: g.last_name,
+          email: g.email,
+          phone: g.phone,
+          status: g.status || 'active',
+          sia_licence: g.sia_licence,
+          sia_expiry: g.sia_expiry,
+          hourly_rate: g.hourly_rate,
+          position: g.position,
+          company_id: g.company_id,
+          company_name: g.company?.name || null,
+          user_id: g.user_id,
+          created_at: g.created_at,
+        }))
+      );
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGuards();
+  }, []);
+
+  return { guards, loading, error, refetch: fetchGuards };
+}
+
+export function useSystemHealth() {
+  const [health, setHealth] = useState<SystemHealth>({
+    totalCompanies: 0,
+    activeCompanies: 0,
+    totalUsers: 0,
+    activeUsersToday: 0,
+    totalGuards: 0,
+    totalSites: 0,
+    totalTickets: 0,
+    openTickets: 0,
+    urgentTickets: 0,
+    webhookTotal: 0,
+    webhookFailed: 0,
+    webhookLast24h: 0,
+    webhookFailed24h: 0,
+    failedBilling: 0,
+    overdueAmount: 0,
+    edgeFunctions: [],
+    dbResponseMs: null,
+    healthScore: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetch = async () => {
+      setLoading(true);
+      try {
+        const startTime = performance.now();
+
+        const [
+          { data: companies },
+          { data: users },
+          { data: guards },
+          { data: sites },
+          { count: ticketCount },
+          { count: openTicketCount },
+          { count: urgentTicketCount },
+          { count: webhookTotal },
+          { count: webhookFailed },
+          { count: webhook24h },
+          { count: webhookFailed24h },
+          { data: overdueData },
+        ] = await Promise.all([
+          supabase.from('companies').select('id, account_status, subscription_status'),
+          supabase.from('users').select('id, last_sign_in_at'),
+          supabase.from('guards').select('id'),
+          supabase.from('sites').select('id'),
+          supabase.from('support_tickets').select('*', { count: 'exact', head: true }),
+          supabase.from('support_tickets').select('*', { count: 'exact', head: true }).in('status', ['new', 'open', 'in_progress']),
+          supabase.from('support_tickets').select('*', { count: 'exact', head: true }).eq('priority', 'urgent').in('status', ['new', 'open', 'in_progress']),
+          supabase.from('billing_webhook_events').select('*', { count: 'exact', head: true }),
+          supabase.from('billing_webhook_events').select('*', { count: 'exact', head: true }).not('error', 'is', null),
+          supabase.from('billing_webhook_events').select('*', { count: 'exact', head: true }).gte('received_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+          supabase.from('billing_webhook_events').select('*', { count: 'exact', head: true }).gte('received_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).not('error', 'is', null),
+          supabase.from('v_billing_overdue').select('amount_due').limit(5000),
+        ]);
+
+        const endTime = performance.now();
+        const dbMs = Math.round(endTime - startTime);
+
+        const companyList = companies || [];
+        const userList = users || [];
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const activeUsersToday = userList.filter((u: any) => u.last_sign_in_at && u.last_sign_in_at >= todayStart).length;
+
+        const failedBilling = companyList.filter(
+          (c: any) => c.subscription_status === 'past_due' || c.subscription_status === 'unpaid'
+        ).length;
+
+        const overdueSum = (overdueData || []).reduce((s: number, r: any) => s + (r.amount_due || 0), 0);
+
+        const activeCompanies = companyList.filter((c: any) => c.account_status === 'active').length;
+
+        const totalEvents = webhookTotal || 0;
+        const failedEvents = webhookFailed || 0;
+        const webhookSuccessRate = totalEvents > 0 ? ((totalEvents - failedEvents) / totalEvents) * 100 : 100;
+        const billingHealth = companyList.length > 0 ? ((companyList.length - failedBilling) / companyList.length) * 100 : 100;
+        const ticketHealth = (ticketCount || 0) > 0 ? Math.max(0, 100 - ((openTicketCount || 0) / (ticketCount || 1)) * 40) : 100;
+        const dbHealth = dbMs < 500 ? 100 : dbMs < 1000 ? 80 : dbMs < 2000 ? 60 : 30;
+        const healthScore = Math.round((webhookSuccessRate * 0.2 + billingHealth * 0.3 + ticketHealth * 0.2 + dbHealth * 0.15 + (activeCompanies > 0 ? 15 : 0)));
+
+        const knownFunctions = [
+          { name: 'Generate Incident PDF', slug: 'generate-incident-pdf' },
+          { name: 'Get Incident Report Data', slug: 'get-incident-report-data' },
+          { name: 'Generate Weekly Site Report', slug: 'generate-weekly-site-report' },
+          { name: 'Weekly Site Reports Scheduler', slug: 'weekly-site-reports-scheduler' },
+          { name: 'Get Client Clocking', slug: 'get-client-clocking' },
+          { name: 'Ops Signup', slug: 'ops-signup' },
+          { name: 'AI Summarize OB Entry', slug: 'ai-summarize-ob-entry' },
+          { name: 'AI Summarize Day', slug: 'ai-summarize-day' },
+          { name: 'AI Suggest Staffing', slug: 'ai-suggest-staffing' },
+          { name: 'AI Score Site Risk', slug: 'ai-score-site-risk' },
+          { name: 'Site Risk Scores Scheduler', slug: 'site-risk-scores-scheduler' },
+          { name: 'SOP Process Document', slug: 'sop-process-document' },
+          { name: 'SOP Query', slug: 'sop-query' },
+          { name: 'AI Index SOP Document', slug: 'ai-index-sop-document' },
+          { name: 'AI Ask SOP', slug: 'ai-ask-sop' },
+          { name: 'Send Notification Email', slug: 'send-notification-email' },
+          { name: 'Create Stripe Checkout Session', slug: 'create-checkout-session' },
+          { name: 'Create Portal Session', slug: 'create-portal-session' },
+          { name: 'AI Sick Cover', slug: 'ai-sick-cover' },
+          { name: 'AI Improve SOP', slug: 'ai-improve-sop' },
+          { name: 'Has Permission', slug: 'has-permission' },
+          { name: 'Test OpenAI Config', slug: 'test-openai-config' },
+          { name: 'Save OpenAI Key', slug: 'save-openai-key' },
+          { name: 'Client Invite User', slug: 'client-invite-user' },
+          { name: 'Create Demo Admin', slug: 'create-demo-admin' },
+          { name: 'Seed Admin Data', slug: 'seed-admin-data' },
+          { name: 'Save API Key', slug: 'save-api-key' },
+          { name: 'Test API Key', slug: 'test-api-key' },
+          { name: 'Admin Invite User', slug: 'admin-invite-user' },
+          { name: 'Admin Resend Invite', slug: 'admin-resend-invite' },
+          { name: 'Stripe Webhook Handler', slug: 'stripe-webhook' },
+          { name: 'Financial CSV Export', slug: 'financial-export-csv' },
+          { name: 'Financial PDF Export', slug: 'financial-export-pdf' },
+          { name: 'Stripe Backfill Data', slug: 'stripe-backfill' },
+          { name: 'Ticket AI Check', slug: 'ticket-ai-check' },
+          { name: 'Stripe Webhook Test', slug: 'stripe-webhook-test' },
+          { name: 'Stripe Setup Webhook', slug: 'stripe-setup-webhook' },
+          { name: 'Guard Scan Checkpoint', slug: 'guard-scan-checkpoint' },
+          { name: 'AI ACS Readiness Scan', slug: 'ai-acs-readiness' },
+          { name: 'AI Operations Copilot', slug: 'operations-copilot' },
+          { name: 'Send Welcome Email', slug: 'send-welcome-email' },
+          { name: 'GuardianHub Agent Proxy', slug: 'guardianhub-agent-proxy' },
+        ];
+
+        setHealth({
+          totalCompanies: companyList.length,
+          activeCompanies,
+          totalUsers: userList.length,
+          activeUsersToday,
+          totalGuards: guards?.length || 0,
+          totalSites: sites?.length || 0,
+          totalTickets: ticketCount || 0,
+          openTickets: openTicketCount || 0,
+          urgentTickets: urgentTicketCount || 0,
+          webhookTotal: totalEvents,
+          webhookFailed: failedEvents,
+          webhookLast24h: webhook24h || 0,
+          webhookFailed24h: webhookFailed24h || 0,
+          failedBilling,
+          overdueAmount: overdueSum,
+          edgeFunctions: knownFunctions,
+          dbResponseMs: dbMs,
+          healthScore,
+        });
+      } catch {}
+      setLoading(false);
+    };
+    fetch();
+  }, []);
+
+  return { health, loading };
 }

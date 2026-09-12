@@ -52,7 +52,16 @@ export default function ContactContent() {
                     data-readdy-form
                     action="https://readdy.ai/api/form/d7ublqpjlv0i8kopuau0"
                     method="POST"
-                    onSubmit={() => setSubmitted(true)}
+                    onSubmit={(e) => {
+                      const form = e.currentTarget;
+                      const hpEl = form.querySelector('[data-hp-field]') as HTMLInputElement;
+                      if (hpEl && hpEl.value.trim()) {
+                        e.preventDefault();
+                        setSubmitted(true);
+                        return;
+                      }
+                      setSubmitted(true);
+                    }}
                   >
                     {isTitan && (
                       <input type="hidden" name="inquiry_type" value="Titan Enterprise" />
@@ -144,6 +153,16 @@ export default function ContactContent() {
                       ></textarea>
                       <p className="text-gray-500 text-xs mt-1">Max 500 characters</p>
                     </div>
+
+                    <input
+                      type="text"
+                      name="phone_alt"
+                      data-hp-field
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      readOnly
+                    />
 
                     <button
                       type="submit"

@@ -84,14 +84,10 @@ export function StatCard({
     gray: { bg: 'bg-gray-600/10', text: 'text-gray-400', border: 'border-gray-600/20' },
   };
   const c = colors[color] || colors.indigo;
-  const Wrapper = href ? Link : 'div';
-  const props = href ? { href, className: `group` } : {};
+  const cardClass = `bg-[#111827] border ${c.border} rounded-xl p-5 hover:border-gray-700 transition-all ${href ? 'cursor-pointer group' : ''}`;
 
-  return (
-    <Wrapper
-      {...props}
-      className={`bg-[#111827] border ${c.border} rounded-xl p-5 hover:border-gray-700 transition-all ${href ? 'cursor-pointer' : ''}`}
-    >
+  const cardContent = (
+    <>
       <div className="flex items-start justify-between mb-4">
         <div className={`w-10 h-10 rounded-lg ${c.bg} flex items-center justify-center`}>
           <div className={`w-5 h-5 flex items-center justify-center ${c.text}`}>
@@ -106,7 +102,21 @@ export function StatCard({
       </div>
       <div className="text-2xl font-bold text-white">{value}</div>
       <div className="text-sm text-gray-500 mt-0.5">{label}</div>
-    </Wrapper>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cardClass}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={cardClass}>
+      {cardContent}
+    </div>
   );
 }
 

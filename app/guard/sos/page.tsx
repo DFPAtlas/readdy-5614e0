@@ -1,23 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 
 export default function SOSPage() {
   const router = useRouter();
-  const { currentUser, profile, isLoading: authLoading } = useAuth();
+  const g = useGuardAuth();
   const [pressed, setPressed] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.replace('/login/guard');
-    }
-  }, [currentUser, authLoading, router]);
 
   function handlePressStart() {
     setPressed(true);
@@ -50,28 +46,61 @@ export default function SOSPage() {
     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
     setPressed(false);
     setSent(true);
+    setSending(true);
 
-    const { supabase } = await import('@/lib/supabase');
-    const { data: guardData } = await supabase.from('guards').select('id, company_id').eq('user_id', currentUser.id).maybeSingle();
-    if (!guardData) return;
+    if (!g.companyId || !g.guardId) {
+      setSending(false);
+      return;
+    }
+
+    let loc: { lat: number; lng: number } | null = null;
+    try {
+      const pos: GeolocationPosition = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+      });
+      loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    } catch {}
 
     await supabase.from('occurrence_books').insert({
-      company_id: guardData.company_id,
-      guard_id: guardData.id,
-      entry_type: 'Incident',
-      entry: `SOS ALERT triggered by ${profile?.first_name} ${profile?.last_name} at ${new Date().toLocaleTimeString('en-GB')}. Immediate response required.`,
+      company_id: g.companyId,
+      site_id: g.todayShift?.site_id || null,
+      guard_id: g.guardId,
+      entry_type: 'SOS / Emergency',
+      entry: `EMERGENCY SOS ALERT triggered by ${g.guardName} at ${new Date().toLocaleTimeString('en-GB')}. GPS: ${loc ? `${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}` : 'Not available'}. Immediate response required.`,
       occurred_at: new Date().toISOString(),
     });
 
     await supabase.from('ai_activity_logs').insert({
-      company_id: guardData.company_id,
-      guard_id: guardData.id,
-      action_type: 'panic_alarm_triggered',
-      details: { guard_name: `${profile?.first_name} ${profile?.last_name}`, time: new Date().toISOString() },
+      company_id: g.companyId,
+      guard_id: g.guardId,
+      action_type: 'sos_panic_alarm',
+      details: { guard_name: g.guardName, site_id: g.todayShift?.site_id, gps: loc, time: new Date().toISOString() },
     });
+
+    const sosUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sos-emergency-notify`;
+    const sessionData = await supabase.auth.getSession();
+    const token = sessionData.data.session?.access_token;
+    fetch(sosUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        company_id: g.companyId,
+        site_id: g.todayShift?.site_id || null,
+        guard_id: g.guardId,
+        guard_name: g.guardName,
+        shift_id: g.todayShift?.id || null,
+        lat: loc?.lat || null,
+        lng: loc?.lng || null,
+      }),
+    }).catch(() => {});
+
+    setSending(false);
   }
 
-  if (authLoading || !currentUser) {
+  if (g.loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <i className="ri-loader-4-line animate-spin text-[#3b82f6] text-2xl"></i>
@@ -87,10 +116,13 @@ export default function SOSPage() {
         </div>
         <h1 className="text-3xl font-bold text-white mb-3">SOS Alert Sent</h1>
         <p className="text-base text-gray-400 text-center mb-2">Operations has been notified immediately.</p>
+        <p className="text-sm text-gray-500 text-center mb-2">
+          {sending ? 'Sending alert...' : 'Incident created, notifications dispatched.'}
+        </p>
         <p className="text-sm text-gray-500 text-center mb-12">Stay safe. Help is on the way.</p>
         <button
           onClick={() => { setSent(false); router.push('/guard'); }}
-          className="w-full max-w-xs h-16 bg-[#3b82f6] hover:bg-blue-500 text-white font-bold rounded-2xl transition-all active:scale-[0.98] cursor-pointer"
+          className="w-full max-w-xs h-16 bg-[#3b82f6] hover:bg-blue-500 text-white font-bold rounded-2xl transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
         >
           Return to Home
         </button>

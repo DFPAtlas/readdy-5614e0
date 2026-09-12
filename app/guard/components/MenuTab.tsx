@@ -305,6 +305,18 @@ export default function MenuTab() {
                 <p className="text-[11px] text-gray-500">Control room chat</p>
               </div>
             </Link>
+            <Link
+              href="/guard/training"
+              className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 flex items-center gap-3 cursor-pointer active:scale-[0.97] transition-transform"
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                <i className="ri-graduation-cap-line text-amber-400 text-lg"></i>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white whitespace-nowrap">My Training</p>
+                <p className="text-[11px] text-gray-500">Certifications & modules</p>
+              </div>
+            </Link>
           </div>
         </div>
       )}

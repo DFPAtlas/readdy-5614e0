@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub SOS Escalation",
+  "version": "1.0.0",
+  "description": "Handles SOS alerts - deterministic delivery first, AI summarization second. Never delays SOS delivery for AI.",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "sos-escalation", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "SOS Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { guard_id, company_id, site_id, shift_id, location, sos_event_id } = body;\n\nreturn {\n  json: {\n    sos_event_id: sos_event_id || body.run_id,\n    guard_id,\n    company_id,\n    site_id,\n    shift_id,\n    triggered_at: new Date().toISOString(),\n    location,\n    escalation_level: 1,\n    notification_sent: true,\n    escalation_contacts: [],\n    ai_summary: null\n  }\n};"
+      },
+      "id": "process-sos",
+      "name": "Process SOS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "sos_escalation" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "sos.escalated" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "SOS Event Webhook": { "main": [[ { "node": "Process SOS", "type": "main", "index": 0 } ]] },
+    "Process SOS": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

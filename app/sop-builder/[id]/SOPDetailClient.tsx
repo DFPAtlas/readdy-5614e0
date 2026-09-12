@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useBuiltSOPs, BuiltSOP, getSOPTypeLabel, SOPStatus } from '@/lib/useBuiltSOPs';
 import { useSOPAcknowledgements } from '@/lib/useSOPAcknowledgements';
 import { useAuth } from '@/lib/auth';
@@ -24,6 +25,7 @@ function statusBadge(status: SOPStatus) {
 }
 
 export default function SOPDetailClient({ id }: { id: string }) {
+  const router = useRouter();
   const { getById, updateStatus, saveContent, archiveSOP, deleteSOP, incrementVersion, refetch } = useBuiltSOPs();
   const { user, profile } = useAuth();
   const { acks, refetch: refetchAcks } = useSOPAcknowledgements(id);
@@ -143,9 +145,7 @@ export default function SOPDetailClient({ id }: { id: string }) {
     if (!sop) return;
     await deleteSOP(sop.id);
     setShowDelete(false);
-    if (typeof window !== 'undefined') {
-      window.location.href = '/sop-builder';
-    }
+    router.push('/sop-builder');
   };
 
   const handleSubmitForReview = async () => {

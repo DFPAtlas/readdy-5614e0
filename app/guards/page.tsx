@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useGuards, getDaysUntil, getSIAStatus, type Guard } from '@/lib/useGuards';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
@@ -11,11 +12,24 @@ import GuardModal from './components/GuardModal';
 import GuardProfileDrawer from './components/GuardProfileDrawer';
 import GuardDeleteDialog from './components/GuardDeleteDialog';
 import ExpiryAlertBanner from './components/ExpiryAlertBanner';
+import GuardSummaryCards from './components/GuardSummaryCards';
+import FilterDropdown from './components/FilterDropdown';
 import Toast from '@/app/sites/components/Toast';
 import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 
-const STATUS_OPTIONS = ['all', 'active', 'suspended', 'inactive'];
-const SIA_OPTIONS = ['all', 'valid', 'expiring_soon', 'expired'];
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Statuses', dot: 'bg-gray-400' },
+  { value: 'active', label: 'Active', dot: 'bg-emerald-500' },
+  { value: 'suspended', label: 'Suspended', dot: 'bg-amber-500' },
+  { value: 'inactive', label: 'Inactive', dot: 'bg-gray-500' },
+];
+
+const SIA_OPTIONS = [
+  { value: 'all', label: 'All SIA', dot: 'bg-gray-400' },
+  { value: 'valid', label: 'Valid', dot: 'bg-emerald-500' },
+  { value: 'expiring_soon', label: 'Expiring Soon', dot: 'bg-amber-500' },
+  { value: 'expired', label: 'Expired', dot: 'bg-red-500' },
+];
 
 export default function GuardsPage() {
   const { guards, loading, error, refetch, addGuard, updateGuard, deleteGuard, setGuardStatus } = useGuards();
@@ -97,12 +111,30 @@ export default function GuardsPage() {
     return result;
   }, [guards, search, statusFilter, siaFilter, sortKey, sortDir]);
 
+  const expiredCount = useMemo(() => {
+    return guards.filter((g) => getSIAStatus(g.sia_expiry) === 'expired').length;
+  }, [guards]);
+
   const expiringCount = useMemo(() => {
     return guards.filter((g) => {
       const days = getDaysUntil(g.sia_expiry);
       return days != null && days >= 0 && days <= 30;
     }).length;
   }, [guards]);
+
+  const expiringSoonCount = useMemo(() => {
+    return guards.filter((g) => getSIAStatus(g.sia_expiry) === 'expiring_soon').length;
+  }, [guards]);
+
+  const inactiveCount = guards.filter((g) => (g.status || 'active') !== 'active').length;
+
+  const summaryItems = [
+    { label: 'Total Guards', value: guards.length, icon: 'ri-team-line', accent: 'bg-blue-500/15 text-blue-400' },
+    { label: 'Active', value: activeGuards, icon: 'ri-shield-check-line', accent: 'bg-emerald-500/15 text-emerald-400' },
+    { label: 'Inactive / Suspended', value: inactiveCount, icon: 'ri-user-unfollow-line', accent: 'bg-gray-500/15 text-gray-400' },
+    { label: 'SIA Expiring Soon', value: expiringSoonCount, icon: 'ri-time-line', accent: 'bg-amber-500/15 text-amber-400' },
+    { label: 'SIA Expired', value: expiredCount, icon: 'ri-close-circle-line', accent: 'bg-red-500/15 text-red-400' },
+  ];
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / 25));
   const safePage = Math.min(page, totalPages);
@@ -165,22 +197,34 @@ export default function GuardsPage() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Guards</h1>
-          <p className="text-gray-400 text-sm mt-1">Manage your security officers and their credentials</p>
+          <p className="text-gray-400 text-sm mt-1">Manage security personnel, credentials and employment status.</p>
         </div>
-        {can('staff', 'create') && (
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
-          Add Guard
-        </button>
-        )}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/staff"
+            className="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-dashboard-line"></i></div>
+            Workforce Operations
+          </Link>
+          {can('staff', 'create') && (
+            <button
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
+              Add Guard
+            </button>
+          )}
+        </div>
       </div>
+
+      <GuardSummaryCards items={summaryItems} />
 
       {!bannerDismissed && (
         <ExpiryAlertBanner
-          count={expiringCount}
+          expiredCount={expiredCount}
+          expiringCount={expiringCount}
           onReview={() => { setSiaFilter('expiring_soon'); setBannerDismissed(true); }}
           onDismiss={() => setBannerDismissed(true)}
         />
@@ -199,20 +243,20 @@ export default function GuardsPage() {
             className="w-full bg-gray-800/60 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
-        <button
-          onClick={() => setStatusFilter((r) => STATUS_OPTIONS[(STATUS_OPTIONS.indexOf(r) + 1) % STATUS_OPTIONS.length])}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 bg-gray-800/60 text-gray-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-filter-line"></i></div>
-          {statusFilter === 'all' ? 'All Statuses' : `Status: ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`}
-        </button>
-        <button
-          onClick={() => setSiaFilter((r) => SIA_OPTIONS[(SIA_OPTIONS.indexOf(r) + 1) % SIA_OPTIONS.length])}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 bg-gray-800/60 text-gray-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-shield-check-line"></i></div>
-          {siaFilter === 'all' ? 'All SIA' : `SIA: ${siaFilter === 'expiring_soon' ? 'Expiring Soon' : siaFilter.charAt(0).toUpperCase() + siaFilter.slice(1)}`}
-        </button>
+        <FilterDropdown
+          value={statusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(1); }}
+          options={STATUS_OPTIONS}
+          icon="ri-filter-line"
+          label={(c) => (c.value === 'all' ? 'All Statuses' : `Status: ${c.label}`)}
+        />
+        <FilterDropdown
+          value={siaFilter}
+          onChange={(v) => { setSiaFilter(v); setPage(1); }}
+          options={SIA_OPTIONS}
+          icon="ri-shield-check-line"
+          label={(c) => (c.value === 'all' ? 'All SIA' : `SIA: ${c.label}`)}
+        />
       </div>
 
       {error && (
@@ -267,7 +311,8 @@ export default function GuardsPage() {
       <UpgradeRequiredModal
         isOpen={limitModalOpen}
         onClose={() => setLimitModalOpen(false)}
-        featureName={`Add Guard (limit: ${maxGuards})`}
+        limitLabel={`Add Guard`}
+        limitValue={maxGuards}
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

@@ -1,0 +1,60 @@
+{
+  "name": "GuardianHub — Shared: Health Check (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Shared health check v1.0.0\n\nReceives a health.ping event, performs provider availability checks via the GuardianHub edge functions, and reports healthy/degraded/unavailable via the signed callback. Never reports healthy if a required check failed or was skipped."
+      },
+      "id": "a5a5a5a5-a5a5-4a5a-8a5a-a5a5a5a5a5a501",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "/guardianhub/shared/health-check", "responseMode": "onReceived" },
+      "id": "a5a5a5a5-a5a5-4a5a-8a5a-a5a5a5a5a5a502",
+      "name": "Signed Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_CALLBACK_SIGNING_SECRET||$env.N8N_GUARDIANHUB_SIGNING_SECRET;const b=$json.body||'';const cb={run_id:b.run_id||'',agent_key:b.agent_key,company_id:b.company_id,event_type:b.event_type,status:'succeeded',result:{agent:'health-check',status:'degraded',message:'Health check scaffold — wire provider checks before production',checked_at:new Date().toISOString()}};const sig=s?crypto.createHmac('sha256',s).update(JSON.stringify(cb)).digest('hex'):'';return[{json:{callback:cb,signature:sig,timestamp:String(Date.now()),nonce:$json.headers['x-gh-nonce']||'',correlation_id:$json.headers['x-gh-correlation-id']||''}}];"
+      },
+      "id": "a5a5a5a5-a5a5-4a5a-8a5a-a5a5a5a5a5a503",
+      "name": "Build Health Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GUARDIANHUB_CALLBACK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-GH-Signature", "value": "={{ $json.signature }}" },
+          { "name": "X-GH-Timestamp", "value": "={{ $json.timestamp }}" },
+          { "name": "X-GH-Nonce", "value": "={{ $json.nonce }}" },
+          { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.callback) }}"
+      },
+      "id": "a5a5a5a5-a5a5-4a5a-8a5a-a5a5a5a5a5a504",
+      "name": "Send Signed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Signed Event Webhook": { "main": [[{ "node": "Build Health Callback", "type": "main", "index": 0 }]] },
+    "Build Health Callback": { "main": [[{ "node": "Send Signed Callback", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

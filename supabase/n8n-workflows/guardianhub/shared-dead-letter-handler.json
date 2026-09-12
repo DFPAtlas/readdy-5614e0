@@ -1,0 +1,60 @@
+{
+  "name": "GuardianHub — Shared: Dead-Letter Handler (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Shared dead-letter handler v1.0.0\n\nReceives a signed event that has exhausted retries and records it as dead-lettered via the signed callback. Operators can then replay or resolve it from the Agent Operations Console."
+      },
+      "id": "a4a4a4a4-a4a4-4a4a-8a4a-a4a4a4a4a4a401",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "/guardianhub/shared/dead-letter", "responseMode": "onReceived" },
+      "id": "a4a4a4a4-a4a4-4a4a-8a4a-a4a4a4a4a4a402",
+      "name": "Signed Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_CALLBACK_SIGNING_SECRET||$env.N8N_GUARDIANHUB_SIGNING_SECRET;const b=$json.body||'';const cb={run_id:b.run_id||'',agent_key:b.agent_key,company_id:b.company_id,event_type:b.event_type,status:'dead_lettered',error:(b.error||'max retries exceeded').slice(0,500)};const sig=s?crypto.createHmac('sha256',s).update(JSON.stringify(cb)).digest('hex'):'';return[{json:{callback:cb,signature:sig,timestamp:String(Date.now()),nonce:$json.headers['x-gh-nonce']||'',correlation_id:$json.headers['x-gh-correlation-id']||''}}];"
+      },
+      "id": "a4a4a4a4-a4a4-4a4a-8a4a-a4a4a4a4a4a403",
+      "name": "Build Dead-Letter Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GUARDIANHUB_CALLBACK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-GH-Signature", "value": "={{ $json.signature }}" },
+          { "name": "X-GH-Timestamp", "value": "={{ $json.timestamp }}" },
+          { "name": "X-GH-Nonce", "value": "={{ $json.nonce }}" },
+          { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.callback) }}"
+      },
+      "id": "a4a4a4a4-a4a4-4a4a-8a4a-a4a4a4a4a4a404",
+      "name": "Send Signed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Signed Event Webhook": { "main": [[{ "node": "Build Dead-Letter Callback", "type": "main", "index": 0 }]] },
+    "Build Dead-Letter Callback": { "main": [[{ "node": "Send Signed Callback", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

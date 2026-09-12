@@ -7,7 +7,7 @@ import QuickNoteBar from './QuickNoteBar';
 import GuardSOPView from './GuardSOPView';
 import GuardBuiltSOPsView from './GuardBuiltSOPsView';
 import { useNetworkStatus, queuePendingAction } from '@/lib/useNetworkStatus';
-import type { GuardShift, AttendanceLog } from '@/lib/useGuardPortal';
+import type { GuardShift, AttendanceLog, GuardAssignedSite } from '@/lib/useGuardPortal';
 
 interface HomeTabProps {
   todayShift: GuardShift | null;
@@ -16,6 +16,7 @@ interface HomeTabProps {
   guardId: string | null;
   companyId: string | null;
   guardName?: string;
+  assignedSites: GuardAssignedSite[];
   onRefetch: () => void;
 }
 
@@ -58,7 +59,7 @@ function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number) 
   return R * c;
 }
 
-export default function HomeTab({ todayShift, nextShift, activeAttendance, guardId, companyId, guardName, onRefetch }: HomeTabProps) {
+export default function HomeTab({ todayShift, nextShift, activeAttendance, guardId, companyId, guardName, assignedSites, onRefetch }: HomeTabProps) {
   const router = useRouter();
   const { isOnline } = useNetworkStatus();
   const [clockingIn, setClockingIn] = useState(false);
@@ -199,17 +200,25 @@ export default function HomeTab({ todayShift, nextShift, activeAttendance, guard
     }).eq('id', activeAttendance.id);
 
     await supabase.from('shifts').update({ status: 'completed' }).eq('id', todayShift.id);
+
     await supabase.from('occurrence_books').insert({
       company_id: companyId,
       site_id: todayShift.site_id,
       guard_id: guardId,
-      entry_type: 'Shift End',
-      entry: `Shift ended at ${formatTime(new Date().toISOString())}. Officer leaving site.`,
+      shift_id: todayShift.id,
+      attendance_log_id: activeAttendance.id,
+      entry_type: 'handover',
+      title: `Shift ended at ${formatTime(new Date().toISOString())}`,
+      entry: `Officer ${guardName || 'on duty'} booked off at ${formatTime(new Date().toISOString())}. Site handed over.`,
+      client_visible: false,
+      visibility: 'handover',
+      occurred_at: new Date().toISOString(),
     });
 
-    if (navigator.vibrate) navigator.vibrate(200);
+    // Navigate to handover page
     setClockingOut(false);
     onRefetch();
+    router.push('/guard/ob?handover=true');
   }
 
   const shiftWindow = todayShift ? isWithinClockInWindow(todayShift.start_time, todayShift.end_time) : false;
@@ -636,14 +645,40 @@ export default function HomeTab({ todayShift, nextShift, activeAttendance, guard
       </div>
       <h2 className="text-xl font-semibold text-white mb-2">No shift today</h2>
       {nextShift && nextShift.site ? (
-        <div className="text-center mt-2">
+        <div className="text-center mt-2 mb-4">
           <p className="text-sm text-gray-400 mb-1">Your next shift:</p>
           <p className="text-base text-white font-medium">{nextShift.site.site_name}</p>
           <p className="text-sm text-[#3b82f6]">{formatDay(nextShift.start_time)} at {formatTime(nextShift.start_time)}</p>
         </div>
       ) : (
-        <p className="text-sm text-gray-400 mt-2">Nothing scheduled in the next 7 days.</p>
+        <p className="text-sm text-gray-400 mt-2 mb-4">Nothing scheduled in the next 7 days.</p>
       )}
+
+      {assignedSites.length > 0 && (
+        <div className="w-full max-w-sm mt-2">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 text-center">Your Assigned Sites</p>
+          <div className="space-y-2">
+            {assignedSites.map((site) => (
+              <div
+                key={site.id}
+                className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 flex items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[#3b82f6]/10 flex items-center justify-center shrink-0">
+                  <i className="ri-building-line text-[#3b82f6] text-lg"></i>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white truncate">{site.site_name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {site.induction_status === 'complete' ? 'Induction complete' : 'Induction pending'}
+                  </p>
+                </div>
+                <div className={`w-2 h-2 rounded-full shrink-0 ${site.induction_status === 'complete' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <button
         disabled
         className="mt-8 w-full h-16 bg-gray-700/30 text-gray-500 font-semibold rounded-2xl cursor-not-allowed flex items-center justify-center gap-2"

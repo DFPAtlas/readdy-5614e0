@@ -152,7 +152,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <i className="ri-lock-line text-blue-400"></i>
-                  <span>SOC 2 Type II</span>
+                  <span>AES-256 encryption</span>
                 </div>
               </div>
             </div>
@@ -170,8 +170,8 @@ export default function HomePage() {
                     <i className="ri-check-line text-green-400"></i>
                   </div>
                   <div>
-                    <p className="text-white text-sm font-medium">1,247 guards</p>
-                    <p className="text-gray-500 text-xs">Active on duty now</p>
+                    <p className="text-white text-sm font-medium">Live dashboards</p>
+                    <p className="text-gray-500 text-xs">Real-time site visibility</p>
                   </div>
                 </div>
               </div>
@@ -317,10 +317,10 @@ export default function HomePage() {
 
           <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: '500+', label: 'Security firms' },
-              { value: '40,000+', label: 'Guards managed daily' },
-              { value: '2,800+', label: 'Active sites' },
-              { value: '99.97%', label: 'Platform uptime' },
+              { value: 'UK-built', label: 'For security firms' },
+              { value: 'SIA-aligned', label: 'ACS workflow support' },
+              { value: 'Cloud-native', label: 'Always available' },
+              { value: 'AES-256', label: 'Encryption standard' },
             ].map((stat) => (
               <div key={stat.label}>
                 <div className="text-3xl md:text-4xl font-bold text-white mb-1">
@@ -413,7 +413,7 @@ export default function HomePage() {
           </div>
           <div className="text-center">
             <p className="text-gray-400 text-sm mb-4">
-              All plans include a 14-day free trial. No credit card required.
+              All plans include a 15-day free trial. No credit card required.
             </p>
             <Link
               href="/pricing"
@@ -434,7 +434,7 @@ export default function HomePage() {
               Ready to transform your security operations?
             </h2>
             <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-              Join 500+ security firms already using GuardianHub to run tighter, smarter, more profitable operations.
+              Join security firms already using GuardianHub to run tighter, smarter, more profitable operations.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link

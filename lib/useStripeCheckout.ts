@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { supabase } from './supabase';
 import { useRouter } from 'next/navigation';
+import { getAppBaseUrl } from './getAppBaseUrl';
 
 export function useStripeCheckout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const checkout = async (plan: 'sentinel-starter' | 'sentinel' | 'command', billing: 'monthly' | 'yearly', onSuccess?: () => void) => {
+  const checkout = async (plan: 'sentinel-starter' | 'sentinel' | 'command', billing: 'monthly' | 'yearly' = 'monthly', onSuccess?: () => void) => {
     setLoading(true);
     setError(null);
 
@@ -25,7 +26,7 @@ export function useStripeCheckout() {
         return;
       }
 
-      const returnUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const returnUrl = getAppBaseUrl();
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`,
@@ -47,7 +48,11 @@ export function useStripeCheckout() {
 
       if (data.url) {
         if (onSuccess) onSuccess();
-        window.location.href = data.url;
+        try {
+          window.open(data.url, '_top');
+        } catch {
+          window.location.href = data.url;
+        }
       } else {
         throw new Error('No checkout URL returned');
       }

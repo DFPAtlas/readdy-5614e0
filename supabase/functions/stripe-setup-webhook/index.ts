@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.5.0?target=deno";
 
 const corsHeaders = {
@@ -11,27 +12,61 @@ serve(async (req) => {
 
   const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-  if (!stripeSecret || !supabaseUrl) {
+  if (!stripeSecret || !supabaseUrl || !supabaseServiceKey) {
     return new Response(JSON.stringify({ error: "Missing STRIPE_SECRET_KEY or SUPABASE_URL" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const token = authHeader.replace("Bearer ", "");
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+  if (!profile || profile.role !== "super_admin") {
+    return new Response(JSON.stringify({ error: "Forbidden: super_admin required" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2024-12-18.acacia" });
   const webhookUrl = `${supabaseUrl}/functions/v1/stripe-webhook`;
 
   const requiredEvents = [
     "checkout.session.completed",
-    "invoice.payment_succeeded",
-    "invoice.payment_failed",
+    "customer.subscription.created",
     "customer.subscription.updated",
     "customer.subscription.deleted",
-    "customer.subscription.created",
+    "invoice.paid",
+    "invoice.payment_failed",
+    "invoice.finalized",
+    "invoice.voided",
     "charge.succeeded",
     "charge.failed",
-    "invoice.created",
+    "charge.dispute.created",
+    "charge.dispute.updated",
+    "charge.dispute.closed",
+    "charge.refund.updated",
+    "payment_intent.succeeded",
+    "payment_intent.payment_failed",
   ];
 
   try {
@@ -46,12 +81,11 @@ serve(async (req) => {
         });
         return new Response(
           JSON.stringify({
-            message: "Webhook endpoint already existed. Added missing events.",
+            message: "Webhook updated with missing events.",
             id: updated.id,
             url: updated.url,
             enabled_events: updated.enabled_events,
             secret_exists: !!existing.secret,
-            note: "The webhook signing secret was already generated. Find it in your Stripe Dashboard → Developers → Webhooks if you need to re-copy it.",
           }, null, 2),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -59,11 +93,10 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({
-          message: "Webhook endpoint already registered with all required events.",
+          message: "Webhook already registered with all required events.",
           id: existing.id,
           url: existing.url,
           enabled_events: existing.enabled_events,
-          note: "If you need the signing secret, retrieve it from Stripe Dashboard → Developers → Webhooks.",
         }, null, 2),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

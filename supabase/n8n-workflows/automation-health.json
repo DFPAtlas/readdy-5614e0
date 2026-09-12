@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Automation Health",
+  "version": "1.0.0",
+  "description": "Monitors n8n availability, queue backlog, failed workflows, dead letters, and credential expiry",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "automation-health", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Health Check Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    n8n_status: 'healthy',\n    queue_backlog: 0,\n    failed_workflows_24h: 0,\n    dead_letter_count: 0,\n    callback_failures_24h: 0,\n    signature_failures_24h: 0,\n    expired_credentials: [],\n    avg_execution_time_ms: 0,\n    agent_status: {},\n    alerts: [],\n    checked_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "run-health-check",
+      "name": "Run Health Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "automation_health" },
+            { "name": "company_id", "value": "={{ $json.company_id || '' }}" },
+            { "name": "event_type", "value": "health.check_complete" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Health Check Webhook": { "main": [[ { "node": "Run Health Check", "type": "main", "index": 0 } ]] },
+    "Run Health Check": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

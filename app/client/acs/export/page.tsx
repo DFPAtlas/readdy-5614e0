@@ -1,15 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useACS } from '@/lib/useACS';
+import { useAuth } from '@/lib/auth';
+import { logEvidenceAccess, logPageAccess } from '@/lib/useEvidenceAuditLog';
 
 export default function ACSExportPage() {
   const { evidence, staffCompliance, policies, criteria, actions, siteCompliance, config } = useACS();
+  const { currentUser, companyId, profile } = useAuth();
   const [generating, setGenerating] = useState(false);
   const [done, setDone] = useState(false);
 
+  useEffect(() => {
+    if (companyId && profile?.id) {
+      logPageAccess({
+        company_id: companyId,
+        user_id: profile.id,
+        user_role: profile.role || 'client',
+        source_route: '/client/acs/export',
+      });
+    }
+  }, [companyId, profile?.id, profile?.role]);
+
   function generatePack() {
     setGenerating(true);
+    if (companyId && profile?.id) {
+      logEvidenceAccess({
+        company_id: companyId,
+        user_id: profile.id,
+        user_role: profile.role || 'client',
+        action: 'export',
+        source_route: '/client/acs/export',
+        metadata: { evidence_count: evidence.length, staff_count: staffCompliance.length },
+      });
+    }
     setTimeout(() => {
       setGenerating(false);
       setDone(true);

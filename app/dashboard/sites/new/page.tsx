@@ -1,361 +1,318 @@
-
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
 
 export default function NewSitePage() {
   const router = useRouter();
+  const { companyId } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const [form, setForm] = useState({
+    site_name: '',
+    address: '',
+    postcode: '',
+    client_name: '',
+    risk_level: 'medium',
+    site_type: 'static',
+    check_call_interval: 60,
+    site_contact_name: '',
+    site_contact_phone: '',
+    site_contact_email: '',
+    emergency_contact: '',
+    patrol_enabled: false,
+    patrol_interval: 60,
+    assignment_instructions: '',
+  });
+
+  const handleChange = (field: string, value: string | boolean | number) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!companyId) {
+      setToast({ message: 'Not authenticated', type: 'error' });
+      return;
+    }
+    if (!form.site_name.trim()) {
+      setToast({ message: 'Site name is required', type: 'error' });
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    const { error } = await supabase.from('sites').insert({
+      company_id: companyId,
+      site_name: form.site_name.trim(),
+      address: form.address.trim() || null,
+      postcode: form.postcode.trim() || null,
+      client_name: form.client_name.trim() || null,
+      risk_level: form.risk_level,
+      site_type: form.site_type,
+      check_call_interval: form.check_call_interval,
+      site_contact_name: form.site_contact_name.trim() || null,
+      site_contact_phone: form.site_contact_phone.trim() || null,
+      site_contact_email: form.site_contact_email.trim() || null,
+      emergency_contact: form.emergency_contact.trim() || null,
+      patrol_enabled: form.patrol_enabled,
+      patrol_interval: form.patrol_interval,
+      assignment_instructions: form.assignment_instructions.trim() || null,
+    });
+
     setIsSubmitting(false);
-    setSubmitStatus('success');
-    
-    // Redirect to dashboard after success
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 1500);
+
+    if (error) {
+      setToast({ message: error.message || 'Failed to create site', type: 'error' });
+    } else {
+      setToast({ message: 'Site created successfully', type: 'success' });
+      setTimeout(() => {
+        router.push('/dashboard/sites');
+      }, 1000);
+    }
   };
 
+  const riskLevels = ['low', 'medium', 'high', 'critical'] as const;
+  const siteTypes = ['static', 'construction', 'retail', 'office', 'warehouse', 'event', 'residential', 'other'];
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Add New Site</h1>
-              <p className="text-gray-600 mt-2">Register a new security site to your account</p>
-            </div>
-            <Link 
-              href="/dashboard"
-              className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              <i className="ri-arrow-left-line mr-2"></i>
-              Back to Dashboard
-            </Link>
+    <div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Add New Site</h1>
+            <p className="text-gray-400">Register a new security site to your account</p>
           </div>
+          <Link
+            href="/dashboard/sites"
+            className="inline-flex items-center px-4 py-2.5 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer whitespace-nowrap text-sm"
+          >
+            <div className="w-4 h-4 flex items-center justify-center mr-2"><i className="ri-arrow-left-line"></i></div>
+            Back to Sites
+          </Link>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Site Information */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Site Information</h2>
-            <div className="grid md:grid-cols-2 gap-6">
+        {toast && (
+          <div className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
+            toast.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' :
+            'bg-red-500/10 border border-red-500/20 text-red-400'
+          }`}>
+            <div className="w-4 h-4 flex items-center justify-center">
+              <i className={toast.type === 'success' ? 'ri-check-line' : 'ri-error-warning-line'}></i>
+            </div>
+            {toast.message}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-5">Site Information</h2>
+            <div className="grid md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Site Name</label>
-                <input 
-                  type="text" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter site name"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Site Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={form.site_name}
+                  onChange={(e) => handleChange('site_name', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="e.g. City Centre Mall"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
-                <select 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 pr-8"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Site Type</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = siteTypes.indexOf(form.site_type);
+                    handleChange('site_type', siteTypes[(idx + 1) % siteTypes.length]);
+                  }}
+                  className="w-full flex items-center justify-between bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white cursor-pointer"
                 >
-                  <option value="">Select property type</option>
-                  <option value="office">Office Building</option>
-                  <option value="retail">Retail Store</option>
-                  <option value="warehouse">Warehouse</option>
-                  <option value="residential">Residential Complex</option>
-                  <option value="industrial">Industrial Site</option>
-                  <option value="other">Other</option>
-                </select>
+                  <span>{form.site_type.charAt(0).toUpperCase() + form.site_type.slice(1)}</span>
+                  <div className="w-4 h-4 flex items-center justify-center text-gray-500"><i className="ri-arrow-down-s-line"></i></div>
+                </button>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Full Address</label>
-                <textarea 
-                  required 
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter complete address"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Address</label>
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="Full address"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-                <input 
-                  type="text" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter city"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Postcode</label>
+                <input
+                  type="text"
+                  value={form.postcode}
+                  onChange={(e) => handleChange('postcode', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="Postcode"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Postcode</label>
-                <input 
-                  type="text" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter postcode"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Risk Level</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = riskLevels.indexOf(form.risk_level as typeof riskLevels[number]);
+                    handleChange('risk_level', riskLevels[(idx + 1) % 4]);
+                  }}
+                  className={`w-full flex items-center justify-between border rounded-lg px-4 py-2.5 text-sm font-medium cursor-pointer ${
+                    form.risk_level === 'critical' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                    form.risk_level === 'high' ? 'bg-orange-500/10 border-orange-500/20 text-orange-400' :
+                    form.risk_level === 'medium' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  }`}>
+                    <span>{form.risk_level.charAt(0).toUpperCase() + form.risk_level.slice(1)}</span>
+                    <div className="w-4 h-4 flex items-center justify-center text-gray-500"><i className="ri-arrow-down-s-line"></i></div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-5">Client & Contact Information</h2>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Client Name</label>
+                <input
+                  type="text"
+                  value={form.client_name}
+                  onChange={(e) => handleChange('client_name', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="e.g. ABC Properties Ltd"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Site Size (sq ft)</label>
-                <input 
-                  type="number" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter site size"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Site Contact Name</label>
+                <input
+                  type="text"
+                  value={form.site_contact_name}
+                  onChange={(e) => handleChange('site_contact_name', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="Primary contact person"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
-                <select 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 pr-8"
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Site Contact Phone</label>
+                <input
+                  type="text"
+                  value={form.site_contact_phone}
+                  onChange={(e) => handleChange('site_contact_phone', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="+44 123 456 7890"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Site Contact Email</label>
+                <input
+                  type="email"
+                  value={form.site_contact_email}
+                  onChange={(e) => handleChange('site_contact_email', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="contact@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Emergency Contact</label>
+                <input
+                  type="text"
+                  value={form.emergency_contact}
+                  onChange={(e) => handleChange('emergency_contact', e.target.value)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  placeholder="Emergency phone number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Check-in Interval (min)</label>
+                <input
+                  type="number"
+                  value={form.check_call_interval}
+                  onChange={(e) => handleChange('check_call_interval', parseInt(e.target.value) || 60)}
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-5">Patrol Settings</h2>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleChange('patrol_enabled', !form.patrol_enabled)}
+                  className={`w-11 h-6 rounded-full transition-colors cursor-pointer relative ${
+                    form.patrol_enabled ? 'bg-blue-600' : 'bg-gray-700'
+                  }`}
                 >
-                  <option value="">Select risk level</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
+                  <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                    form.patrol_enabled ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}></div>
+                </button>
+                <label className="text-sm font-medium text-gray-300">Enable Patrols</label>
               </div>
+              {form.patrol_enabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Patrol Interval (min)</label>
+                  <input
+                    type="number"
+                    value={form.patrol_interval}
+                    onChange={(e) => handleChange('patrol_interval', parseInt(e.target.value) || 60)}
+                    className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Client Information */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Client Information</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Client Name</label>
-                <input 
-                  type="text" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter client name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Client Email</label>
-                <input 
-                  type="email" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter client email"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Client Phone</label>
-                <input 
-                  type="tel" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter client phone"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Emergency Contact</label>
-                <input 
-                  type="tel" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter emergency contact"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Site Manager Name</label>
-                <input 
-                  type="text" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter site manager name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Site Manager Phone</label>
-                <input 
-                  type="tel" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter site manager phone"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Contract Details */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Contract Details</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Contract Value (£)</label>
-                <input 
-                  type="number" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter monthly value"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Number of Guards Required</label>
-                <input 
-                  type="number" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter number of guards"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Contract Start Date</label>
-                <input 
-                  type="date" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Contract End Date</label>
-                <input 
-                  type="date" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Security Features */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Security Features</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CCTV Cameras</label>
-                <input 
-                  type="number" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Number of cameras"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Access Points</label>
-                <input 
-                  type="number" 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Number of access points"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Alarm System Type</label>
-                <select 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 pr-8"
-                >
-                  <option value="">Select alarm system</option>
-                  <option value="basic">Basic Alarm</option>
-                  <option value="advanced">Advanced Security System</option>
-                  <option value="integrated">Integrated Smart System</option>
-                  <option value="none">No Alarm System</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Patrol Frequency</label>
-                <select 
-                  required 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 pr-8"
-                >
-                  <option value="">Select patrol frequency</option>
-                  <option value="hourly">Hourly</option>
-                  <option value="2-hours">Every 2 Hours</option>
-                  <option value="4-hours">Every 4 Hours</option>
-                  <option value="daily">Daily</option>
-                  <option value="custom">Custom Schedule</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Access Code</label>
-                <input 
-                  type="text" 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter access code (if applicable)"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Key Holder Contact</label>
-                <input 
-                  type="tel" 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="Enter key holder contact"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Special Instructions */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Special Instructions</h2>
+          <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-5">Assignment Instructions</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Additional Information</label>
-              <textarea 
+              <textarea
                 rows={4}
                 maxLength={500}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                placeholder="Enter any special instructions, procedures, or important notes for this site (max 500 characters)"
+                value={form.assignment_instructions}
+                onChange={(e) => handleChange('assignment_instructions', e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                placeholder="Any special instructions or notes for guards assigned to this site (max 500 characters)"
               />
-              <p className="text-sm text-gray-500 mt-1">Maximum 500 characters</p>
+              <p className="text-xs text-gray-500 mt-1">{form.assignment_instructions.length}/500 characters</p>
             </div>
           </div>
 
-          {/* Submit Buttons */}
-          <div className="flex justify-end space-x-4">
-            <button 
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
+          <div className="flex justify-end gap-3">
+            <Link
+              href="/dashboard/sites"
+              className="px-5 py-2.5 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer whitespace-nowrap text-sm"
             >
               Cancel
-            </button>
-            <button 
+            </Link>
+            <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap text-sm font-medium"
             >
               {isSubmitting ? (
                 <>
                   <i className="ri-loader-4-line animate-spin mr-2"></i>
-                  Adding Site...
+                  Creating...
                 </>
               ) : (
                 <>
-                  <i className="ri-add-line mr-2"></i>
-                  Add Site
+                  <div className="w-4 h-4 flex items-center justify-center mr-2"><i className="ri-add-line"></i></div>
+                  Create Site
                 </>
               )}
             </button>
           </div>
-
-          {/* Success Message */}
-          {submitStatus === 'success' && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i className="ri-check-line text-2xl text-green-600"></i>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Site Added Successfully!</h3>
-                  <p className="text-gray-600 mb-4">The new site has been added to your dashboard.</p>
-                  <div className="text-sm text-gray-500">Redirecting to dashboard...</div>
-                </div>
-              </div>
-            </div>
-          )}
         </form>
       </div>
     </div>

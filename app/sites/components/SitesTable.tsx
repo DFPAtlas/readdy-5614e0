@@ -19,10 +19,13 @@ interface Props {
   onPageChange: (p: number) => void;
   total: number;
   search: string;
+  hasAnySites: boolean;
+  canCreate: boolean;
+  onAdd: () => void;
 }
 
 export default function SitesTable({
-  sites, loading, sortKey, sortDir, onSort, onEdit, onDelete, page, totalPages, onPageChange, total, search,
+  sites, loading, sortKey, sortDir, onSort, onEdit, onDelete, page, totalPages, onPageChange, total, search, hasAnySites, canCreate, onAdd,
 }: Props) {
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-xl overflow-hidden">
@@ -43,7 +46,7 @@ export default function SitesTable({
           </table>
         </div>
       ) : sites.length === 0 ? (
-        <EmptyState search={search} />
+        <EmptyState search={search} hasAnySites={hasAnySites} canCreate={canCreate} onAdd={onAdd} />
       ) : (
         <>
           <div className="overflow-x-auto">

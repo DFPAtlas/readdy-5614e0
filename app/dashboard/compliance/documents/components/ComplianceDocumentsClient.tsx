@@ -13,6 +13,8 @@ import UploadReviewModal from './UploadReviewModal';
 import LoadingState from './LoadingState';
 import EmptyState from './EmptyState';
 import { FeatureGate } from '@/lib/useEntitlements';
+import TrainingOverduePanel from './TrainingOverduePanel';
+import PolicyReviewPanel from './PolicyReviewPanel';
 
 export default function ComplianceDocumentsClient() {
   const {
@@ -158,6 +160,15 @@ export default function ComplianceDocumentsClient() {
       <WidgetBoundary widgetName="ComplianceSummaryCards" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
         <SummaryCards summary={summary} />
       </WidgetBoundary>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <WidgetBoundary widgetName="PolicyReviewPanel" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
+          <PolicyReviewPanel />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="TrainingOverduePanel" pagePath="/dashboard/compliance/documents" clientId={companyId || undefined} userId={profile?.id || undefined}>
+          <TrainingOverduePanel />
+        </WidgetBoundary>
+      </div>
 
       {allEmpty ? (
         <EmptyState onUpload={() => setShowUploadModal(true)} />

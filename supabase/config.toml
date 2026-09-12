@@ -1,0 +1,72 @@
+[project]
+project_id = "guardianhub"
+api_host = ""
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/dashboard"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+
+# ============================================================================
+# PHASE 1B: Edge Function JWT & Security Configuration
+# ============================================================================
+
+[functions]
+
+[edge_function_jwt_settings]
+# DEFAULT: verify_jwt = true for ALL functions
+# 
+# VERIFIED IN PHASE 1B (verify_jwt = true):
+#   admin-invite-user, has-permission, guardianhub-agent-proxy,
+#   operations-copilot, sos-emergency-notify, save-api-key,
+#   ai-sick-cover, compliance-expiry-check, acs-audit,
+#   send-notification-email, send-welcome-email,
+#   ai-acs-readiness, ai-ask-sop, ai-improve-sop,
+#   ai-index-sop-document, ai-score-site-risk, ai-suggest-staffing,
+#   ai-summarize-day, ai-summarize-ob-entry, client-invite-user,
+#   create-checkout-session, create-portal-session,
+#   financial-export-csv, financial-export-pdf,
+#   generate-acs-evidence-pack, generate-compliance-report,
+#   generate-incident-pdf, generate-patrol-summary,
+#   generate-weekly-site-report, get-client-clocking,
+#   get-incident-report-data, guard-scan-checkpoint,
+#   lone-worker-check, patrol-missed-check, save-openai-key,
+#   seed-admin-data, sop-process-document, sop-query,
+#   test-api-key, test-openai-config, ticket-ai-check
+#
+# verify_jwt = false (with strong alternative verification):
+#   stripe-webhook — Stripe HMAC signature verification
+#   stripe-webhook-test — super-admin only test endpoint
+#   stripe-setup-webhook — super-admin only
+#   stripe-backfill — super-admin only
+#   ops-signup — public signup (rate limit + bot protection needed)
+#   create-demo-admin — dev-only (hardcoded token)
+#
+# CORS POLICY:
+#   All authenticated functions: origin allowlist (no wildcard)
+#   Webhook functions (stripe-webhook): minimal CORS
+#   Scheduler functions: no broad browser CORS

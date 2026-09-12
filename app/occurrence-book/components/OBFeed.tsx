@@ -169,7 +169,7 @@ function OBEntryRow({ entry, isLast, onEdit, onDelete, summarisingIds }: { entry
                   <button onClick={() => onEdit(entry)} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:text-white hover:bg-gray-800/50 transition-colors cursor-pointer">
                     <div className="w-4 h-4 flex items-center justify-center"><i className="ri-pencil-line"></i></div>
                   </button>
-                  <button onClick={() => onDelete(entry)} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
+                  <button onClick={() => onDelete(entry)} title="Permanently delete entry" className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer">
                     <div className="w-4 h-4 flex items-center justify-center"><i className="ri-delete-bin-line"></i></div>
                   </button>
                 </>
@@ -185,13 +185,14 @@ function OBEntryRow({ entry, isLast, onEdit, onDelete, summarisingIds }: { entry
 
           {/* AI Summary */}
           {entry.ai_summary && (
-            <div className="flex items-start gap-2 mb-2.5 bg-blue-600/5 border border-blue-500/10 rounded-lg px-3 py-2">
-              <div className="w-3.5 h-3.5 flex items-center justify-center text-blue-400 mt-0.5 shrink-0">
-                <i className="ri-sparkling-line text-xs"></i>
+            <div className="mb-2.5 bg-blue-600/5 border border-blue-500/15 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-3.5 h-3.5 flex items-center justify-center text-blue-400">
+                  <i className="ri-sparkling-line text-xs"></i>
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">AI Summary</span>
               </div>
-              <p className="text-xs text-blue-300 italic leading-relaxed">
-                Summary: {entry.ai_summary}
-              </p>
+              <p className="text-xs text-blue-300/80 leading-relaxed">{entry.ai_summary}</p>
             </div>
           )}
 

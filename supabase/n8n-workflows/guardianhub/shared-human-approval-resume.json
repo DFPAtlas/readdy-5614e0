@@ -1,0 +1,60 @@
+{
+  "name": "GuardianHub — Shared: Human Approval Resume (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Shared human approval resume v1.0.0\n\nResumes an approval-required agent action only after GuardianHub confirms the approval is valid and non-expired. The approval check is enforced server-side; this workflow runs the post-approval action."
+      },
+      "id": "a6a6a6a6-a6a6-4a6a-8a6a-a6a6a6a6a6a601",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "/guardianhub/shared/approval-resume", "responseMode": "onReceived" },
+      "id": "a6a6a6a6-a6a6-4a6a-8a6a-a6a6a6a6a6a602",
+      "name": "Signed Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_CALLBACK_SIGNING_SECRET||$env.N8N_GUARDIANHUB_SIGNING_SECRET;const b=$json.body||'';if(b.approval_status!=='approved')throw new Error('Approval not confirmed');const cb={run_id:b.run_id||'',agent_key:b.agent_key,company_id:b.company_id,event_type:b.event_type,status:'succeeded',result:{agent:b.agent_key,message:'Post-approval action completed',processed_at:new Date().toISOString()}};const sig=s?crypto.createHmac('sha256',s).update(JSON.stringify(cb)).digest('hex'):'';return[{json:{callback:cb,signature:sig,timestamp:String(Date.now()),nonce:$json.headers['x-gh-nonce']||'',correlation_id:$json.headers['x-gh-correlation-id']||''}}];"
+      },
+      "id": "a6a6a6a6-a6a6-4a6a-8a6a-a6a6a6a6a6a603",
+      "name": "Verify Approval & Build Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GUARDIANHUB_CALLBACK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-GH-Signature", "value": "={{ $json.signature }}" },
+          { "name": "X-GH-Timestamp", "value": "={{ $json.timestamp }}" },
+          { "name": "X-GH-Nonce", "value": "={{ $json.nonce }}" },
+          { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.callback) }}"
+      },
+      "id": "a6a6a6a6-a6a6-4a6a-8a6a-a6a6a6a6a6a604",
+      "name": "Send Signed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Signed Event Webhook": { "main": [[{ "node": "Verify Approval & Build Callback", "type": "main", "index": 0 }]] },
+    "Verify Approval & Build Callback": { "main": [[{ "node": "Send Signed Callback", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

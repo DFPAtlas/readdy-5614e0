@@ -22,84 +22,119 @@ export default function ActiveAlerts({ siteId }: { siteId: string }) {
       setLoading(true);
       const { data } = await supabase
         .from('incidents')
-        .select('id, incident_type, description, severity, status, occurred_at, site_name:sites(site_name)')
+        .select('id, incident_type, severity, description, status, occurred_at, title')
         .eq('site_id', siteId)
-        .in('status', ['open', 'in_progress'])
+        .in('status', ['open', 'in_progress', 'reviewing'])
         .order('occurred_at', { ascending: false })
-        .limit(6);
+        .limit(8);
 
-      setAlerts((data || []).map((a: any) => ({
-        ...a,
-        site_name: a.site_name?.site_name || 'This site',
-      })));
+      setAlerts(data || []);
       setLoading(false);
     }
     load();
   }, [siteId]);
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityBadge = (severity: string) => {
     switch (severity) {
-      case 'high': case 'critical': return 'bg-red-500';
-      case 'medium': return 'bg-orange-500';
-      case 'low': return 'bg-yellow-500';
-      default: return 'bg-gray-500';
+      case 'high': case 'critical': return { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' };
+      case 'medium': return { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' };
+      case 'low': return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' };
+      default: return { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20' };
     }
   };
 
-  const getAlertIcon = (type: string) => {
+  const getAlertIcon = (type: string | null) => {
     if (!type) return 'ri-alert-line';
     const t = type.toLowerCase();
-    if (t.includes('breach') || t.includes('intrusion')) return 'ri-shield-cross-line';
+    if (t.includes('breach') || t.includes('intrusion') || t.includes('security')) return 'ri-shield-cross-line';
     if (t.includes('suspicious') || t.includes('theft')) return 'ri-error-warning-line';
     if (t.includes('system') || t.includes('equipment')) return 'ri-information-line';
+    if (t.includes('fire') || t.includes('emergency')) return 'ri-fire-line';
     return 'ri-alert-line';
   };
 
-  if (loading) {
-    return (
-      <div className="bg-slate-600 rounded-lg p-6 text-white">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Active Alerts</h2>
-        </div>
-        <p className="text-sm text-gray-400">Loading alerts...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-slate-600 rounded-lg p-6 text-white">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Active Alerts</h2>
+    <div className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <i className="ri-error-warning-line text-red-400 text-sm"></i>
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-white">Active Alerts</h2>
+            {alerts.length > 0 && (
+              <p className="text-[11px] text-red-400">{alerts.length} open</p>
+            )}
+          </div>
+        </div>
         {alerts.length > 0 && (
-          <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-            <span className="text-xs font-bold">{alerts.length}</span>
+          <div className="w-7 h-7 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+            <span className="text-xs font-bold text-red-400">{alerts.length}</span>
           </div>
         )}
       </div>
 
-      {alerts.length === 0 ? (
-        <p className="text-sm text-gray-400">No active alerts for this site.</p>
-      ) : (
-        <div className="space-y-4">
-          {alerts.map((alert) => (
-            <div key={alert.id} className="bg-slate-700 rounded-lg p-4">
-              <div className="flex items-start space-x-3 mb-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getSeverityColor(alert.severity || 'medium')}`}>
-                  <i className={`${getAlertIcon(alert.incident_type || '')} text-white text-sm`}></i>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-medium text-white">{alert.incident_type || 'Alert'}</h3>
-                    <span className="text-xs text-gray-300">{alert.occurred_at ? timeAgo(alert.occurred_at) : ''}</span>
-                  </div>
-                  <p className="text-sm text-gray-300 mb-2">{alert.description || 'No description'}</p>
-                  <p className="text-xs text-blue-300">Status: {alert.status}</p>
+      <div className="p-4">
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-white/5 flex-shrink-0"></div>
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-white/5 rounded w-20"></div>
+                  <div className="h-2 bg-white/5 rounded w-full"></div>
                 </div>
               </div>
+            ))}
+          </div>
+        ) : alerts.length === 0 ? (
+          <div className="text-center py-6">
+            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-2">
+              <i className="ri-check-line text-gray-500"></i>
             </div>
-          ))}
-        </div>
-      )}
+            <p className="text-xs text-gray-400">No active alerts</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {alerts.map((alert) => {
+              const sev = getSeverityBadge(alert.severity || 'medium');
+              return (
+                <div key={alert.id} className="p-3 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${sev.bg} ${sev.border}`}>
+                      <i className={`${getAlertIcon(alert.incident_type)} ${sev.text} text-xs`}></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <p className="text-sm font-medium text-white truncate">
+                          {alert.title || alert.incident_type || 'Alert'}
+                        </p>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${sev.bg} ${sev.text} whitespace-nowrap flex-shrink-0`}>
+                          {alert.severity || 'medium'}
+                        </span>
+                      </div>
+                      {alert.description && (
+                        <p className="text-xs text-gray-400 line-clamp-2 mb-1">{alert.description}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <span className={`${alert.status === 'open' ? 'text-red-400' : 'text-amber-400'}`}>
+                          {alert.status === 'in_progress' ? 'In Progress' : alert.status === 'reviewing' ? 'Reviewing' : 'Open'}
+                        </span>
+                        {alert.occurred_at && (
+                          <>
+                            <span className="text-gray-600">·</span>
+                            <span className="text-gray-500">{timeAgo(alert.occurred_at)}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

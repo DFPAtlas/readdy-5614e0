@@ -146,6 +146,7 @@ export default function ClientIncidentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/5">
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Ref</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Date & Time</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Site</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
@@ -160,6 +161,7 @@ export default function ClientIncidentsPage() {
                     const st = clientStatus(i.status);
                     return (
                       <tr key={i.id} className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-3 text-gray-400 text-xs font-mono">{i.incident_number || '—'}</td>
                         <td className="px-4 py-3 text-white">
                           {new Date(i.occurred_at || i.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                           <div className="text-xs text-gray-500">

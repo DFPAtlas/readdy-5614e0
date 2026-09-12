@@ -6,27 +6,33 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
 import { useEntitlements } from '@/lib/useEntitlements';
+import type { PlanEntitlements } from '@/lib/entitlements';
 import SOPAssistantWidget from '@/app/components/SOPAssistantWidget';
 import NotificationBell from '@/app/components/NotificationBell';
 import { usePendingLeave } from '@/lib/usePendingLeave';
 import { TablePageSkeleton } from './PageSkeleton';
 import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 
+interface LockedFeatureInfo {
+  label: string;
+  featureKey?: keyof PlanEntitlements;
+}
+
 const navItems = [
-  { label: 'Dashboard', href: '/ops', icon: 'ri-dashboard-line', perm: 'dashboard' },
-  { label: 'Sites', href: '/ops/sites', icon: 'ri-building-line', perm: 'sites' },
+  { label: 'Dashboard', href: '/dashboard', icon: 'ri-dashboard-line', perm: 'dashboard' },
+  { label: 'Sites', href: '/sites', icon: 'ri-building-line', perm: 'sites' },
   { label: 'Notices', href: '/dashboard/notices', icon: 'ri-notification-3-line', perm: 'sites' },
-  { label: 'Guards', href: '/ops/guards', icon: 'ri-shield-user-line', perm: 'staff' },
+  { label: 'Guards', href: '/guards', icon: 'ri-shield-user-line', perm: 'staff' },
   { label: 'Availability', href: '/ops/guards/availability', icon: 'ri-calendar-check-line', perm: 'staff' },
-  { label: 'Leave Approval', href: '/ops/guards/leave-approval', icon: 'ri-calendar-close-line', perm: 'staff', badge: true, feature: 'hasLeaveAutomation' },
-  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-hand-heart-line', perm: 'staff', feature: 'hasLeaveAutomation' },
+  { label: 'Leave Approval', href: '/ops/guards/leave-approval', icon: 'ri-calendar-close-line', perm: 'staff', badge: true, feature: 'hasLeaveAutomation' as keyof PlanEntitlements },
+  { label: 'Leave Requests', href: '/dashboard/leave-requests', icon: 'ri-hand-heart-line', perm: 'staff', feature: 'hasLeaveAutomation' as keyof PlanEntitlements },
   { label: 'Rotas', href: '/rotas', icon: 'ri-calendar-event-line', perm: 'rotas' },
   { label: 'Pattern Builder', href: '/rotas/patterns', icon: 'ri-stack-line', perm: 'shift_patterns' },
-  { label: 'Incidents', href: '/ops/incidents', icon: 'ri-alarm-warning-line', perm: 'incidents' },
+  { label: 'Incidents', href: '/incidents', icon: 'ri-alarm-warning-line', perm: 'incidents' },
   { label: 'Forms', href: '/ops/forms', icon: 'ri-file-list-line', perm: 'occurrence_book' },
-  { label: 'Reports', href: '/ops/reports', icon: 'ri-bar-chart-box-line', perm: 'reports' },
+  { label: 'Reports', href: '/reports', icon: 'ri-bar-chart-box-line', perm: 'reports' },
   { label: 'SOP Builder', href: '/sop-builder', icon: 'ri-draft-line', perm: 'sop_documents' },
-  { label: 'SOP Library', href: '/ops/sops', icon: 'ri-book-open-line', perm: 'sop_documents' },
+  { label: 'SOP Library', href: '/sops', icon: 'ri-book-open-line', perm: 'sop_documents' },
   { label: 'Settings', href: '/ops/settings', icon: 'ri-settings-3-line', perm: 'settings' },
 ];
 
@@ -41,7 +47,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   const { can } = useMyPermissions(user?.id || null, user?.company_id || null);
   const { canAccess } = useEntitlements();
   const { pending } = usePendingLeave();
-  const [lockedFeature, setLockedFeature] = useState<string | null>(null);
+  const [lockedFeature, setLockedFeature] = useState<LockedFeatureInfo | null>(null);
 
   const isAuthPage = pathname && AUTH_PAGES.some((p) => pathname === p || pathname.startsWith(p + '/'));
 
@@ -50,7 +56,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     ? sortedNavItems.find(
         (item) =>
           pathname === item.href ||
-          (pathname.startsWith(item.href + '/') && item.href !== '/ops')
+          (pathname.startsWith(item.href + '/') && item.href !== '/dashboard')
       )?.href ?? null
     : null;
 
@@ -118,7 +124,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
         `}</style>
         <div className="flex flex-col h-full">
           <div className="flex items-center h-16 px-4 border-b border-gray-800">
-            <Link href="/ops" className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+            <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
               <img
                 src="https://storage.readdy-site.link/project_files/18288eee-63fa-4165-a658-6aa7ab020255/0f55097c-53e5-494b-b419-876152a51ee7_edited_image_d3fb89d4-4c94-480b-911a-a4f5576d177c_0.png?v=4a5cb4d0eb32cb9bee8b5acd1d9f9fa6"
                 alt="GuardianHub"
@@ -137,7 +143,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
                 return (
                   <button
                     key={item.href}
-                    onClick={() => setLockedFeature(item.label)}
+                    onClick={() => setLockedFeature({ label: item.label, featureKey: item.feature })}
                     title={`${item.label} requires upgrade`}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap w-full text-left opacity-40 cursor-pointer hover:opacity-60 hover:bg-gray-800/30 group relative"
                   >
@@ -254,7 +260,8 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       <UpgradeRequiredModal
         isOpen={lockedFeature !== null}
         onClose={() => setLockedFeature(null)}
-        featureName={lockedFeature || undefined}
+        featureName={lockedFeature?.label || undefined}
+        featureKey={lockedFeature?.featureKey}
       />
     </div>
   );

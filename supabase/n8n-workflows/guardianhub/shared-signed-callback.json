@@ -1,0 +1,51 @@
+{
+  "name": "GuardianHub — Shared: Signed Callback (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Shared signed callback v1.0.0\n\nReusable node pair that builds a GuardianHub callback body, signs it with HMAC, and POSTs it to the configured callback URL. Call as a sub-workflow from agent handlers."
+      },
+      "id": "a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a201",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_CALLBACK_SIGNING_SECRET||$env.N8N_GUARDIANHUB_SIGNING_SECRET;const inp=$input.first().json;const cb={run_id:inp.run_id||'',agent_key:inp.agent_key||'',company_id:inp.company_id||null,event_type:inp.event_type||'',status:inp.status||'succeeded',result:inp.result||{}};const sig=s?crypto.createHmac('sha256',s).update(JSON.stringify(cb)).digest('hex'):'';return[{json:{callback:cb,signature:sig,timestamp:inp.timestamp||String(Date.now()),nonce:inp.nonce||'',correlation_id:inp.correlation_id||''}}];"
+      },
+      "id": "a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a202",
+      "name": "Build Signed Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GUARDIANHUB_CALLBACK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-GH-Signature", "value": "={{ $json.signature }}" },
+          { "name": "X-GH-Timestamp", "value": "={{ $json.timestamp }}" },
+          { "name": "X-GH-Nonce", "value": "={{ $json.nonce }}" },
+          { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.callback) }}"
+      },
+      "id": "a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a203",
+      "name": "Send Signed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    }
+  ],
+  "connections": {
+    "Build Signed Callback": { "main": [[{ "node": "Send Signed Callback", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "GuardianHub — Shared: Signed Event Intake (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Shared signed event intake v1.0.0\n\nReusable webhook that receives a signed GuardianHub event and verifies the HMAC signature, timestamp tolerance and nonce presence. Call this as a sub-workflow, or copy the Verify node into agent workflows."
+      },
+      "id": "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a101",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "/guardianhub/shared/intake", "responseMode": "onReceived" },
+      "id": "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a102",
+      "name": "Signed Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_GUARDIANHUB_SIGNING_SECRET;if(!s)throw new Error('N8N_GUARDIANHUB_SIGNING_SECRET not configured');const body=$json.body||'';const sig=String($json.headers['x-gh-signature']||'').toLowerCase();const computed=crypto.createHmac('sha256',s).update(JSON.stringify(body)).digest('hex');if(sig!==computed)throw new Error('Invalid signature');const ts=parseInt($json.headers['x-gh-timestamp']||'0',10);if(!ts||Math.abs(Date.now()-ts)>300000)throw new Error('Expired timestamp');return[{json:{body,headers:$json.headers,timestamp:String(ts),nonce:$json.headers['x-gh-nonce']||'',correlation_id:$json.headers['x-gh-correlation-id']||''}}];"
+      },
+      "id": "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a103",
+      "name": "Verify HMAC Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    }
+  ],
+  "connections": {
+    "Signed Event Webhook": { "main": [[{ "node": "Verify HMAC Signature", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

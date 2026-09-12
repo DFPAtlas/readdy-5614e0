@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -11,8 +10,6 @@ import FAQSection from './components/FAQSection';
 import CTASection from './components/CTASection';
 
 export default function PricingPage() {
-  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
-
   return (
     <div className="min-h-screen bg-[#0a0e1a]">
       <Navbar />
@@ -25,27 +22,7 @@ export default function PricingPage() {
             subtitle="No hidden fees. No per-site licensing. Pay for the operation you run, not the contracts you win."
           />
 
-          <div className="flex justify-center mb-14">
-            <div className="inline-flex items-center bg-white/5 border border-white/10 rounded-xl p-1.5">
-              <button
-                onClick={() => setBilling('monthly')}
-                className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap ${billing === 'monthly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'text-gray-400 hover:text-white'}`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBilling('yearly')}
-                className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap flex items-center gap-2 ${billing === 'yearly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'text-gray-400 hover:text-white'}`}
-              >
-                Yearly
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${billing === 'yearly' ? 'bg-white/20 text-white' : 'bg-green-500/15 text-green-400'}`}>
-                  Save 20%
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <PricingCards billing={billing} />
+          <PricingCards />
 
           <div className="flex justify-center mt-10">
             <Link

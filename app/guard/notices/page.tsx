@@ -1,27 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 import { ToastProvider } from '@/lib/guard/ToastContext';
 import GuardTopBar from '../components/GuardTopBar';
 import GuardBottomNav from '../components/GuardBottomNav';
 import GuardNoticesView from '../components/GuardNoticesView';
 
 export default function GuardNoticesPage() {
-  const { currentUser, profile, company, isLoading: authLoading } = useAuth();
-  const router = useRouter();
+  const g = useGuardAuth();
 
-  useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.replace('/login/guard');
-    }
-    if (!authLoading && profile && profile.role !== 'guard') {
-      router.replace('/dashboard');
-    }
-  }, [currentUser, profile, authLoading, router]);
-
-  if (authLoading || !currentUser || !profile) {
+  if (g.loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <i className="ri-loader-4-line animate-spin text-[#3b82f6] text-2xl"></i>
@@ -32,7 +20,7 @@ export default function GuardNoticesPage() {
   return (
     <ToastProvider>
       <div className="min-h-screen bg-black text-white flex flex-col">
-        <GuardTopBar />
+        <GuardTopBar siteName={g.todayShift?.site?.site_name || 'GuardianHub'} />
         <main className="flex-1 pt-14 pb-[72px] overflow-y-auto max-w-lg mx-auto w-full">
           <GuardNoticesView />
         </main>

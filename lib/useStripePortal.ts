@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from './supabase';
 import { useRouter } from 'next/navigation';
+import { getAppBaseUrl } from './getAppBaseUrl';
 
 export function useStripePortal() {
   const [loading, setLoading] = useState(false);
@@ -20,9 +21,7 @@ export function useStripePortal() {
         return;
       }
 
-      const returnUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/dashboard/settings`
-        : '/dashboard/settings';
+      const returnUrl = `${getAppBaseUrl()}/dashboard/settings`;
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-portal-session`,
@@ -43,7 +42,11 @@ export function useStripePortal() {
       }
 
       if (data.url) {
-        window.location.href = data.url;
+        try {
+          window.open(data.url, '_top');
+        } catch {
+          window.location.href = data.url;
+        }
       } else {
         throw new Error('No portal URL returned');
       }

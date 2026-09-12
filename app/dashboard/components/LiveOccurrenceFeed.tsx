@@ -26,18 +26,18 @@ const typeIcons: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-  'Shift Start': 'bg-blue-100 text-blue-600',
-  'Shift End': 'bg-gray-100 text-gray-600',
-  'Patrol Check': 'bg-emerald-100 text-emerald-600',
-  Visitor: 'bg-indigo-100 text-indigo-600',
-  Delivery: 'bg-orange-100 text-orange-600',
-  Incident: 'bg-red-100 text-red-600',
-  Maintenance: 'bg-amber-100 text-amber-600',
-  Communication: 'bg-purple-100 text-purple-600',
-  'Health & Safety': 'bg-pink-100 text-pink-600',
-  'Lost Property': 'bg-cyan-100 text-cyan-600',
-  Note: 'bg-gray-100 text-gray-600',
-  Other: 'bg-gray-100 text-gray-500',
+  'Shift Start': 'bg-blue-500/10 text-blue-400',
+  'Shift End': 'bg-gray-500/10 text-gray-400',
+  'Patrol Check': 'bg-emerald-500/10 text-emerald-400',
+  Visitor: 'bg-indigo-500/10 text-indigo-400',
+  Delivery: 'bg-orange-500/10 text-orange-400',
+  Incident: 'bg-red-500/10 text-red-400',
+  Maintenance: 'bg-amber-500/10 text-amber-400',
+  Communication: 'bg-purple-500/10 text-purple-400',
+  'Health & Safety': 'bg-pink-500/10 text-pink-400',
+  'Lost Property': 'bg-cyan-500/10 text-cyan-400',
+  Note: 'bg-gray-500/10 text-gray-400',
+  Other: 'bg-gray-500/10 text-gray-400',
 };
 
 function timeAgo(iso: string | null): string {

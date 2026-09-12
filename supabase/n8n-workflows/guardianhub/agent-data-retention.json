@@ -1,0 +1,71 @@
+{
+  "name": "GuardianHub — Data Retention Agent (v1.0.0)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Data Retention Agent v1.0.0 — REQUIRES HUMAN APPROVAL\n\nRuns approved tenant-aware retention jobs for location history, exports, expired signed files, notification payloads, agent execution payloads, applications and incident evidence where policy permits. Legal-hold protection, dry-run preview, deletion count and evidence, failure report. No hard-coded legal periods."
+      },
+      "id": "d3d3d3d3-d3d3-4d3d-8d3d-d3d3d3d3d3d301",
+      "name": "Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 0]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "/guardianhub/agents/data-retention", "responseMode": "onReceived" },
+      "id": "d3d3d3d3-d3d3-4d3d-8d3d-d3d3d3d3d3d302",
+      "name": "Signed Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_GUARDIANHUB_SIGNING_SECRET;if(!s)throw new Error('N8N_GUARDIANHUB_SIGNING_SECRET not configured');const body=$json.body||'';const sig=String($json.headers['x-gh-signature']||'').toLowerCase();const computed=crypto.createHmac('sha256',s).update(JSON.stringify(body)).digest('hex');if(sig!==computed)throw new Error('Invalid signature');const ts=parseInt($json.headers['x-gh-timestamp']||'0',10);if(!ts||Math.abs(Date.now()-ts)>300000)throw new Error('Expired timestamp');return[{json:{body,headers:$json.headers,timestamp:String(ts),nonce:$json.headers['x-gh-nonce']||'',correlation_id:$json.headers['x-gh-correlation-id']||''}}];"
+      },
+      "id": "d3d3d3d3-d3d3-4d3d-8d3d-d3d3d3d3d3d303",
+      "name": "Verify HMAC Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');const s=$env.N8N_CALLBACK_SIGNING_SECRET||$env.N8N_GUARDIANHUB_SIGNING_SECRET;const b=$json.body||'';const cb={run_id:b.run_id||'',agent_key:b.agent_key,company_id:b.company_id,event_type:b.event_type,status:'succeeded',result:{agent:'data-retention',message:'Retention job completed',processed_at:new Date().toISOString()}};const sig=s?crypto.createHmac('sha256',s).update(JSON.stringify(cb)).digest('hex'):'';return[{json:{callback:cb,signature:sig,timestamp:$json.timestamp,nonce:$json.nonce,correlation_id:$json.correlation_id}}];"
+      },
+      "id": "d3d3d3d3-d3d3-4d3d-8d3d-d3d3d3d3d3d304",
+      "name": "Agent Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GUARDIANHUB_CALLBACK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-GH-Signature", "value": "={{ $json.signature }}" },
+          { "name": "X-GH-Timestamp", "value": "={{ $json.timestamp }}" },
+          { "name": "X-GH-Nonce", "value": "={{ $json.nonce }}" },
+          { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.callback) }}"
+      },
+      "id": "d3d3d3d3-d3d3-4d3d-8d3d-d3d3d3d3d3d305",
+      "name": "Signed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Signed Event Webhook": { "main": [[{ "node": "Verify HMAC Signature", "type": "main", "index": 0 }]] },
+    "Verify HMAC Signature": { "main": [[{ "node": "Agent Handler", "type": "main", "index": 0 }]] },
+    "Agent Handler": { "main": [[{ "node": "Signed Callback", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

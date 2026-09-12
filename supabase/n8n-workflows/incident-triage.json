@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Incident Triage",
+  "version": "1.0.0",
+  "description": "Receives signed incident events, classifies severity, detects missing fields, and suggests review actions",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "incident-triage", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Incident Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { incident_id, company_id, severity, category, description, site_id } = $input.first().json.body || $input.first().json;\n\nconst classification = {\n  incident_id,\n  company_id,\n  suggested_severity: severity || 'medium',\n  suggested_category: category || 'general',\n  missing_fields: [],\n  recommendations: [],\n  ai_summary: '',\n  confidence: 'medium'\n};\n\nif (!description) classification.missing_fields.push('description');\nif (!site_id) classification.missing_fields.push('site_id');\n\nclassification.recommendations.push('Review incident details and verify classification');\nclassification.ai_summary = `Incident ${incident_id}: Requires human review. Category: ${classification.suggested_category}. Severity: ${classification.suggested_severity}.`;\n\nreturn { json: classification };"
+      },
+      "id": "classify",
+      "name": "Classify Incident",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "incident_triage" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "incident.triage" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Incident Event Webhook": { "main": [[ { "node": "Classify Incident", "type": "main", "index": 0 } ]] },
+    "Classify Incident": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

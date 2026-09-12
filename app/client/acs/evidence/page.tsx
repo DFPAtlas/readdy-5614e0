@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useACS } from '@/lib/useACS';
 import { useAuth } from '@/lib/auth';
+import { logEvidenceAccess, logPageAccess } from '@/lib/useEvidenceAuditLog';
 
 const ACS_AREAS = [
   'Strategy',
@@ -20,11 +21,22 @@ const STATUSES = ['current', 'review', 'expired', 'archived'];
 
 export default function ACSEvidencePage() {
   const { evidence, criteria, refresh } = useACS();
-  const { currentUser } = useAuth();
+  const { currentUser, companyId, profile } = useAuth();
   const [showUpload, setShowUpload] = useState(false);
   const [selectedArea, setSelectedArea] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  useEffect(() => {
+    if (companyId && profile?.id) {
+      logPageAccess({
+        company_id: companyId,
+        user_id: profile.id,
+        user_role: profile.role || 'client',
+        source_route: '/client/acs/evidence',
+      });
+    }
+  }, [companyId, profile?.id, profile?.role]);
 
   const [form, setForm] = useState({
     title: '',
@@ -58,31 +70,35 @@ export default function ACSEvidencePage() {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const { data } = await supabase.storage.from('acs-evidence').upload(`${Date.now()}_${file.name}`, file);
-      if (data) {
-        const { data: publicUrl } = supabase.storage.from('acs-evidence').getPublicUrl(data.path);
-        await supabase.from('acs_evidence').insert({
-          company_id: currentUser?.company_id,
-          title: form.title || file.name,
-          acs_area: form.acs_area,
-          acs_criterion: form.acs_criterion,
-          category: form.category,
-          owner: form.owner,
-          file_url: publicUrl.publicUrl,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          review_date: form.review_date || null,
-          expiry_date: form.expiry_date || null,
-          version: form.version,
-          status: form.status,
-          notes: form.notes,
-          uploaded_by: currentUser?.id,
-        });
-        refresh();
-        setShowUpload(false);
-        setForm({ title: '', acs_area: ACS_AREAS[0], acs_criterion: '', category: CATEGORIES[0], owner: '', review_date: '', expiry_date: '', version: '1.0', status: 'current', notes: '' });
-      }
+      const filePath = `${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('acs-evidence').upload(filePath, file);
+      if (uploadError) return;
+
+      const { data: signedData } = await supabase.storage.from('acs-evidence').createSignedUrl(filePath, 60 * 60 * 24 * 7);
+
+      const fileUrl = signedData?.signedUrl || '';
+
+      await supabase.from('acs_evidence').insert({
+        company_id: currentUser?.company_id,
+        title: form.title || file.name,
+        acs_area: form.acs_area,
+        acs_criterion: form.acs_criterion,
+        category: form.category,
+        owner: form.owner,
+        file_url: fileUrl,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        review_date: form.review_date || null,
+        expiry_date: form.expiry_date || null,
+        version: form.version,
+        status: form.status,
+        notes: form.notes,
+        uploaded_by: currentUser?.id,
+      });
+      refresh();
+      setShowUpload(false);
+      setForm({ title: '', acs_area: ACS_AREAS[0], acs_criterion: '', category: CATEGORIES[0], owner: '', review_date: '', expiry_date: '', version: '1.0', status: 'current', notes: '' });
     };
     input.click();
   }

@@ -57,15 +57,6 @@ export default function CommandCentreHeader({ kpis, lastUpdated, onRefresh }: Co
               <PulsingDot color="bg-emerald-500" />
               LIVE
             </span>
-            <Link
-              href="/dashboard/ops-room"
-              className="ml-2 hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 text-xs font-semibold border border-white/10 hover:border-white/20 hover:text-white transition-all cursor-pointer"
-            >
-              <div className="w-3 h-3 flex items-center justify-center">
-                <i className="ri-expand-diagonal-line"></i>
-              </div>
-              Ops Room
-            </Link>
 
             {/* Panic Mode trigger */}
             {canTriggerPanic && !panicMode && (

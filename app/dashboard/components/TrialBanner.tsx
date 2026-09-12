@@ -72,7 +72,7 @@ export default function TrialBanner({ companyId }: { companyId: string | null })
             </>
           ) : (
             <>
-              <span className="text-blue-400 font-bold">{daysLeft} {daysLeft === 1 ? 'day' : 'days'}</span> remaining on your Sentinel Starter trial
+              <span className="text-blue-400 font-bold">{daysLeft} {daysLeft === 1 ? 'day' : 'days'}</span> remaining on your Guardian-Hub Starter trial
             </>
           )}
         </span>

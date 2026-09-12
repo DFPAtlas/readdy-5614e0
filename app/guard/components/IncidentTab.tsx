@@ -40,6 +40,7 @@ export default function IncidentTab({ todayShift, guardId, companyId, onSubmitte
   const [description, setDescription] = useState('');
   const [actionsTaken, setActionsTaken] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -76,8 +77,11 @@ export default function IncidentTab({ todayShift, guardId, companyId, onSubmitte
       return;
     }
 
-    const { data: urlData } = await supabase.storage.from('incident-media').createSignedUrl(data.path, 3600);
-    if (urlData) setPhotoUrls((prev) => [...prev, urlData.signedUrl]);
+    const { data: urlData } = await supabase.storage.from('incident-media').createSignedUrl(data.path, 60 * 60 * 24 * 7);
+    if (urlData) {
+      setPhotoUrls((prev) => [...prev, urlData.signedUrl]);
+      setPhotoPaths((prev) => [...prev, data.path]);
+    }
     setUploading(false);
   }
 
@@ -121,12 +125,14 @@ export default function IncidentTab({ todayShift, guardId, companyId, onSubmitte
       entry: `${type} (${severity}) reported: ${description.slice(0, 100)}`,
     });
 
-    for (const url of photoUrls) {
+    for (let i = 0; i < photoUrls.length; i++) {
       await supabase.from('incident_media').insert({
         company_id: companyId,
         incident_id: incidentData.id,
-        file_url: url,
+        file_url: photoUrls[i],
         file_type: 'image',
+        storage_path: photoPaths[i] || null,
+        filename: (photoPaths[i] || '').split('/').pop() || null,
       });
     }
 
@@ -141,6 +147,7 @@ export default function IncidentTab({ todayShift, guardId, companyId, onSubmitte
       setDescription('');
       setActionsTaken('');
       setPhotoUrls([]);
+      setPhotoPaths([]);
       router.push('/guard');
     }, 2000);
   }

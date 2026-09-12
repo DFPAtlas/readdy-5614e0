@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import AITooledOperationsCopilot from '@/app/dashboard/components/AITooledOperationsCopilot';
+import { useRequireEntitlement } from '@/lib/useRequireEntitlement';
 
 interface Client {
   id: string;
@@ -16,6 +17,7 @@ interface Client {
 }
 
 export default function ClientsListPage() {
+  const { allowed, loading: entGuardLoading } = useRequireEntitlement('hasClientPortal');
   const { companyId, profile } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +26,7 @@ export default function ClientsListPage() {
   const isAdmin = profile && ['super_admin', 'company_admin', 'operations_manager'].includes(profile.role);
 
   useEffect(() => {
-    if (!companyId) {
+    if (!companyId || !allowed) {
       setLoading(false);
       return;
     }
@@ -61,13 +63,29 @@ export default function ClientsListPage() {
     };
 
     fetchClients();
-  }, [companyId]);
+  }, [companyId, allowed]);
 
   const filtered = clients.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.contact_person || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  if (entGuardLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Redirecting to plans...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0e1a]">

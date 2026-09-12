@@ -6,7 +6,7 @@ import { useInView } from '../../hooks/useInView';
 const comparisonFeatures = [
   { name: 'Guards', starter: 'Up to 10', sentinel: 'Up to 25', command: 'Up to 200', titan: 'Unlimited' },
   { name: 'Sites', starter: '1', sentinel: 'Up to 3', command: 'Unlimited', titan: 'Unlimited' },
-  { name: 'Pricing model', starter: 'Monthly only', sentinel: 'Monthly / Yearly', command: 'Monthly / Yearly', titan: 'Custom' },
+  { name: 'Pricing model', starter: 'Monthly / Annual', sentinel: 'Monthly / Annual', command: 'Monthly / Annual', titan: 'Custom' },
   { name: 'Basic rota system', starter: true, sentinel: true, command: true, titan: true },
   { name: 'AI rota generation', starter: false, sentinel: false, command: true, titan: true },
   { name: 'Leave & sickness automation', starter: false, sentinel: false, command: true, titan: true },

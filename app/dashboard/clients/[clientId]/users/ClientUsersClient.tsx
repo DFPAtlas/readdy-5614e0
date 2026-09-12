@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useClientUsers } from '@/lib/useClientUsers';
 import AddUserModal from './AddUserModal';
+import { useRequireEntitlement } from '@/lib/useRequireEntitlement';
 
 const roleOptions = [
   { value: 'viewer', label: 'Viewer', color: 'bg-gray-500/15 text-gray-400 border-gray-500/20' },
@@ -52,6 +53,7 @@ interface ClientUsersClientProps {
 }
 
 export default function ClientUsersClient({ clientId }: ClientUsersClientProps) {
+  const { allowed, loading: entGuardLoading } = useRequireEntitlement('hasClientPortal');
   const {
     clientUsers,
     companyUsers,
@@ -92,6 +94,22 @@ export default function ClientUsersClient({ clientId }: ClientUsersClientProps) 
 
   const fullName = (u: any) =>
     [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Unnamed';
+
+  if (entGuardLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Redirecting to plans...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0e1a]">

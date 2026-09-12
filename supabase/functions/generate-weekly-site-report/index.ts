@@ -12,7 +12,12 @@ function formatDate(iso: string) {
 }
 
 function generateFallbackSummary(data: any): string {
-  return `EXECUTIVE SUMMARY\nThis week at ${data.site_name} operations ran ${data.patrols.percentage >= 90 ? "smoothly" : "with some challenges"}. ${data.incidents.total === 0 ? "No incidents were recorded." : `${data.incidents.total} incident${data.incidents.total > 1 ? "s were" : " was"} logged, ${data.incidents.open > 0 ? `with ${data.incidents.open} still open.` : "all now resolved or under review."}`}\n\nKEY METRICS\n- Patrol completion: ${data.patrols.completed} of ${data.patrols.scheduled} (${data.patrols.percentage}%)\n- Shifts scheduled: ${data.shifts.total} (${data.shifts.completed} completed, ${data.shifts.missed} missed, ${data.shifts.no_show} no-show)\n- Hours of cover: ${data.hours_covered}\n- Incidents: ${data.incidents.total} (${data.incidents.by_severity.critical} critical, ${data.incidents.by_severity.high} high, ${data.incidents.by_severity.medium} medium, ${data.incidents.by_severity.low} low)\n- Open issues: ${data.incidents.open}\n\nNOTABLE INCIDENTS\n${data.incidents.notable.length === 0 ? "No incidents above Low severity were recorded this week." : data.incidents.notable.map((i: any, idx: number) => `${idx + 1}. ${i.date} \u2014 ${i.type} (${i.severity.toUpperCase()}) \u2014 ${i.status}. ${i.summary}`).join("\n")}\n\nOPERATIONAL HIGHLIGHTS\n${data.occurrence_book.notable.length === 0 ? "No notable occurrence book entries this week." : data.occurrence_book.notable.map((o: any, idx: number) => `${idx + 1}. ${o.date} \u2014 ${o.type}: ${o.summary}`).join("\n")}\n\nRECOMMENDATIONS\n${data.patrols.percentage < 90 ? "- Review patrol completion rates and identify any barriers to full completion.\n" : ""}${data.incidents.open > 0 ? "- Follow up on open incidents to ensure timely resolution.\n" : ""}${data.shifts.no_show > 0 ? "- Investigate no-show shifts and consider back-up guard arrangements.\n" : ""}- Continue current security posture and review next week.`;
+  const patrolOk = data.patrols.percentage >= 90;
+  const incidentsText = data.incidents.total === 0
+    ? "No incidents were recorded."
+    : `${data.incidents.total} incident${data.incidents.total > 1 ? "s were" : " was"} logged, ${data.incidents.open > 0 ? `with ${data.incidents.open} still open.` : "all now resolved or under review."}`;
+
+  return `EXECUTIVE SUMMARY\nThis week at ${data.site_name} operations ran ${patrolOk ? "smoothly" : "with some challenges"}. ${incidentsText}\n\nKEY METRICS\n- Patrol scans: ${data.patrols.completed} of ${data.patrols.scheduled} checkpoints (${data.patrols.percentage}%)\n- GPS verified scans: ${data.patrols.gps_verified}\n- Shifts scheduled: ${data.shifts.total} (${data.shifts.completed} completed, ${data.shifts.missed} missed, ${data.shifts.no_show} no-show)\n- Hours of cover: ${data.hours_covered}\n- Incidents: ${data.incidents.total} (${data.incidents.by_severity.critical} critical, ${data.incidents.by_severity.high} high, ${data.incidents.by_severity.medium} medium, ${data.incidents.by_severity.low} low)\n- Visitors: ${data.visitors.total}\n- Lone worker sessions: ${data.lone_worker.sessions}\n- SOS alerts: ${data.sos.total}\n- Open issues: ${data.incidents.open}\n\nNOTABLE INCIDENTS\n${data.incidents.notable.length === 0 ? "No incidents above Low severity were recorded this week." : data.incidents.notable.map((i: any, idx: number) => `${idx + 1}. ${i.date} \u2014 ${i.type} (${i.severity.toUpperCase()}) \u2014 ${i.status}. ${i.summary}`).join("\n")}\n\nOPERATIONAL HIGHLIGHTS\n${data.occurrence_book.notable.length === 0 ? "No notable occurrence book entries this week." : data.occurrence_book.notable.map((o: any, idx: number) => `${idx + 1}. ${o.date} \u2014 ${o.type}: ${o.summary}`).join("\n")}\n\nRECOMMENDATIONS\n${data.patrols.percentage < 90 ? "- Review patrol completion rates and identify any barriers to full completion.\n" : ""}${data.incidents.open > 0 ? "- Follow up on open incidents to ensure timely resolution.\n" : ""}${data.shifts.no_show > 0 ? "- Investigate no-show shifts and consider back-up guard arrangements.\n" : ""}${data.sos.total > 0 ? "- Review SOS activation circumstances and guard welfare procedures.\n" : ""}- Continue current security posture and review next week.`;
 }
 
 function hexToRgb(hex: string) {
@@ -21,7 +26,7 @@ function hexToRgb(hex: string) {
   return { r: ((b >> 16) & 255) / 255, g: ((b >> 8) & 255) / 255, b: (b & 255) / 255 };
 }
 
-function drawBlock(page: any, y: number, title: string, x: number, w: number, bold: any, normal: any) {
+function drawBlock(page: any, y: number, title: string, x: number, w: number, bold: any, _normal: any) {
   page.drawText(title, { x, y, size: 14, font: bold, color: rgb(0.15, 0.15, 0.15) });
   y -= 16;
   page.drawLine({ start: { x, y }, end: { x: x + w, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
@@ -105,6 +110,7 @@ async function generateWeeklyPDF(ctx: any): Promise<Uint8Array> {
     `${ctx.structuredData.patrols.percentage}% patrol completion`,
     `${ctx.structuredData.incidents.critical} critical incidents`,
     `${ctx.structuredData.hours_covered} hours of cover`,
+    `${ctx.structuredData.sos.total} SOS alerts`,
   ];
   const statLine = stats.join("  \u00b7  ");
   page.drawText(statLine, { x: MARGIN, y, size: 11, font: helveticaBold, color: rgb(brandRgb.r, brandRgb.g, brandRgb.b) });
@@ -121,24 +127,26 @@ async function generateWeeklyPDF(ctx: any): Promise<Uint8Array> {
 
   y = drawBlock(page, y, "Key Metrics", MARGIN, UW, helveticaBold, helvetica);
   const metrics = [
-    ["Patrols Completed", `${ctx.structuredData.patrols.completed} / ${ctx.structuredData.patrols.scheduled} (${ctx.structuredData.patrols.percentage}%)`],
+    ["Patrol Checkpoints Completed", `${ctx.structuredData.patrols.completed} / ${ctx.structuredData.patrols.scheduled} (${ctx.structuredData.patrols.percentage}%)`],
+    ["GPS Verified Scans", `${ctx.structuredData.patrols.gps_verified}`],
     ["Incidents Logged", `${ctx.structuredData.incidents.total} (${ctx.structuredData.incidents.by_severity.critical}C, ${ctx.structuredData.incidents.by_severity.high}H, ${ctx.structuredData.incidents.by_severity.medium}M, ${ctx.structuredData.incidents.by_severity.low}L)`],
     ["Hours of Cover", `${ctx.structuredData.hours_covered}`],
+    ["Visitors This Week", `${ctx.structuredData.visitors.total}`],
     ["Open Issues", `${ctx.structuredData.incidents.open}`],
   ];
 
   const cardW = (UW - 15) / 2;
-  const cardH = 60;
+  const cardH = 56;
   for (let i = 0; i < metrics.length; i++) {
     const col = i % 2;
     const row = Math.floor(i / 2);
     const cx = MARGIN + col * (cardW + 15);
-    const cy = y - (row + 1) * (cardH + 12) + cardH;
+    const cy = y - (row + 1) * (cardH + 10) + cardH;
     page.drawRectangle({ x: cx, y: cy - cardH, width: cardW, height: cardH, color: rgb(0.97, 0.97, 0.97), borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.5 });
     page.drawText(metrics[i][0], { x: cx + 8, y: cy - 18, size: 9, font: helveticaOblique, color: rgb(0.45, 0.45, 0.45) });
-    page.drawText(metrics[i][1], { x: cx + 8, y: cy - 38, size: 14, font: helveticaBold, color: rgb(0.15, 0.15, 0.15) });
+    page.drawText(metrics[i][1], { x: cx + 8, y: cy - 36, size: 13, font: helveticaBold, color: rgb(0.15, 0.15, 0.15) });
   }
-  y -= Math.ceil(metrics.length / 2) * (cardH + 12) + 20;
+  y -= Math.ceil(metrics.length / 2) * (cardH + 10) + 20;
 
   if (ctx.incidents.length > 0) {
     page = pdfDoc.addPage([PAGE_W, PAGE_H]);
@@ -174,7 +182,7 @@ async function generateWeeklyPDF(ctx: any): Promise<Uint8Array> {
     y = drawBlock(page, y, "Operational Summary", MARGIN, UW, helveticaBold, helvetica);
 
     if (ctx.structuredData.patrols.scheduled > 0) {
-      page.drawText("Patrol completion by day", { x: MARGIN, y, size: 11, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) });
+      page.drawText("Patrol checkpoint completion by day", { x: MARGIN, y, size: 11, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) });
       y -= 16;
       const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       const barH = 14;
@@ -189,6 +197,15 @@ async function generateWeeklyPDF(ctx: any): Promise<Uint8Array> {
         y -= barH + 6;
       }
       y -= 10;
+    }
+
+    if (ctx.structuredData.lone_worker.sessions > 0) {
+      page.drawText("Lone Worker Activity", { x: MARGIN, y, size: 11, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) });
+      y -= 14;
+      page.drawText(`${ctx.structuredData.lone_worker.sessions} lone worker sessions this week (${ctx.structuredData.lone_worker.missed_checkins} missed check-ins, ${ctx.structuredData.lone_worker.alarms} alarms triggered)`, {
+        x: MARGIN + 8, y, size: 9, font: helvetica, color: rgb(0.35, 0.35, 0.35),
+      });
+      y -= 20;
     }
 
     if (ctx.occurrences.length > 0) {
@@ -352,24 +369,29 @@ Deno.serve(async (req) => {
       ["Incident", "Maintenance", "Communication", "Health & Safety"].includes(o.entry_type || "")
     );
 
-    let patrolData: any = { completed: 0, scheduled: 0, by_day: {} };
+    let patrolData: any = { completed: 0, scheduled: 0, gps_verified: 0, gps_failed: 0, by_day: {} };
     try {
-      const { data: patrols } = await supabase
-        .from("patrols")
-        .select("id, status, scheduled_at, completed_at")
+      const { data: patrolScans } = await supabase
+        .from("patrol_scans")
+        .select("id, scan_status, gps_status, gps_verified, scanned_at")
         .eq("site_id", site_id)
-        .gte("scheduled_at", period_start)
-        .lte("scheduled_at", period_end);
-      if (patrols) {
-        patrolData.completed = patrols.filter((p) => p.status === "completed").length;
-        patrolData.scheduled = patrols.length;
+        .gte("scanned_at", period_start)
+        .lte("scanned_at", period_end);
+
+      if (patrolScans) {
+        patrolData.scheduled = patrolScans.length;
+        patrolData.completed = patrolScans.filter((p) => p.scan_status === "valid" || p.scan_status === "late").length;
+        patrolData.gps_verified = patrolScans.filter((p) => p.gps_verified === true).length;
+        patrolData.gps_failed = patrolScans.filter((p) => p.gps_status === "outside_radius" || p.gps_status === "gps_unavailable").length;
+
         const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
         for (const d of days) patrolData.by_day[d] = { completed: 0, scheduled: 0 };
-        for (const p of patrols) {
-          const day = days[new Date(p.scheduled_at).getDay()];
+        for (const p of patrolScans) {
+          const d = new Date(p.scanned_at);
+          const day = days[(d.getDay() + 6) % 7];
           if (day) {
             patrolData.by_day[day].scheduled++;
-            if (p.status === "completed") patrolData.by_day[day].completed++;
+            if (p.scan_status === "valid" || p.scan_status === "late") patrolData.by_day[day].completed++;
           }
         }
       }
@@ -379,6 +401,34 @@ Deno.serve(async (req) => {
     const patrolPct = patrolData.scheduled > 0
       ? Math.round((patrolData.completed / patrolData.scheduled) * 100)
       : 0;
+
+    const { data: visitors } = await supabase
+      .from("visitor_logs")
+      .select("id")
+      .eq("site_id", site_id)
+      .gte("time_in", period_start)
+      .lte("time_in", period_end);
+
+    const { data: loneWorkerSessions } = await supabase
+      .from("lone_worker_sessions")
+      .select("id, missed_check_ins, alarm_triggered_at, status")
+      .eq("site_id", site_id)
+      .gte("session_start", period_start)
+      .lte("session_start", period_end);
+
+    const loneWorkerData = {
+      sessions: loneWorkerSessions?.length || 0,
+      missed_checkins: loneWorkerSessions?.reduce((acc, s) => acc + (s.missed_check_ins || 0), 0) || 0,
+      alarms: loneWorkerSessions?.filter((s) => s.alarm_triggered_at).length || 0,
+    };
+
+    const { data: sosAlerts } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("site_id", site_id)
+      .eq("type", "sos_alert")
+      .gte("created_at", period_start)
+      .lte("created_at", period_end);
 
     const structuredData = {
       site_name: site.site_name,
@@ -403,6 +453,15 @@ Deno.serve(async (req) => {
         completed: patrolData.completed,
         scheduled: patrolData.scheduled,
         percentage: patrolPct,
+        gps_verified: patrolData.gps_verified,
+        gps_failed: patrolData.gps_failed,
+      },
+      visitors: {
+        total: visitors?.length || 0,
+      },
+      lone_worker: loneWorkerData,
+      sos: {
+        total: sosAlerts?.length || 0,
       },
       occurrence_book: {
         total: occurrences?.length || 0,
@@ -429,7 +488,7 @@ Deno.serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are a UK security operations manager writing a weekly site report for a client. You will receive structured data about everything that happened at the site during the week. Write a professional executive summary suitable for sending to a non-security audience.\n\nStructure:\n1. EXECUTIVE SUMMARY \u2014 2-3 sentences capturing the week's overall picture.\n2. KEY METRICS \u2014 bullet list of the most important numbers.\n3. NOTABLE INCIDENTS \u2014 brief summary of any incidents above Low severity. For each: what happened, what was done, current status.\n4. OPERATIONAL HIGHLIGHTS \u2014 patrol completion, attendance, anything noteworthy from the occurrence book.\n5. RECOMMENDATIONS \u2014 any specific actions you'd recommend the client consider, based purely on the data shown. Don't invent risks.\n\nRules:\n- British English.\n- Reassuring but not boastful tone \u2014 clients want to feel safe and informed, not sold to.\n- Don't speculate beyond the data.\n- Don't use marketing language.\n- Aim for 350\u2013500 words total.`,
+                content: `You are a UK security operations manager writing a weekly site report for a client. You will receive structured data about everything that happened at the site during the week. Write a professional executive summary suitable for sending to a non-security audience.\n\nStructure:\n1. EXECUTIVE SUMMARY \u2014 2-3 sentences capturing the week's overall picture including patrol completion, incidents, and any SOS/lone worker alerts.\n2. KEY METRICS \u2014 bullet list of the most important numbers.\n3. NOTABLE INCIDENTS \u2014 brief summary of any incidents above Low severity. For each: what happened, what was done, current status.\n4. OPERATIONAL HIGHLIGHTS \u2014 patrol completion, attendance, visitors, lone worker activity, anything noteworthy from the occurrence book.\n5. RECOMMENDATIONS \u2014 any specific actions you'd recommend the client consider, based purely on the data shown. Don't invent risks.\n\nRules:\n- British English.\n- Reassuring but not boastful tone \u2014 clients want to feel safe and informed, not sold to.\n- Don't speculate beyond the data.\n- Don't use marketing language.\n- Aim for 350\u2013500 words total.`,
               },
               {
                 role: "user",
@@ -470,8 +529,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to upload PDF", detail: uploadError.message }), { status: 500, headers: corsHeaders });
     }
 
-    const { data: urlData } = supabase.storage.from("reports").getPublicUrl(storagePath);
-    const fileUrl = urlData.publicUrl;
+    const { data: signedData } = await supabase.storage.from("reports").createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
     const { data: reportRecord } = await supabase
       .from("reports")
@@ -480,23 +538,21 @@ Deno.serve(async (req) => {
         site_id,
         report_type: "weekly_site",
         title: `Weekly Report \u2014 ${site.site_name} \u2014 ${formatDate(period_start)} to ${formatDate(period_end)}`,
-        file_url: fileUrl,
+        file_url: signedData?.signedUrl,
         generated_by: userId,
         generated_at: new Date().toISOString(),
         period_start,
         period_end,
         status: "draft",
+        client_visible: false,
         ai_summary: aiSummary,
       })
       .select("id")
       .single();
 
-    const { data: signedData } = await supabase.storage.from("reports").createSignedUrl(storagePath, 60 * 60 * 24);
-
     return new Response(
       JSON.stringify({
-        url: signedData?.signedUrl || fileUrl,
-        public_url: fileUrl,
+        url: signedData?.signedUrl,
         report_id: reportRecord?.id,
         ai_summary: aiSummary,
       }),

@@ -2,18 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ============================================================================
-// SOLE ACTIVE STRIPE WEBHOOK — PRODUCTION
-// ============================================================================
-// This is the ONLY Stripe webhook endpoint configured for live/production use.
-// There is no "enhanced-stripe-webhook" — that name does not exist in this
-// codebase. Do NOT create a second webhook endpoint in the Stripe dashboard
-// unless you also deploy its matching edge function here first.
-//
-// The stripe-webhook-test function is an admin-only testing tool (protected by
-// SuperAdminGate on the frontend) and is NOT a real webhook receiver.
-// ============================================================================
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
@@ -43,13 +31,13 @@ serve(async (req) => {
   }
 
   const body = await req.text();
-  const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2024-12-18.acacia" });
   let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: `Webhook signature verification failed: ${err.message}` }), {
+    return new Response(JSON.stringify({ error: `Webhook signature verification failed` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -61,11 +49,11 @@ serve(async (req) => {
 
   const { data: existing } = await admin
     .from("billing_webhook_events")
-    .select("id")
+    .select("id, processed_at, stripe_event_id")
     .eq("stripe_event_id", event.id)
     .maybeSingle();
 
-  if (existing) {
+  if (existing?.processed_at) {
     return new Response(JSON.stringify({ received: true, idempotent: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -93,10 +81,10 @@ serve(async (req) => {
 
   function planSlugToLabel(slug: string): string {
     switch (slug) {
-      case 'sentinel-starter': return 'Sentinel Starter';
-      case 'sentinel': return 'GuardianHub Sentinel';
-      case 'command': return 'GuardianHub Command';
-      case 'titan': return 'GuardianHub Titan';
+      case 'sentinel-starter': return 'Guardian-Hub Starter';
+      case 'sentinel': return 'Guardian-Hub Sentinel';
+      case 'command': return 'Guardian-Hub Command';
+      case 'titan': return 'Guardian-Hub Titan';
       default: return slug.charAt(0).toUpperCase() + slug.slice(1);
     }
   }
@@ -128,7 +116,7 @@ serve(async (req) => {
       const module = modules.find((m) => m.slug === moduleSlug);
       if (!module) continue;
 
-      const { data: existing } = await admin
+      const { data: existingMod } = await admin
         .from("company_enabled_modules")
         .select("id")
         .eq("company_id", companyId)
@@ -136,7 +124,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (mf.included) {
-        if (!existing) {
+        if (!existingMod) {
           await admin.from("company_enabled_modules").insert({
             company_id: companyId,
             module_id: module.id,
@@ -146,13 +134,13 @@ serve(async (req) => {
         } else {
           await admin.from("company_enabled_modules")
             .update({ enabled: true, enabled_at: new Date().toISOString() })
-            .eq("id", existing.id);
+            .eq("id", existingMod.id);
         }
       } else {
-        if (existing) {
+        if (existingMod) {
           await admin.from("company_enabled_modules")
             .update({ enabled: false })
-            .eq("id", existing.id);
+            .eq("id", existingMod.id);
         }
       }
     }
@@ -192,10 +180,38 @@ serve(async (req) => {
     const updateCompanySubscription = async (customerId: string, updates: Record<string, any>) => {
       const { data: company } = await admin
         .from("companies")
-        .select("id")
+        .select("id, subscription_period_end, subscription_status")
         .eq("stripe_customer_id", customerId)
         .maybeSingle();
-      if (!company) return;
+      if (!company) return null;
+
+      if (updates.subscription_period_end && company.subscription_period_end) {
+        const newEnd = new Date(updates.subscription_period_end).getTime();
+        const existingEnd = new Date(company.subscription_period_end).getTime();
+        if (newEnd < existingEnd) {
+          delete updates.subscription_period_end;
+        }
+      }
+
+      const allowedTransitions: Record<string, string[]> = {
+        'incomplete': ['incomplete', 'incomplete_expired', 'active', 'trialing', 'past_due'],
+        'incomplete_expired': ['incomplete_expired'],
+        'trialing': ['trialing', 'active', 'past_due', 'canceled'],
+        'active': ['active', 'past_due', 'unpaid', 'canceled', 'paused'],
+        'past_due': ['past_due', 'active', 'unpaid', 'canceled'],
+        'unpaid': ['unpaid', 'active', 'past_due', 'canceled'],
+        'canceled': ['canceled'],
+        'paused': ['paused', 'active'],
+      };
+
+      if (updates.subscription_status) {
+        const currentStatus = company.subscription_status || 'incomplete';
+        const allowed = allowedTransitions[currentStatus] || [currentStatus];
+        if (!allowed.includes(updates.subscription_status)) {
+          updates.subscription_status = currentStatus;
+        }
+      }
+
       const { error } = await admin.from("companies").update(updates).eq("id", company.id);
       if (error) throw error;
       return company.id;
@@ -231,13 +247,19 @@ serve(async (req) => {
       };
       await admin.from("billing_invoices").upsert(row, { onConflict: "stripe_invoice_id" });
 
-      if (inv.subscription && inv.status === "open" && (inv.attempt_count ?? 0) > 0) {
+      if (inv.subscription && (inv.status === "open") && (inv.attempt_count ?? 0) > 0 && inv.status !== "void") {
         await updateCompanySubscription(inv.customer, { subscription_status: "past_due", updated_at: new Date().toISOString() });
         const cid = await companyLookup(inv.customer);
         if (cid) await disablePremiumModules(cid);
       }
       if (inv.subscription && inv.status === "paid") {
         await updateCompanySubscription(inv.customer, { subscription_status: "active", updated_at: new Date().toISOString() });
+      }
+      if (inv.subscription && inv.status === "void") {
+        const cid = await companyLookup(inv.customer);
+        if (cid) {
+          await updateCompanySubscription(inv.customer, { subscription_status: "past_due", updated_at: new Date().toISOString() });
+        }
       }
     };
 
@@ -344,6 +366,9 @@ serve(async (req) => {
         if (sub.cancel_at) {
           updates.subscription_cancel_at = new Date(sub.cancel_at * 1000).toISOString();
         }
+        if (sub.trial_end) {
+          updates.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+        }
         if (priceId) {
           const slug = await getPlanSlugFromPriceId(priceId);
           if (slug) {
@@ -353,9 +378,9 @@ serve(async (req) => {
         }
         await updateCompanySubscription(sub.customer, updates);
 
-        if (priceId) {
+        if (priceId && companyId) {
           const slug = await getPlanSlugFromPriceId(priceId);
-          if (slug && companyId) {
+          if (slug) {
             if (sub.status === 'active' || sub.status === 'trialing') {
               await syncCompanyModules(companyId, slug);
             } else if (sub.status === 'canceled' || sub.status === 'past_due' || sub.status === 'unpaid') {
@@ -369,12 +394,19 @@ serve(async (req) => {
     const handleCheckoutSession = async (session: any) => {
       if (session.customer && session.subscription) {
         const meta = session.metadata || {};
+
+        const sub = await stripe.subscriptions.retrieve(session.subscription);
+
+        const subStatus = sub.status;
+        const isTrialing = subStatus === 'trialing';
+
         const updates: Record<string, any> = {
           stripe_subscription_id: session.subscription,
           stripe_customer_id: session.customer,
-          subscription_status: "active",
+          subscription_status: isTrialing ? "trialing" : "active",
           updated_at: new Date().toISOString(),
         };
+
         if (meta.selected_plan) {
           updates.subscription_plan = meta.selected_plan;
           updates.plan_name = planSlugToLabel(meta.selected_plan);
@@ -382,20 +414,33 @@ serve(async (req) => {
         if (meta.billing_interval) {
           updates.subscription_billing = meta.billing_interval;
         }
-
-        const sub = await stripe.subscriptions.retrieve(session.subscription);
         if (sub.current_period_end) {
           updates.subscription_period_end = new Date(sub.current_period_end * 1000).toISOString();
         }
         if (sub.cancel_at) {
           updates.subscription_cancel_at = new Date(sub.cancel_at * 1000).toISOString();
         }
+        if (sub.trial_end) {
+          updates.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+        }
 
         await updateCompanySubscription(session.customer, updates);
 
         const companyId = await companyLookup(session.customer);
         if (companyId && meta.selected_plan) {
-          await syncCompanyModules(companyId, meta.selected_plan);
+          if (subStatus === 'active' || subStatus === 'trialing') {
+            await syncCompanyModules(companyId, meta.selected_plan);
+          }
+        }
+
+        if (companyId) {
+          await admin.from("admin_activity_log").insert({
+            action: "checkout_completed",
+            description: `Subscription activated via checkout: ${updates.plan_name || meta.selected_plan}`,
+            company_id: companyId,
+            performed_by: meta.user_id || null,
+            metadata: { session_id: session.id, subscription_id: session.subscription },
+          });
         }
       }
     };
@@ -406,12 +451,17 @@ serve(async (req) => {
       await handleInvoice(event.data.object);
     } else if (event.type.startsWith("charge.")) {
       await handleCharge(event.data.object);
-    } else if (event.type.startsWith("refund.")) {
+    } else if (event.type.startsWith("refund.") || event.type.startsWith("charge.refund")) {
       await handleRefund(event.data.object);
     } else if (event.type.startsWith("charge.dispute.")) {
       await handleDispute(event.data.object);
     } else if (event.type.startsWith("customer.subscription.")) {
       await handleSubscriptionEvent(event.data.object, event.type);
+    } else if (event.type === "payment_intent.succeeded" || event.type === "payment_intent.payment_failed") {
+      const pi = event.data.object as any;
+      if (pi.charges?.data?.[0]) {
+        await handleCharge(pi.charges.data[0]);
+      }
     }
 
     await admin
@@ -428,7 +478,7 @@ serve(async (req) => {
       .update({ error: err.message, processed_at: new Date().toISOString() })
       .eq("stripe_event_id", event.id);
 
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "Webhook processing error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

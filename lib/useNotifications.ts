@@ -52,7 +52,7 @@ export function useNotifications(userId: string | null) {
   const [loading, setLoading] = useState(true);
   const [criticalAlert, setCriticalAlert] = useState<Notification | null>(null);
   const pendingCriticals = useRef<Notification[]>([]);
-  const channelRef = useRef<string | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!userId) { setLoading(false); return; }
@@ -76,7 +76,6 @@ export function useNotifications(userId: string | null) {
     if (!userId) return;
 
     const channelName = `notifications-${userId}-${Date.now()}`;
-    channelRef.current = channelName;
 
     const channel = supabase
       .channel(channelName)
@@ -108,9 +107,12 @@ export function useNotifications(userId: string | null) {
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(supabase.channel(channelRef.current));
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
     };
   }, [userId, fetchNotifications]);

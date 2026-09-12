@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAssignmentMatrix } from '@/lib/useAssignmentMatrix';
 import { useGuards } from '@/lib/useGuards';
 import { useSites } from '@/lib/useSites';
@@ -118,37 +119,58 @@ export default function SiteAssignmentClient() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-white">Site Assignment Matrix</h1>
-          <p className="text-sm text-gray-500 mt-1">Guard approvals, training, and site assignments at a glance</p>
-        </div>
-        <button
-          onClick={refetch}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-300 transition-colors cursor-pointer"
-        >
-          <div className="w-4 h-4 flex items-center justify-center">
-            <i className="ri-refresh-line text-sm"></i>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/80 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded">Workforce Deployment</span>
+            <span className="text-[10px] text-gray-500">Step 1 · Eligibility</span>
           </div>
-          Refresh
-        </button>
+          <h1 className="text-2xl font-bold text-white">Site Deployment Eligibility</h1>
+          <p className="text-gray-400 text-sm mt-1">Confirm which guards are cleared for each site, then deploy them in the rota.</p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href="/rotas"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-calendar-event-line"></i></div>
+            Open Rotas
+          </Link>
+          <button
+            onClick={refetch}
+            className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-800 border border-gray-700 text-gray-300 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <i className="ri-refresh-line text-sm"></i>
+            </div>
+            Refresh
+          </button>
+        </div>
       </div>
 
-      <WidgetBoundary widgetName="SiteAssignmentAgent" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
-        <AgentStatusBar
-          agentKey="client_dashboard"
-          loading={agentLoading}
-          error={agentError}
-          data={agentData}
-          onRetry={fetchAgent}
-        />
-      </WidgetBoundary>
+      <div className="bg-[#0a0e1a] border border-gray-800 rounded-xl px-4 py-2.5">
+        <WidgetBoundary widgetName="SiteAssignmentAgent" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
+          <AgentStatusBar
+            agentKey="client_dashboard"
+            loading={agentLoading}
+            error={agentError}
+            data={agentData}
+            onRetry={fetchAgent}
+          />
+        </WidgetBoundary>
+      </div>
 
       <WidgetBoundary widgetName="AssignmentSummaryCards" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
         <SummaryCards {...counts} />
       </WidgetBoundary>
 
-      <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
+      <div className="bg-[#0a0e1a] border border-gray-800 rounded-xl p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 flex items-center justify-center text-gray-400"><i className="ri-filter-3-line"></i></div>
+            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Filters</h2>
+          </div>
+        </div>
         <WidgetBoundary widgetName="AssignmentFilters" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
           <AssignmentFilters
             clients={clientOptions}
@@ -161,7 +183,7 @@ export default function SiteAssignmentClient() {
         </WidgetBoundary>
       </div>
 
-      <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
+      <div className="bg-[#0a0e1a] border border-gray-800 rounded-xl p-4">
         <WidgetBoundary widgetName="AssignmentMatrix" pagePath="/dashboard/site-assignments" clientId={companyId || undefined} userId={profile?.id || undefined}>
           <AssignmentMatrix rows={rows} columns={columns} filters={filters} onCellClick={handleCellClick} />
         </WidgetBoundary>

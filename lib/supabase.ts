@@ -1,4 +1,5 @@
 import { createClient as _createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,7 +11,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   });
 }
 
-export const supabase = _createClient(
+export const supabase = _createClient<Database>(
   SUPABASE_URL || "https://example.supabase.co",
   SUPABASE_KEY || "missing-anon-key"
 );

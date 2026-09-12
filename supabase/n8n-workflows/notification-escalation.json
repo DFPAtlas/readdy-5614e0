@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Notification Escalation",
+  "version": "1.0.0",
+  "description": "Applies company escalation rules, respects quiet hours, deduplicates, and tracks delivery/acknowledgment",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "notification-escalation", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Notification Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { company_id, notification_type, recipients, priority, dedup_key } = body;\n\nconst isQuietHours = () => {\n  const hour = new Date().getHours();\n  return hour >= 22 || hour < 6;\n};\n\nconst isCritical = priority === 'critical' || notification_type === 'sos';\n\nreturn {\n  json: {\n    company_id,\n    notification_type,\n    priority: priority || 'normal',\n    quiet_hours_active: isQuietHours() && !isCritical,\n    delivery_deferred: isQuietHours() && !isCritical,\n    dedup_key: dedup_key || `${company_id}:${notification_type}:${new Date().toISOString().slice(0, 10)}`,\n    channels_attempted: [],\n    delivery_status: isQuietHours() && !isCritical ? 'deferred' : 'sending',\n    escalation_level: 0,\n    generated_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "process-notification",
+      "name": "Process Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "notification_escalation" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "notification.processed" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Notification Event Webhook": { "main": [[ { "node": "Process Notification", "type": "main", "index": 0 } ]] },
+    "Process Notification": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

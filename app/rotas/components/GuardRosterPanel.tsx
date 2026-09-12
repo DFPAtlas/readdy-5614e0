@@ -56,7 +56,7 @@ export default function GuardRosterPanel({
   })();
 
   return (
-    <div className={`bg-[#151b27] border-r border-gray-800 flex flex-col transition-all duration-200 ${collapsed ? 'w-14' : 'w-72'}`}>
+    <div className={`bg-[#151b27] border border-gray-800 rounded-xl flex flex-col transition-all duration-200 overflow-hidden ${collapsed ? 'w-14' : 'w-full'}`}>
       <button
         onClick={onToggleCollapse}
         className="flex items-center gap-2 px-3 py-3 border-b border-gray-800 hover:bg-gray-800/30 transition-colors cursor-pointer"

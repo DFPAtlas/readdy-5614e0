@@ -9,11 +9,13 @@ interface AgentInfo {
   description: string | null;
   webhook_path: string;
   is_active: boolean;
+  category?: string;
+  risk_level?: string;
+  requires_approval?: boolean;
+  version?: string;
 }
 
 interface AgentCallContext {
-  clientId?: string | null;
-  userId?: string | null;
   siteId?: string | null;
   guardId?: string | null;
   requestedPage?: string | null;
@@ -25,6 +27,8 @@ interface AgentCallResult {
   data: any;
   error: string | null;
   logId: string | null;
+  approvalRequired?: boolean;
+  approvalId?: string | null;
 }
 
 let cachedAgents: AgentInfo[] | null = null;
@@ -52,6 +56,7 @@ export function clearAgentCache() {
 
 export async function callAgent(
   agentKey: string,
+  eventType: string,
   payload: Record<string, any> = {},
   context: AgentCallContext = {}
 ): Promise<AgentCallResult> {
@@ -62,100 +67,91 @@ export async function callAgent(
     return { success: false, data: null, error: `Agent "${agentKey}" not registered`, logId: null };
   }
 
-  const logPayload = {
-    agent_key: agentKey,
-    client_id: context.clientId || null,
-    user_id: context.userId || null,
-    site_id: context.siteId || null,
-    guard_id: context.guardId || null,
-    requested_page: context.requestedPage || null,
-    requested_feature: context.requestedFeature || null,
-    status: 'pending',
-    request_payload: payload,
-    source: 'guardianhub_web_app',
-  };
-
-  const { data: inserted } = await supabase
-    .from('agent_execution_logs')
-    .insert(logPayload)
-    .select('id')
-    .maybeSingle();
-
-  const logId = inserted?.id || null;
+  const idempotencyKey = `${agentKey}:${eventType}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
   try {
-    const baseUrl = (process.env.NEXT_PUBLIC_N8N_GUARDIANHUB_BASE_URL || '').trim();
-    if (!baseUrl) {
-      if (logId) {
-        await supabase
-          .from('agent_execution_logs')
-          .update({ status: 'skipped', error_message: 'N8N base URL not configured' })
-          .eq('id', logId);
-      }
-      return { success: false, data: null, error: 'N8N not configured — set NEXT_PUBLIC_N8N_GUARDIANHUB_BASE_URL', logId };
-    }
-
-    const webhookUrl = `${baseUrl}${agent.webhook_path}`;
-
-    const enrichedPayload = {
-      ...payload,
-      source: 'guardianhub_web_app',
-      client_id: context.clientId,
-      user_id: context.userId,
-      site_id: context.siteId,
-      guard_id: context.guardId,
-      agent_key: agentKey,
-      timestamp: new Date().toISOString(),
-    };
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(enrichedPayload),
+    const { data, error } = await supabase.functions.invoke('automation-gateway', {
+      body: {
+        agent_key: agentKey,
+        event_type: eventType,
+        payload: {
+          ...payload,
+          site_id: context.siteId,
+          guard_id: context.guardId,
+          requested_page: context.requestedPage,
+          requested_feature: context.requestedFeature,
+        },
+        idempotency_key: idempotencyKey,
+      },
     });
 
-    let responseData: any = null;
-    const responseText = await response.text();
-    try {
-      responseData = JSON.parse(responseText);
-    } catch {
-      responseData = { raw: responseText };
+    if (error) {
+      return {
+        success: false,
+        data: null,
+        error: error.message || 'Gateway invocation failed',
+        logId: null,
+      };
     }
 
-    if (logId) {
-      await supabase
-        .from('agent_execution_logs')
-        .update({
-          status: response.ok ? 'success' : 'failed',
-          response_payload: responseData,
-          error_message: response.ok ? null : `HTTP ${response.status}: ${responseText.slice(0, 500)}`,
-        })
-        .eq('id', logId);
+    if (data?.status === 'approval_required') {
+      return {
+        success: false,
+        data: data,
+        error: 'Approval required for this action',
+        logId: null,
+        approvalRequired: true,
+        approvalId: data.approval_id,
+      };
     }
 
     return {
-      success: response.ok,
-      data: responseData,
-      error: response.ok ? null : `HTTP ${response.status}`,
-      logId,
+      success: data?.success === true,
+      data: data?.data || data,
+      error: data?.success === true ? null : (data?.error || 'Agent returned an error'),
+      logId: data?.run_id || null,
     };
   } catch (err: any) {
-    if (logId) {
-      await supabase
-        .from('agent_execution_logs')
-        .update({
-          status: 'failed',
-          error_message: err.message || 'Network error',
-        })
-        .eq('id', logId);
-    }
-
     return {
       success: false,
       data: null,
       error: err.message || 'Network error',
-      logId,
+      logId: null,
     };
+  }
+}
+
+export async function callAgentWithApproval(
+  agentKey: string,
+  eventType: string,
+  approvalId: string,
+  payload: Record<string, any> = {}
+): Promise<AgentCallResult> {
+  try {
+    const { data, error } = await supabase.functions.invoke('automation-gateway', {
+      body: {
+        agent_key: agentKey,
+        event_type: eventType,
+        payload: {
+          ...payload,
+          approval_id: approvalId,
+          pre_approved: true,
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, data: null, error: error.message, logId: null };
+    }
+
+    return {
+      success: data?.success === true,
+      data: data?.data || data,
+      error: data?.success === true ? null : (data?.error || 'Agent returned an error'),
+      logId: data?.run_id || null,
+    };
+  } catch (err: any) {
+    return { success: false, data: null, error: err.message, logId: null };
   }
 }
 
@@ -163,14 +159,15 @@ export async function logWebhookEvent(
   agentKey: string,
   eventType: string,
   eventPayload: Record<string, any>,
-  clientId?: string | null
+  companyId?: string | null
 ): Promise<void> {
   await supabase.from('agent_webhook_events').insert({
     agent_key: agentKey,
-    client_id: clientId || null,
+    company_id: companyId || null,
     event_type: eventType,
     event_payload: eventPayload,
     processed: false,
+    status: 'pending',
   });
 }
 

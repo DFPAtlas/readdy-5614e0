@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 import SwipeableItem from '../components/SwipeableItem';
 import GuardBottomNav from '../components/GuardBottomNav';
 
@@ -19,32 +18,18 @@ interface ReportItem {
 }
 
 export default function GuardReportsPage() {
-  const { currentUser, profile, company, isLoading: authLoading } = useAuth();
-  const router = useRouter();
+  const g = useGuardAuth();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'incident' | 'patrol' | 'ob'>('all');
 
-  useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.replace('/login/guard');
-    }
-    if (!authLoading && profile && profile.role !== 'guard') {
-      router.replace('/dashboard');
-    }
-  }, [currentUser, profile, authLoading, router]);
-
   const loadReports = useCallback(async () => {
-    if (!currentUser || !company?.id) { setLoading(false); return; }
-
-    const { data: guardData } = await supabase.from('guards').select('id').eq('user_id', currentUser.id).maybeSingle();
-    const guardId = guardData?.id;
-    if (!guardId) { setLoading(false); return; }
+    if (!g.guardId || !g.companyId) { setLoading(false); return; }
 
     const [incidentsRes, patrolsRes, obRes] = await Promise.all([
-      supabase.from('incidents').select('id, incident_type, description, site:sites!inner(site_name), created_at, status, severity').eq('guard_id', guardId).order('created_at', { ascending: false }).limit(25),
-      supabase.from('patrol_logs').select('id, status, checkpoints_total, checkpoints_completed, site:sites!inner(site_name), start_time, end_time').eq('guard_id', guardId).order('start_time', { ascending: false }).limit(15),
-      supabase.from('occurrence_books').select('id, entry_type, entry, site:sites!inner(site_name), created_at').eq('guard_id', guardId).order('created_at', { ascending: false }).limit(15),
+      supabase.from('incidents').select('id, incident_type, description, site:sites!inner(site_name), created_at, status, severity').eq('guard_id', g.guardId).eq('company_id', g.companyId).order('created_at', { ascending: false }).limit(25),
+      supabase.from('patrol_logs').select('id, status, checkpoints_total, checkpoints_completed, site:sites!inner(site_name), start_time, end_time').eq('guard_id', g.guardId).eq('company_id', g.companyId).order('start_time', { ascending: false }).limit(15),
+      supabase.from('occurrence_books').select('id, entry_type, entry, site:sites!inner(site_name), created_at').eq('guard_id', g.guardId).eq('company_id', g.companyId).order('created_at', { ascending: false }).limit(15),
     ]);
 
     const items: ReportItem[] = [];
@@ -91,11 +76,11 @@ export default function GuardReportsPage() {
     items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setReports(items);
     setLoading(false);
-  }, [currentUser, company?.id]);
+  }, [g.guardId, g.companyId]);
 
   useEffect(() => {
-    if (currentUser) loadReports();
-  }, [currentUser, loadReports]);
+    if (g.guardId) loadReports();
+  }, [g.guardId, loadReports]);
 
   const filtered = filter === 'all' ? reports : reports.filter((r) => r.type === filter);
 
@@ -123,7 +108,7 @@ export default function GuardReportsPage() {
     return 'bg-amber-500/5 border-amber-500/10';
   };
 
-  if (authLoading || !currentUser) {
+  if (g.loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <i className="ri-loader-4-line animate-spin text-[#3b82f6] text-2xl"></i>
@@ -139,7 +124,6 @@ export default function GuardReportsPage() {
           <p className="text-sm text-gray-400 mt-1">Your activity log</p>
         </div>
 
-        {/* Filter Pills */}
         <div className="flex gap-2 px-4 py-2 overflow-x-auto">
           {([
             { key: 'all', label: 'All' },
@@ -161,7 +145,6 @@ export default function GuardReportsPage() {
           ))}
         </div>
 
-        {/* Report List */}
         <div className="px-4 py-3 space-y-2">
           {loading ? (
             <div className="flex justify-center py-12">

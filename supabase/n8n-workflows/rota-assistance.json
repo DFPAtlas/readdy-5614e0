@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Rota Assistance",
+  "version": "1.0.0",
+  "description": "Ranks eligible guards for rota slots using hard rules first, then scoring. Requires human approval for assignments.",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "rota-assistance", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Rota Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { site_id, shift_date, shift_type_id, company_id, required_skills } = body;\n\nreturn {\n  json: {\n    site_id,\n    shift_date,\n    shift_type_id,\n    company_id,\n    eligible_guards: [],\n    ranked_guards: [],\n    hard_requirements: required_skills || [],\n    conflicts_detected: [],\n    recommendation: 'No eligible guards found - manual scheduling required',\n    requires_approval: true,\n    generated_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "rank-guards",
+      "name": "Rank Eligible Guards",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "rota_assistance" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "rota.assistance_complete" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Rota Request Webhook": { "main": [[ { "node": "Rank Eligible Guards", "type": "main", "index": 0 } ]] },
+    "Rank Eligible Guards": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

@@ -1,10 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { getRoleHome, getOnboardingRoute } from '@/lib/redirect';
+import { checkAccountAccess } from '@/lib/accountStatus';
+import type { UserRole } from '@/lib/types';
 
-export type UserRole = 'super_admin' | 'company_admin' | 'operations_manager' | 'guard' | 'client';
+export type { UserRole };
 
 interface Profile {
   id: string;
@@ -53,35 +56,23 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   user: any | null;
   session: any | null;
+  refreshCompany: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_ROUTES = [
-  '/',
-  '/about',
-  '/platform',
-  '/solutions',
-  '/pricing',
-  '/contact',
-  '/demo',
-  '/terms',
-  '/privacy',
-  '/gdpr',
-  '/cookies',
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/ops/login',
-  '/ops/signup',
-  '/setup-super-admin',
-  '/dashboard/setup',
-  '/auth/callback',
-];
+function isPublicRoute(path: string | null): boolean {
+  if (!path) return false;
+  const routes = [
+    '/', '/about', '/platform', '/solutions', '/pricing', '/contact',
+    '/demo', '/terms', '/privacy', '/gdpr', '/cookies',
+    '/login', '/signup', '/forgot-password', '/reset-password', '/recovery',
+    '/ops/login', '/ops/signup', '/setup-super-admin', '/auth/callback',
+  ];
+  return routes.some((r) => path === r || path.startsWith(r + '/'));
+}
 
-const GUARD_ROUTES = ['/guard'];
-const CLIENT_ROUTES = ['/client'];
+export { isPublicRoute };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -92,126 +83,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
-  const [routerReady, setRouterReady] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const redirectRef = useRef(false);
-  const loadingRef = useRef(false);
+  const initializedRef = useRef(false);
+  const profileLoadingRef = useRef(false);
+  const redirectingRef = useRef(false);
 
-  const isPublicRoute = (path: string | null) => {
-    if (!path) return false;
-    return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(route + '/'));
-  };
-
-  const getHomeRoute = (userRole: UserRole | null, onboardingStatus?: string | null) => {
-    if (!userRole) return '/login';
-    if (userRole === 'super_admin') return '/admin';
-    if (['company_admin', 'operations_manager'].includes(userRole)) {
-      if (onboardingStatus && onboardingStatus !== 'completed') return '/dashboard/setup-wizard';
-      return '/dashboard';
-    }
-    if (userRole === 'guard') return '/guard';
-    if (userRole === 'client') return '/client';
-    return '/dashboard';
-  };
-
-  const canAccessRoute = (userRole: UserRole | null, path: string | null) => {
-    if (!userRole || !path) return false;
-    if (path.startsWith('/admin') && userRole !== 'super_admin') return false;
-    if (path.startsWith('/super-admin') && userRole !== 'super_admin') return false;
-    if (userRole === 'super_admin') {
-      return path.startsWith('/admin') || path.startsWith('/super-admin') || !path.startsWith('/admin');
-    }
-    if (['company_admin', 'operations_manager'].includes(userRole)) {
-      return true;
-    }
-    if (userRole === 'guard') {
-      return GUARD_ROUTES.some((r) => path === r || path.startsWith(r + '/')) || isPublicRoute(path);
-    }
-    if (userRole === 'client') {
-      return CLIENT_ROUTES.some((r) => path === r || path.startsWith(r + '/')) || isPublicRoute(path);
-    }
-    return isPublicRoute(path);
-  };
-
-  useEffect(() => {
-    setRouterReady(true);
-  }, []);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const { data: { session: sess } } = await supabase.auth.getSession();
-        setSession(sess);
-        if (sess?.user) {
-          await loadUserProfile(sess.user.id);
-        }
-      } catch (err: any) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('[Auth] initAuth error:', err);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      if (sess?.user) {
-        loadUserProfile(sess.user.id);
-      } else {
-        loadingRef.current = false;
-        setCurrentUser(null);
-        setUser(null);
-        setProfile(null);
-        setCompany(null);
-        setCompanyId(null);
-        setRole(null);
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (isLoading) return;
-    if (!routerReady) return;
-    if (currentUser && profile && canAccessRoute(profile.role, pathname)) {
-      redirectRef.current = false;
-      if (['company_admin', 'operations_manager'].includes(profile.role) &&
-          company?.onboarding_status && company.onboarding_status !== 'completed' &&
-          !pathname.startsWith('/dashboard/setup') && !pathname.startsWith('/dashboard/setup-wizard') &&
-          pathname !== '/pricing' && pathname !== '/checkout/success' && pathname !== '/checkout/cancel') {
-        redirectRef.current = true;
-        setTimeout(() => {
-          try { router.push('/dashboard/setup-wizard'); } catch { window.location.href = '/dashboard/setup-wizard'; }
-        });
-        return;
-      }
-      return;
-    }
-    if (redirectRef.current) return;
-    if (!currentUser && !isPublicRoute(pathname)) {
-      redirectRef.current = true;
-      setTimeout(() => {
-        try { router.push('/login'); } catch { window.location.href = '/login'; }
-      });
-      return;
-    }
-    if (currentUser && profile && !canAccessRoute(profile.role, pathname)) {
-      const home = getHomeRoute(profile.role, company?.onboarding_status);
-      redirectRef.current = true;
-      setTimeout(() => {
-        try { router.push(home); } catch { window.location.href = home; }
-      });
-    }
-  }, [currentUser, profile, isLoading, pathname, company, routerReady]);
-
-  const loadUserProfile = async (userId: string) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
+  const loadUserProfile = useCallback(async (userId: string) => {
+    if (profileLoadingRef.current) return;
+    profileLoadingRef.current = true;
     setIsLoading(true);
     try {
       const { data: userData } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
@@ -241,9 +121,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       setUser(enrichedUser);
     } catch (err: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Auth] loadUserProfile error:', err);
-      }
       setProfile(null);
       setCompany(null);
       setCompanyId(null);
@@ -251,14 +128,153 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(null);
       setUser(null);
     } finally {
-      loadingRef.current = false;
+      profileLoadingRef.current = false;
       setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    const init = async () => {
+      try {
+        const { data: { session: sess } } = await supabase.auth.getSession();
+        setSession(sess);
+        if (sess?.user) {
+          await loadUserProfile(sess.user.id);
+        } else {
+          setIsLoading(false);
+        }
+      } catch {
+        setIsLoading(false);
+      }
+    };
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+      setSession(sess);
+      if (sess?.user) {
+        await loadUserProfile(sess.user.id);
+      } else {
+        profileLoadingRef.current = false;
+        setCurrentUser(null);
+        setUser(null);
+        setProfile(null);
+        setCompany(null);
+        setCompanyId(null);
+        setRole(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadUserProfile]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (redirectingRef.current) return;
+
+    const currentPath = pathname;
+
+    if (!currentUser || !profile) {
+      if (!isPublicRoute(currentPath)) {
+        redirectingRef.current = true;
+        router.replace('/login');
+      }
+      return;
+    }
+
+    const accountCheck = checkAccountAccess(profile.status, company?.account_status);
+    if (!accountCheck.allowed) {
+      redirectingRef.current = true;
+      signOut().catch(() => {});
+      return;
+    }
+
+    const homeRoute = getRoleHome(profile.role);
+    const onboardingRoute = getOnboardingRoute(profile.role, company?.onboarding_status);
+
+    if (isPublicRoute(currentPath)) {
+      if (currentPath.startsWith('/login') || currentPath.startsWith('/ops/login')) {
+        if (onboardingRoute) {
+          redirectingRef.current = true;
+          router.replace(onboardingRoute);
+        } else {
+          redirectingRef.current = true;
+          router.replace(homeRoute);
+        }
+      }
+      return;
+    }
+
+    if (profile.role === 'super_admin' && !currentPath.startsWith('/admin') && !currentPath.startsWith('/super-admin')) {
+      redirectingRef.current = true;
+      router.replace('/admin');
+      return;
+    }
+
+    if (['company_admin', 'operations_manager'].includes(profile.role)) {
+      if (onboardingRoute && !currentPath.startsWith('/dashboard/setup-wizard') && currentPath !== '/pricing' && currentPath !== '/checkout/success' && currentPath !== '/checkout/cancel') {
+        redirectingRef.current = true;
+        router.replace(onboardingRoute);
+        return;
+      }
+      if (currentPath.startsWith('/guard')) {
+        redirectingRef.current = true;
+        router.replace(homeRoute);
+        return;
+      }
+      if (currentPath.startsWith('/client') && !currentPath.startsWith('/client/signup')) {
+        redirectingRef.current = true;
+        router.replace(homeRoute);
+        return;
+      }
+    }
+
+    if (profile.role === 'guard') {
+      if (!currentPath.startsWith('/guard') && !isPublicRoute(currentPath)) {
+        redirectingRef.current = true;
+        router.replace('/guard');
+      }
+    }
+
+    if (profile.role === 'client') {
+      if (!currentPath.startsWith('/client') && !isPublicRoute(currentPath)) {
+        redirectingRef.current = true;
+        router.replace('/client');
+      }
+    }
+  }, [currentUser, profile, isLoading, pathname, company, router]);
+
+  const refreshCompany = async () => {
+    if (!profile?.company_id) return;
+    const { data: companyData } = await supabase.from('companies').select('*').eq('id', profile.company_id).maybeSingle();
+    if (companyData) {
+      setCompany(companyData as Company);
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    redirectingRef.current = false;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error };
+
+    if (data?.user) {
+      const { data: userData } = await supabase.from('users').select('id, role, status').eq('id', data.user.id).maybeSingle();
+
+      if (!userData) {
+        await supabase.auth.signOut();
+        return { error: new Error('Account not found. Please contact support.') };
+      }
+
+      if (userData.status === 'suspended' || userData.status === 'removed') {
+        await supabase.auth.signOut();
+        return { error: new Error('Your account is not active. Please contact your administrator.') };
+      }
+    }
+
+    return { error: null };
   };
 
   const signUp = async (
@@ -291,37 +307,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       );
       result = await rawResponse.json();
-    } catch (networkErr: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Signup] Network/parse error:', networkErr);
-      }
+    } catch {
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
 
     if (!rawResponse?.ok || result.error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Signup] Edge function error:', result.error, result.code);
-      }
       return { error: new Error(result.error || 'Profile setup failed. Please contact support.') };
     }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Signup] Auto-login error:', signInError.message);
-      }
       return { error: signInError };
     }
 
     const { data: userData } = await supabase.from('users').select('*').eq('id', result.userId).maybeSingle();
     if (!userData) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Signup] public.users insert failed — no profile row found after signup. UserId:', result.userId);
-      }
       await supabase.auth.signOut();
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
 
+    redirectingRef.current = false;
     return { error: null };
   };
 
@@ -355,41 +360,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       );
       result = await rawResponse.json();
-    } catch (networkErr: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Client Signup] Network/parse error:', networkErr);
-      }
+    } catch {
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
 
     if (!rawResponse?.ok || result.error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Client Signup] Edge function error:', result.error, result.code);
-      }
       return { error: new Error(result.error || 'Profile setup failed. Please contact support.') };
     }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Client Signup] Auto-login error:', signInError.message);
-      }
       return { error: signInError };
     }
 
     const { data: userData } = await supabase.from('users').select('*').eq('id', result.userId).maybeSingle();
     if (!userData) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Client Signup] public.users insert failed — no profile row found after signup. UserId:', result.userId);
-      }
       await supabase.auth.signOut();
       return { error: new Error('Profile setup failed. Please contact support.') };
     }
 
+    redirectingRef.current = false;
     return { error: null };
   };
 
   const signOut = async () => {
+    redirectingRef.current = true;
     await supabase.auth.signOut();
     setCurrentUser(null);
     setUser(null);
@@ -398,13 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCompanyId(null);
     setRole(null);
     setSession(null);
-    setTimeout(() => {
-      try {
-        router.push('/');
-      } catch {
-        window.location.href = '/';
-      }
-    });
+    router.push('/');
   };
 
   return (
@@ -422,6 +411,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signOut,
         user,
         session,
+        refreshCompany,
       }}
     >
       {children}

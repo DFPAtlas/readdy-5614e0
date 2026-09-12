@@ -6,12 +6,13 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { format, subDays, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 
-interface WeeklyReport {
+export interface WeeklyReport {
   id: string;
   title: string;
   file_url: string;
   report_type: string;
   status: string;
+  client_visible: boolean;
   generated_at: string;
   period_start: string;
   period_end: string;
@@ -43,7 +44,7 @@ export default function WeeklyReportsClient() {
     setLoading(true);
     const { data, error } = await supabase
       .from('reports')
-      .select('id, title, file_url, report_type, status, generated_at, period_start, period_end, ai_summary, site_id, sites:site_id(site_name)')
+      .select('id, title, file_url, report_type, status, client_visible, generated_at, period_start, period_end, ai_summary, site_id, sites:site_id(site_name)')
       .eq('company_id', companyId)
       .eq('report_type', 'weekly_site')
       .eq('status', tab)
@@ -78,9 +79,9 @@ export default function WeeklyReportsClient() {
   };
 
   const handleApprove = async (id: string) => {
-    const { error } = await supabase.from('reports').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await supabase.from('reports').update({ status: 'sent', client_visible: true, sent_at: new Date().toISOString() }).eq('id', id);
     if (!error) {
-      setToast('Report approved and marked as sent');
+      setToast('Report approved and marked as sent (client-visible)');
       fetchReports();
     } else {
       setToast('Failed to approve');
@@ -130,6 +131,17 @@ export default function WeeklyReportsClient() {
       setToast('Failed to generate');
     }
     setGenLoading(null);
+  };
+
+  const handleToggleClientVisible = async (r: WeeklyReport) => {
+    const newVal = !r.client_visible;
+    const { error } = await supabase.from('reports').update({ client_visible: newVal }).eq('id', r.id);
+    if (!error) {
+      setToast(newVal ? 'Report marked client-visible' : 'Report hidden from client');
+      fetchReports();
+    } else {
+      setToast('Failed to update');
+    }
   };
 
   const filtered = reports.filter((r) => {
@@ -280,6 +292,19 @@ export default function WeeklyReportsClient() {
                       <div className="w-4 h-4 flex items-center justify-center"><i className="ri-eye-line"></i></div>
                       Preview
                     </a>
+                    <button
+                      onClick={() => handleToggleClientVisible(r)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                        r.client_visible
+                          ? 'bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400'
+                          : 'bg-gray-800 hover:bg-gray-700 text-gray-500'
+                      }`}
+                    >
+                      <div className="w-4 h-4 flex items-center justify-center">
+                        <i className={r.client_visible ? 'ri-eye-line' : 'ri-eye-off-line'}></i>
+                      </div>
+                      {r.client_visible ? 'Visible to client' : 'Hidden'}
+                    </button>
                     {r.status === 'draft' && (
                       <>
                         <button

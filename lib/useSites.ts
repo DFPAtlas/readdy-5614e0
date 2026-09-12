@@ -30,6 +30,9 @@ export interface Site {
   emergency_contact?: string | null;
   patrol_enabled?: boolean | null;
   patrol_interval?: number | null;
+  status?: string | null;
+  site_type?: string | null;
+  postcode?: string | null;
 }
 
 export function useSites() {

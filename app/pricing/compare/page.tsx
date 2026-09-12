@@ -533,7 +533,7 @@ export default function ComparePage() {
                   Ready to choose your plan?
                 </h3>
                 <p className="text-gray-400 text-lg mb-10 max-w-xl mx-auto">
-                  Start with a 14-day free trial on Sentinel or Command. No credit card required.
+                  Start with a 15-day free trial on any plan. No credit card required.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link

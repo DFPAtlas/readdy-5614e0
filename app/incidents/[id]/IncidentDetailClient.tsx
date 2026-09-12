@@ -55,6 +55,28 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
     setSaving(false);
   };
 
+  const handleClientVisibleToggle = async () => {
+    if (!incident) return;
+    setSaving(true);
+    const { error } = await updateIncident({ client_visible: !incident.client_visible });
+    if (!error) {
+      setToast(`Client visibility ${!incident.client_visible ? 'enabled' : 'disabled'}`);
+      refetch();
+    } else setToast('Failed to update client visibility');
+    setSaving(false);
+  };
+
+  const handleFollowUpToggle = async () => {
+    if (!incident) return;
+    setSaving(true);
+    const { error } = await updateIncident({ requires_follow_up: !incident.requires_follow_up });
+    if (!error) {
+      setToast(`Follow-up ${!incident.requires_follow_up ? 'required' : 'not required'}`);
+      refetch();
+    } else setToast('Failed to update follow-up');
+    setSaving(false);
+  };
+
   const handleEscalate = async () => {
     setSaving(true);
     const { error } = await updateIncident({ severity: 'critical', status: 'reviewing' });
@@ -95,8 +117,8 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
         setToast(`Failed to upload ${file.name}`);
         continue;
       }
-      const { data: urlData } = supabase.storage.from('incident-media').getPublicUrl(path);
-      await addMedia(urlData.publicUrl, file.type.startsWith('video') ? 'video' : 'image', file.name);
+      const { data: signedUrl } = await supabase.storage.from('incident-media').createSignedUrl(path, 60 * 60 * 24 * 7);
+      await addMedia(signedUrl?.signedUrl || path, file.type.startsWith('video') ? 'video' : 'image', file.name, path);
       setUploadProgress(((i + 1) / files.length) * 100);
     }
     setToast('Evidence uploaded');
@@ -163,7 +185,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className={`w-3 h-3 rounded-full ${sevColor.dot}`}></div>
-              <h1 className="text-2xl font-bold text-white">{incident.incident_type || 'Incident'}</h1>
+              <h1 className="text-2xl font-bold text-white">{incident.title || incident.incident_type || 'Incident'}</h1>
               <IncidentStatusBadge status={incident.status} />
             </div>
             <p className="text-sm text-gray-400">{incident.site_name || 'Unknown site'}</p>
@@ -218,6 +240,10 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
               {/* Quick facts */}
               <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
+                  <div className="text-xs text-gray-500 mb-0.5">Incident #</div>
+                  <div className="text-sm font-medium text-white">{incident.incident_number || '—'}</div>
+                </div>
+                <div>
                   <div className="text-xs text-gray-500 mb-0.5">Site</div>
                   <Link href={`/sites`} className="text-sm font-medium text-white hover:text-blue-400 transition-colors">
                     {incident.site_name || '—'}
@@ -234,10 +260,26 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
                   </div>
                 </div>
                 <div>
+                  <div className="text-xs text-gray-500 mb-0.5">Location</div>
+                  <div className="text-sm font-medium text-white">{incident.location || incident.site_name || '—'}</div>
+                </div>
+                <div>
                   <div className="text-xs text-gray-500 mb-0.5">Logged</div>
                   <div className="text-sm text-gray-300 tabular-nums">
-                    {incident.created_at ? format(new Date(incident.created_at), 'd MMM yyyy, HH:mm') : '—'}
+                    {incident.reported_at ? format(new Date(incident.reported_at), 'd MMM yyyy, HH:mm') : incident.created_at ? format(new Date(incident.created_at), 'd MMM yyyy, HH:mm') : '—'}
                   </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-0.5">Client Visible</div>
+                  <span className={`text-xs px-2 py-0.5 rounded border font-medium ${incident.client_visible ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-gray-500/10 border-gray-500/20 text-gray-400'}`}>
+                    {incident.client_visible ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-0.5">Follow-up</div>
+                  <span className={`text-xs px-2 py-0.5 rounded border font-medium ${incident.requires_follow_up ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-gray-500/10 border-gray-500/20 text-gray-400'}`}>
+                    {incident.requires_follow_up ? (incident.follow_up_status || 'Pending') : 'None'}
+                  </span>
                 </div>
               </div>
 
@@ -415,6 +457,48 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
                 <option value="high">High</option>
                 <option value="critical">Critical</option>
               </select>
+            </div>
+          </div>
+
+          {/* Visibility & Follow-up */}
+          <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Client Portal</h3>
+            <button
+              onClick={handleClientVisibleToggle}
+              disabled={saving}
+              className={`w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center justify-between ${
+                incident.client_visible
+                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-gray-800/40 border border-gray-700 text-gray-400 hover:bg-gray-700/40'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <i className={incident.client_visible ? 'ri-eye-line' : 'ri-eye-off-line'}></i>
+                </div>
+                Client Visible
+              </span>
+              <span className="text-xs">{incident.client_visible ? 'ON' : 'OFF'}</span>
+            </button>
+            <button
+              onClick={handleFollowUpToggle}
+              disabled={saving}
+              className={`w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center justify-between ${
+                incident.requires_follow_up
+                  ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20'
+                  : 'bg-gray-800/40 border border-gray-700 text-gray-400 hover:bg-gray-700/40'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <i className="ri-task-line"></i>
+                </div>
+                Requires Follow-up
+              </span>
+              <span className="text-xs">{incident.requires_follow_up ? 'YES' : 'NO'}</span>
+            </button>
+            <div className="text-xs text-gray-500 pt-1">
+              Evidence linked: <span className="text-white font-medium">{incident.linked_evidence_count ?? incident.media.length}</span>
             </div>
           </div>
 

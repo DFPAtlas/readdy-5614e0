@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
-import { format, subDays, startOfWeek, endOfWeek, parseISO } from 'date-fns';
+import { format, subDays, subWeeks, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import GlassCard from '@/app/components/GlassCard';
 import { useSites } from '@/lib/useSites';
 import SummaryCards from './SummaryCards';
@@ -104,7 +104,7 @@ export default function ReportBuilder({ onPreview, onExportPDF, onExportCSV, onE
     let incidentsQuery = supabase.from('incidents').select('id, name, status, severity, occurred_at, resolved_at, site_id').eq('company_id', companyId).gte('occurred_at', fromISO).lte('occurred_at', toISO);
     if (selectedSite) incidentsQuery = incidentsQuery.eq('site_id', selectedSite);
 
-    let obQuery = supabase.from('occurrence_books').select('id, site_id, entry_type, entry, occurred_at, created_at').eq('company_id', companyId).gte('created_at', fromISO).lte('created_at', toISO);
+    let obQuery = supabase.from('occurrence_books').select('id, site_id, entry_type, entry, title, occurred_at, created_at, client_visible').eq('company_id', companyId).eq('client_visible', true).gte('created_at', fromISO).lte('created_at', toISO);
     if (selectedSite) obQuery = obQuery.eq('site_id', selectedSite);
 
     let welfareQuery = supabase.from('lone_worker_checkins').select('id, guard_id, checked_in_at, method, note, lat, lng').eq('company_id', companyId).gte('checked_in_at', fromISO).lte('checked_in_at', toISO);

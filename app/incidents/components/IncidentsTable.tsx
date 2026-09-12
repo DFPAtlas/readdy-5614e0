@@ -72,7 +72,7 @@ export default function IncidentsTable({
           <i className="ri-alarm-warning-line text-2xl"></i>
         </div>
         <p className="text-gray-400 text-sm">
-          {search.trim() ? 'No incidents match your filters.' : 'No incidents yet. Log one to get started.'}
+          {search.trim() ? 'No incidents match the current filters.' : 'No incidents found.'}
         </p>
       </div>
     );
@@ -84,6 +84,7 @@ export default function IncidentsTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-800">
+              <th className="w-1 px-0 py-0"></th>
               {headers.map((h) => (
                 <th
                   key={h.key}
@@ -125,7 +126,10 @@ export default function IncidentsTable({
                   onClick={() => onView(incident)}
                   className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors cursor-pointer"
                 >
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="pl-3 pr-0 py-0">
+                    <div className={`w-1 h-full min-h-[3rem] ${dotColor}`}></div>
+                  </td>
+                  <td className="px-2 py-3 whitespace-nowrap">
                     <SeverityBadge severity={incident.severity} />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-white font-medium">

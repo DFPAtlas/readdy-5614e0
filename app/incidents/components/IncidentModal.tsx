@@ -10,19 +10,31 @@ interface Props {
   saving: boolean;
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 pt-1">{children}</div>
+  );
+}
+
 export default function IncidentModal({ editingIncident, onSave, onClose, saving }: Props) {
   const { companyId } = useAuth();
   const [sites, setSites] = useState<{ id: string; site_name: string }[]>([]);
   const [guards, setGuards] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+  const [shifts, setShifts] = useState<{ id: string; guard_id: string; site_id: string; start_time: string; end_time: string }[]>([]);
 
   const [siteId, setSiteId] = useState('');
   const [guardId, setGuardId] = useState('');
+  const [shiftId, setShiftId] = useState('');
   const [incidentType, setIncidentType] = useState('');
   const [severity, setSeverity] = useState('medium');
+  const [title, setTitle] = useState('');
   const [occurredAt, setOccurredAt] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
   const [status, setStatus] = useState('open');
-  const [errors, setErrors] = useState<Record<string, string>>();
+  const [clientVisible, setClientVisible] = useState(true);
+  const [requiresFollowUp, setRequiresFollowUp] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!companyId) return;
@@ -32,25 +44,39 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
     supabase.from('guards').select('id, first_name, last_name').eq('company_id', companyId).eq('status', 'active').order('first_name').then(({ data }) => {
       if (data) setGuards(data);
     });
+    const now = new Date().toISOString();
+    supabase.from('shifts').select('id, guard_id, site_id, start_time, end_time').eq('company_id', companyId).lte('start_time', now).gte('end_time', now).order('start_time').then(({ data }) => {
+      if (data) setShifts(data);
+    });
   }, [companyId]);
 
   useEffect(() => {
     if (editingIncident) {
       setSiteId(editingIncident.site_id || '');
       setGuardId(editingIncident.guard_id || '');
+      setShiftId(editingIncident.shift_id || '');
       setIncidentType(editingIncident.incident_type || '');
       setSeverity(editingIncident.severity || 'medium');
+      setTitle(editingIncident.title || '');
       setOccurredAt(editingIncident.occurred_at ? new Date(editingIncident.occurred_at).toISOString().slice(0, 16) : '');
       setDescription(editingIncident.description || '');
+      setLocation(editingIncident.location || '');
       setStatus(editingIncident.status || 'open');
+      setClientVisible(editingIncident.client_visible ?? true);
+      setRequiresFollowUp(editingIncident.requires_follow_up ?? false);
     } else {
       setSiteId('');
       setGuardId('');
+      setShiftId('');
       setIncidentType('');
       setSeverity('medium');
+      setTitle('');
       setOccurredAt(new Date().toISOString().slice(0, 16));
       setDescription('');
+      setLocation('');
       setStatus('open');
+      setClientVisible(true);
+      setRequiresFollowUp(false);
     }
     setErrors({});
   }, [editingIncident]);
@@ -72,71 +98,59 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
     onSave({
       site_id: siteId,
       guard_id: guardId || null,
+      shift_id: shiftId || null,
       incident_type: incidentType,
       severity,
+      title: title || incidentType,
       occurred_at: new Date(occurredAt).toISOString(),
       description,
+      location: location || null,
       status,
+      client_visible: clientVisible,
+      requires_follow_up: requiresFollowUp,
     });
   };
 
   const sevOptions = ['low', 'medium', 'high', 'critical'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-    >
-      <div className="bg-[#151b27] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
-      >
-        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between"
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-[#151b27] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">{editingIncident ? 'Edit Incident' : 'Log Incident'}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"
-          >
-            <div className="w-5 h-5 flex items-center justify-center"
-            >
-              <i className="ri-close-line"></i>
-            </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
+            <div className="w-5 h-5 flex items-center justify-center"><i className="ri-close-line"></i></div>
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4"
-        >
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Site <span className="text-red-400">*</span></label>
-            <select
-              value={siteId}
-              onChange={(e) => setSiteId(e.target.value)}
-              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="" disabled>Select site...</option>
-              {sites.map((s) => <option key={s.id} value={s.id}>{s.site_name}</option>)}
-            </select>
-            {errors.siteId && <p className="text-red-400 text-xs mt-1">{errors.siteId}</p>}
-          </div>
+        <div className="px-6 py-5 space-y-4">
+          <SectionLabel>Incident Details</SectionLabel>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Reported By Guard (optional)</label>
-            <select
-              value={guardId}
-              onChange={(e) => setGuardId(e.target.value)}
-              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="">—</option>
-              {guards.map((g) => <option key={g.id} value={g.id}>{g.first_name} {g.last_name}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Incident Type <span className="text-red-400">*</span></label>
-            <select
-              value={incidentType}
-              onChange={(e) => setIncidentType(e.target.value)}
-              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="" disabled>Select type...</option>
-              {INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            {errors.incidentType && <p className="text-red-400 text-xs mt-1">{errors.incidentType}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Site <span className="text-red-400">*</span></label>
+              <select
+                value={siteId}
+                onChange={(e) => setSiteId(e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
+              >
+                <option value="" disabled>Select site...</option>
+                {sites.map((s) => <option key={s.id} value={s.id}>{s.site_name}</option>)}
+              </select>
+              {errors.siteId && <p className="text-red-400 text-xs mt-1">{errors.siteId}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Incident Type <span className="text-red-400">*</span></label>
+              <select
+                value={incidentType}
+                onChange={(e) => { setIncidentType(e.target.value); if (!title) setTitle(e.target.value); }}
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
+              >
+                <option value="" disabled>Select type...</option>
+                {INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              {errors.incidentType && <p className="text-red-400 text-xs mt-1">{errors.incidentType}</p>}
+            </div>
           </div>
 
           <div>
@@ -162,19 +176,42 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
             {errors.severity && <p className="text-red-400 text-xs mt-1">{errors.severity}</p>}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Date/Time <span className="text-red-400">*</span></label>
-            <input
-              type="datetime-local"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            />
-            {errors.occurredAt && <p className="text-red-400 text-xs mt-1">{errors.occurredAt}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Date/Time <span className="text-red-400">*</span></label>
+              <input
+                type="datetime-local"
+                value={occurredAt}
+                onChange={(e) => setOccurredAt(e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+              />
+              {errors.occurredAt && <p className="text-red-400 text-xs mt-1">{errors.occurredAt}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Where did this happen?"
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Description <span className="text-red-400">*</span></label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={incidentType || 'Brief summary of incident'}
+              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <SectionLabel>Description</SectionLabel>
+          <div>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -189,13 +226,46 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
             </div>
           </div>
 
+          <SectionLabel>People</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Reported By Guard</label>
+              <select
+                value={guardId}
+                onChange={(e) => setGuardId(e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
+              >
+                <option value="">—</option>
+                {guards.map((g) => <option key={g.id} value={g.id}>{g.first_name} {g.last_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Active Shift</label>
+              <select
+                value={shiftId}
+                onChange={(e) => setShiftId(e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
+              >
+                <option value="">—</option>
+                {shifts.filter(s => !siteId || s.site_id === siteId).map((s) => {
+                  const g = guards.find(x => x.id === s.guard_id);
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {g ? `${g.first_name} ${g.last_name}` : 'Officer'} — {new Date(s.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+
+          <SectionLabel>Status</SectionLabel>
           {editingIncident && (
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
               >
                 <option value="open">Open</option>
                 <option value="reviewing">Reviewing</option>
@@ -203,10 +273,33 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
               </select>
             </div>
           )}
+          {!editingIncident && (
+            <div className="text-sm text-gray-500">New incidents are logged as Open.</div>
+          )}
+
+          <div className="flex items-center gap-6 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={clientVisible}
+                onChange={(e) => setClientVisible(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-300">Visible to client</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={requiresFollowUp}
+                onChange={(e) => setRequiresFollowUp(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-300">Requires follow-up</span>
+            </label>
+          </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-800 flex items-center justify-end gap-3"
-        >
+        <div className="px-6 py-4 border-t border-gray-800 flex items-center justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap">Cancel</button>
           <button
             onClick={handleSave}

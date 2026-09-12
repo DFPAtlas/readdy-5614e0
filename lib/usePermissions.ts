@@ -489,6 +489,11 @@ export function useMyPermissions(userId: string | null, companyId: string | null
             risk_assessments: 'manage', sop_documents: 'manage', assignment_instructions: 'manage',
             client_portal: 'manage', reports: 'manage', ai_tools: 'manage',
             billing: 'manage', settings: 'manage', roles: 'manage',
+            'integrations.view': 'manage', 'integrations.manage': 'manage', 'integrations.approve': 'manage',
+            'api.view': 'manage', 'api.manage': 'manage',
+            'webhooks.view': 'manage', 'webhooks.manage': 'manage',
+            'exports.view': 'manage', 'exports.manage': 'manage', 'imports.manage': 'manage',
+            'workforce.view': 'manage',
           });
         } else {
           setMyPerms({});

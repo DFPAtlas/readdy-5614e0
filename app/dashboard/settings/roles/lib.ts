@@ -74,7 +74,7 @@ export interface UserSiteAccessRecord {
   region: string | null;
 }
 
-export const MODULE_ORDER = ['Dashboard','Staff','Sites','Rotas','Operations','Compliance','Client','Reports','AI','Settings','Site Notice Board'];
+export const MODULE_ORDER = ['Dashboard','Staff','Sites','Rotas','Operations','Compliance','Client','Reports','AI','workforce','recruitment','vetting','hr','training','compliance','billing','finance','pay_run','rate_card','timesheet','expense','credit_note','dispute','integrations','api','webhooks','exports','imports','Settings','Site Notice Board'];
 
 export function useRolesManager() {
   const [roles, setRoles] = useState<Role[]>([]);

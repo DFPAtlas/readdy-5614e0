@@ -302,8 +302,8 @@ export default function PlatformPage() {
           <div className="grid md:grid-cols-3 gap-6 mt-12">
             {[
               {
-                title: 'SOC 2 Type II Compliant',
-                desc: 'Independently audited controls for security, availability, and confidentiality.',
+                title: 'SIA-Aligned Compliance',
+                desc: 'Workflows designed to support SIA ACS assessment criteria with structured evidence gathering and audit preparation.',
                 icon: 'ri-shield-check-line',
               },
               {

@@ -82,7 +82,7 @@ const STATUSES: Record<TicketStatus, { label: string; color: string }> = {
   closed: { label: 'Closed', color: 'bg-gray-700' },
 };
 
-export function useSupportTickets() {
+export function useSupportTickets(scopeToCreator?: boolean) {
   const { profile, companyId } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,7 +93,7 @@ export function useSupportTickets() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase
+      let query = supabase
         .from('support_tickets')
         .select(`
           *,
@@ -102,8 +102,15 @@ export function useSupportTickets() {
           affected_site:affected_site_id(site_name),
           affected_user:affected_user_id(first_name, last_name, email)
         `)
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
+        .eq('company_id', companyId);
+
+      if (scopeToCreator && profile?.id) {
+        query = query.eq('created_by', profile.id);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error: err } = await query;
       if (err) throw err;
       setTickets(data || []);
     } catch (e: any) {
@@ -111,7 +118,7 @@ export function useSupportTickets() {
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, scopeToCreator, profile?.id]);
 
   useEffect(() => {
     fetchTickets();
@@ -145,7 +152,7 @@ export function useSupportTickets() {
   return { tickets, loading, error, refresh: fetchTickets, createTicket };
 }
 
-export function useTicketDetail(ticketId: string | null) {
+export function useTicketDetail(ticketId: string | null, scopeToCreator?: boolean) {
   const { profile, companyId } = useAuth();
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
@@ -158,7 +165,7 @@ export function useTicketDetail(ticketId: string | null) {
     setLoading(true);
     setError(null);
     try {
-      const { data: ticketData, error: tErr } = await supabase
+      let ticketQuery = supabase
         .from('support_tickets')
         .select(`
           *,
@@ -169,8 +176,23 @@ export function useTicketDetail(ticketId: string | null) {
           company:company_id(name)
         `)
         .eq('id', ticketId)
-        .maybeSingle();
+        .eq('company_id', companyId);
+
+      if (scopeToCreator && profile?.id) {
+        ticketQuery = ticketQuery.eq('created_by', profile.id);
+      }
+
+      const { data: ticketData, error: tErr } = await ticketQuery.maybeSingle();
       if (tErr) throw tErr;
+
+      if (!ticketData) {
+        setTicket(null);
+        setMessages([]);
+        setAttachments([]);
+        setLoading(false);
+        return;
+      }
+
       setTicket(ticketData);
 
       const { data: msgData, error: mErr } = await supabase
@@ -197,7 +219,7 @@ export function useTicketDetail(ticketId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [ticketId, companyId]);
+  }, [ticketId, companyId, scopeToCreator, profile?.id]);
 
   useEffect(() => {
     fetchTicket();

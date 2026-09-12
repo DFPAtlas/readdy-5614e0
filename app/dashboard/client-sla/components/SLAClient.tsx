@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRequireEntitlement } from '@/lib/useRequireEntitlement';
 import { useClientSLA, defaultFilters, type FilterState } from '@/lib/useClientSLA';
 import { useSites } from '@/lib/useSites';
 import { useGuards } from '@/lib/useGuards';
@@ -17,6 +18,7 @@ import ExportBar from './ExportBar';
 import LoadingState from './LoadingState';
 
 export default function SLAClient() {
+  const { allowed, loading: entGuardLoading } = useRequireEntitlement('hasClientPortal');
   const [filters, setFilters] = useState<FilterState>({ ...defaultFilters });
   const { summary, patrolData, incidentData, attendanceData, obData, ticketData, riskTrendData, loading, error, refetch } = useClientSLA(filters);
   const { sites } = useSites();
@@ -62,6 +64,22 @@ export default function SLAClient() {
   const handleEmailReport = useCallback(() => {
     // TODO: wire up to email edge function
   }, []);
+
+  if (entGuardLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-gray-400 text-sm">Redirecting to plans...</p>
+      </div>
+    );
+  }
 
   if (loading && !summary.lastUpdated) {
     return <LoadingState />;

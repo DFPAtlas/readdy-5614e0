@@ -192,10 +192,20 @@ export default function DemoPage() {
               <form
                 id="demo-form"
                 data-readdy-form
-                action="https://readdy.ai/api/form/d7ublqpjlv0i8kopuaug"
+                action="https://readdy.ai/api/form/d9tmu6t3pcjqs2fcsgkg"
                 method="POST"
-                onSubmit={() => setSubmitted(true)}
+                onSubmit={(e) => {
+                  const form = e.currentTarget;
+                  const hpEl = form.querySelector('[data-hp-field]') as HTMLInputElement;
+                  if (hpEl && hpEl.value.trim()) {
+                    e.preventDefault();
+                    setSubmitted(true);
+                    return;
+                  }
+                  setSubmitted(true);
+                }}
               >
+                <h3 className="text-lg font-semibold text-white mb-5">Request a personalised demo</h3>
                 <div className="grid md:grid-cols-2 gap-5 mb-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -239,24 +249,25 @@ export default function DemoPage() {
                 <div className="grid md:grid-cols-2 gap-5 mb-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Company
+                      Company *
                     </label>
                     <input
                       type="text"
                       name="company"
+                      required
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors text-sm"
                       placeholder="Your security firm"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Phone
+                      Job role
                     </label>
                     <input
-                      type="tel"
-                      name="phone"
+                      type="text"
+                      name="jobRole"
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors text-sm"
-                      placeholder="+44..."
+                      placeholder="e.g. Operations Director"
                     />
                   </div>
                 </div>
@@ -284,18 +295,60 @@ export default function DemoPage() {
                   </div>
                 </div>
 
-                <div className="mb-6">
+                <div className="mb-5">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    What would you like to see?
+                    Main challenge *
                   </label>
                   <textarea
                     name="interests"
                     rows={3}
+                    required
                     maxLength={500}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors resize-none text-sm"
-                    placeholder="e.g. Rota generation, patrol tracking, client portal..."
+                    placeholder="What problem are you trying to solve? Rota management, patrol verification, client reporting...?"
                   ></textarea>
+                  <p className="text-gray-500 text-xs mt-1">Max 500 characters</p>
                 </div>
+
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Preferred contact method
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {['Email', 'Phone', 'Video call', 'Either'].map((method) => (
+                      <label key={method} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="contactMethod"
+                          value={method}
+                          className="peer sr-only"
+                        />
+                        <span className="inline-block px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-400 peer-checked:bg-blue-500/20 peer-checked:border-blue-500/50 peer-checked:text-blue-300 transition-colors whitespace-nowrap">
+                          {method}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" name="privacyAck" required className="mt-0.5 accent-blue-500" />
+                    <span className="text-gray-400 text-xs leading-relaxed">
+                      I understand that GuardianHub will use my contact details to arrange a demo. My data will be handled in accordance with the <Link href="/privacy" className="text-blue-400 hover:text-blue-300 transition-colors cursor-pointer">Privacy Notice</Link>.
+                    </span>
+                  </label>
+                </div>
+
+                <input
+                  type="text"
+                  name="website_alt"
+                  data-hp-field
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  readOnly
+                />
 
                 <button
                   type="submit"
@@ -334,7 +387,7 @@ export default function DemoPage() {
             <div className="flex flex-wrap justify-center gap-8 text-gray-500 text-sm font-medium">
               <span className="flex items-center gap-2">
                 <i className="ri-shield-check-line text-blue-400"></i>
-                SOC 2 Type II
+                SIA-Aligned Workflows
               </span>
               <span className="flex items-center gap-2">
                 <i className="ri-lock-2-line text-blue-400"></i>

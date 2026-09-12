@@ -61,6 +61,7 @@ export interface WelfareGuard {
   last_clock_in?: string | null;
   last_activity?: string | null;
   on_duty: boolean;
+  no_recent_activity?: boolean;
   last_lone_worker_session?: string | null;
   missed_check_ins?: number;
   escalation_level?: number;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 
 const MOODS = [
   { value: 'good', label: 'Good', emoji: 'ri-emotion-happy-line', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25' },
@@ -13,12 +13,8 @@ const MOODS = [
 ];
 
 export default function WellbeingPage() {
-  const { profile, company } = useAuth();
+  const g = useGuardAuth();
   const router = useRouter();
-  const [guardId, setGuardId] = useState<string | null>(null);
-  const [shiftId, setShiftId] = useState<string | null>(null);
-  const [siteId, setSiteId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mood, setMood] = useState('good');
@@ -26,58 +22,35 @@ export default function WellbeingPage() {
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!profile?.id || !company?.id) return;
-    loadGuardInfo();
-  }, [profile?.id, company?.id]);
+    if (!g.guardId) return;
+    loadHistory();
+  }, [g.guardId]);
 
-  const loadGuardInfo = async () => {
-    const { data: guardData } = await supabase
-      .from('guards')
-      .select('id')
-      .eq('user_id', profile!.id)
-      .maybeSingle();
-
-    if (guardData) {
-      setGuardId(guardData.id);
-
-      const { data: shiftData } = await supabase
-        .from('shifts')
-        .select('id, site_id')
-        .eq('guard_id', guardData.id)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (shiftData) {
-        setShiftId(shiftData.id);
-        setSiteId(shiftData.site_id);
-      }
-
-      const { data: hist } = await supabase
-        .from('guard_wellbeing_checkins')
-        .select('*')
-        .eq('guard_id', guardData.id)
-        .order('created_at', { ascending: false })
-        .limit(15);
-      setHistory(hist || []);
-    }
-    setLoading(false);
+  const loadHistory = async () => {
+    if (!g.guardId) return;
+    const { data } = await supabase
+      .from('guard_wellbeing_checkins')
+      .select('*')
+      .eq('guard_id', g.guardId)
+      .order('created_at', { ascending: false })
+      .limit(15);
+    setHistory(data || []);
   };
 
   const handleSubmit = async () => {
-    if (!guardId || !company?.id) return;
+    if (!g.guardId || !g.companyId) return;
     setSubmitting(true);
 
     const stressMap: Record<string, number> = { good: 1, tired: 5, stressed: 8, need_support: 9 };
     const fatigueMap: Record<string, number> = { good: 1, tired: 8, stressed: 5, need_support: 5 };
     const safetyMap: Record<string, number> = { good: 9, tired: 8, stressed: 6, need_support: 3 };
-
     const average = ((stressMap[mood] || 5) + (fatigueMap[mood] || 5) + (safetyMap[mood] || 5)) / 3;
 
     const { error } = await supabase.from('guard_wellbeing_checkins').insert({
-      guard_id: guardId,
-      company_id: company.id,
-      shift_id: shiftId,
-      site_id: siteId,
+      guard_id: g.guardId,
+      company_id: g.companyId,
+      shift_id: g.todayShift?.id || null,
+      site_id: g.todayShift?.site_id || null,
       stress_score: stressMap[mood] || 5,
       fatigue_score: fatigueMap[mood] || 5,
       safety_score: safetyMap[mood] || 5,
@@ -90,14 +63,7 @@ export default function WellbeingPage() {
       setToast(mood === 'need_support' ? 'Check-in logged — your supervisor will be notified' : 'Wellbeing check-in recorded');
       setConcerns('');
       if (navigator.vibrate) navigator.vibrate(100);
-
-      const { data: updated } = await supabase
-        .from('guard_wellbeing_checkins')
-        .select('*')
-        .eq('guard_id', guardId)
-        .order('created_at', { ascending: false })
-        .limit(15);
-      setHistory(updated || []);
+      loadHistory();
     } else {
       setToast('Failed to log check-in');
     }
@@ -105,7 +71,7 @@ export default function WellbeingPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  if (loading) {
+  if (g.loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>

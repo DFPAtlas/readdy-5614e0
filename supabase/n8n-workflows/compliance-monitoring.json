@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Compliance Monitoring",
+  "version": "1.0.0",
+  "description": "Monitors licence/certification/training expiry with configurable reminder schedules",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "compliance-monitoring", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Compliance Check Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { company_id, check_type } = body;\n\nreturn {\n  json: {\n    company_id,\n    check_type: check_type || 'all',\n    items_expiring_soon: [],\n    items_expired: [],\n    reminders_sent: 0,\n    schedule: ['90d', '60d', '30d', '14d', '7d', 'expired'],\n    next_check: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),\n    generated_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "check-compliance",
+      "name": "Check Compliance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "compliance_monitoring" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "compliance.check_complete" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Compliance Check Webhook": { "main": [[ { "node": "Check Compliance", "type": "main", "index": 0 } ]] },
+    "Check Compliance": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

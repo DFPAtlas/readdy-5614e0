@@ -1,8 +1,6 @@
-'use client';
-
 import { useState, useMemo, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useIncidents, type Incident } from '@/lib/useIncidents';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
@@ -120,35 +118,38 @@ export default function IncidentsPage() {
   const hasActiveFilters = search || siteId || severityFilter.length || statusFilter.length;
 
   return (
-    <div className="space-y-6"
-    >
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
-      >
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Incidents</h1>
-          <p className="text-gray-400 text-sm mt-1">Review and manage security incidents across all sites</p>
+          <h1 className="text-2xl font-bold text-white">Incident Management</h1>
+          <p className="text-gray-400 text-sm mt-1">Review, investigate and manage security incidents across all sites</p>
         </div>
-        {can('incidents', 'create') && (
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
-          Log Incident
-        </button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/occurrence-book"
+            className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-700/50 border border-gray-700 text-gray-300 hover:text-white text-sm font-medium px-3.5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-book-open-line"></i></div>
+            Occurrence Book
+          </Link>
+          {can('incidents', 'create') && (
+            <button
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
+              Log Incident
+            </button>
+          )}
+        </div>
       </div>
 
       <StatCards incidents={incidents} />
 
-      <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4 space-y-3"
-      >
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3"
-        >
-          <div className="relative flex-1 max-w-sm"
-          >
-            <div className="w-5 h-5 flex items-center justify-center absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-            >
+      <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <div className="w-5 h-5 flex items-center justify-center absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
               <i className="ri-search-line text-sm"></i>
             </div>
             <input
@@ -169,20 +170,18 @@ export default function IncidentsPage() {
             {sites.map((s) => <option key={s.id} value={s.id}>{s.site_name}</option>)}
           </select>
 
-          <div className="flex items-center gap-2"
-          >
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 uppercase tracking-wide whitespace-nowrap">Severity</span>
             <SeverityMultiSelect value={severityFilter} onChange={(v) => { setSeverityFilter(v); setPage(1); }} />
           </div>
-          <div className="flex items-center gap-2"
-          >
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 uppercase tracking-wide whitespace-nowrap">Status</span>
             <StatusMultiSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} />
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3"
-        >
-          <div className="flex items-center gap-2"
-          >
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-gray-800/70 pt-3">
+          <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
             <input
               type="date"
@@ -191,8 +190,7 @@ export default function IncidentsPage() {
               className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
             />
           </div>
-          <div className="flex items-center gap-2"
-          >
+          <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
             <input
               type="date"
@@ -204,17 +202,17 @@ export default function IncidentsPage() {
           {hasActiveFilters && (
             <button
               onClick={handleReset}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap ml-auto"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap ml-auto"
             >
-              Reset filters
+              <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-refresh-line"></i></div>
+              Reset Filters
             </button>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3 rounded-lg flex items-center gap-2"
-        >
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
           <div className="w-4 h-4 flex items-center justify-center"><i className="ri-error-warning-line"></i></div>
           {error}
         </div>
@@ -245,23 +243,24 @@ export default function IncidentsPage() {
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       {newIncidentToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-2.5 rounded-lg flex items-center gap-3"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"
-          >
-            <i className="ri-alarm-warning-line"></i>
-          </div>
-          {newIncidentToast}
-          <button onClick={() => { dismissToast(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-blue-400 hover:text-blue-300 text-xs font-medium cursor-pointer whitespace-nowrap"
-          >
-            View
-          </button>
-          <button onClick={dismissToast} className="text-gray-500 hover:text-gray-300 ml-1 cursor-pointer"
-          >
-            <div className="w-4 h-4 flex items-center justify-center"
-            >
-              <i className="ri-close-line"></i>
+        <div className="fixed top-4 right-4 z-50 max-w-sm bg-[#151b27]/95 border border-red-500/30 rounded-lg shadow-2xl px-4 py-3 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-4 h-4 flex items-center justify-center text-red-400">
+              <i className="ri-alarm-warning-line"></i>
             </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white">New incident logged</p>
+            <p className="text-xs text-gray-400 mt-0.5">{newIncidentToast}</p>
+            <button
+              onClick={() => { dismissToast(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className="text-xs text-blue-400 hover:text-blue-300 font-medium mt-1.5 cursor-pointer whitespace-nowrap"
+            >
+              View incidents
+            </button>
+          </div>
+          <button onClick={dismissToast} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-300 cursor-pointer flex-shrink-0">
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-line"></i></div>
           </button>
         </div>
       )}

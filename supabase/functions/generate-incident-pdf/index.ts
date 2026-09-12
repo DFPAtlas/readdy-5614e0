@@ -8,8 +8,6 @@ const corsHeaders = {
 
 async function generateIncidentPDF(data: any, company: any): Promise<Uint8Array> {
   const { PDFDocument, rgb, StandardFonts } = await import("https://esm.sh/pdf-lib@1.17.1");
-  const { drawText, drawImage } = await import("https://esm.sh/pdf-lib@1.17.1");
-
   const pdfDoc = await PDFDocument.create();
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -282,7 +280,7 @@ function parseSections(text: string): [string, string][] {
   return sections;
 }
 
-function drawBlock(page: any, y: number, title: string, x: number, w: number, boldFont: any, normalFont: any) {
+function drawBlock(page: any, y: number, title: string, x: number, w: number, boldFont: any, _normalFont: any) {
   page.drawText(title, { x, y, size: 14, font: boldFont, color: rgb(0.15, 0.15, 0.15) });
   y -= 18;
   page.drawLine({ start: { x, y }, end: { x: x + w, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
@@ -419,8 +417,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to upload PDF", detail: uploadError.message }), { status: 500, headers: corsHeaders });
     }
 
-    const { data: urlData } = supabase.storage.from("reports").getPublicUrl(storagePath);
-    const fileUrl = urlData.publicUrl;
+    const { data: signedData } = await supabase.storage
+      .from("reports")
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
     const { data: reportRecord } = await supabase
       .from("reports")
@@ -430,23 +429,23 @@ Deno.serve(async (req) => {
         report_type: "incident",
         reference_id: incidentId,
         title: `Incident Report \u2014 ${incident.incident_type || "Incident"} at ${site?.site_name || "Unknown"}`,
-        file_url: fileUrl,
+        file_url: signedData?.signedUrl,
         generated_by: user.id,
         generated_at: new Date().toISOString(),
+        client_visible: false,
       })
       .select("id")
       .single();
 
-    const { data: signedData, error: signedError } = await supabase.storage
+    const { data: signedData2 } = await supabase.storage
       .from("reports")
       .createSignedUrl(storagePath, 60 * 60 * 24);
 
-    const signedUrl = signedData?.signedUrl || fileUrl;
+    const finalUrl = signedData2?.signedUrl || signedData?.signedUrl;
 
     return new Response(
       JSON.stringify({
-        url: signedUrl,
-        public_url: fileUrl,
+        url: finalUrl,
         report_id: reportRecord?.id,
         path: storagePath,
       }),

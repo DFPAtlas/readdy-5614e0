@@ -17,19 +17,27 @@ Set these in the Supabase dashboard under Edge Functions → Secrets. They are *
 
 - `STRIPE_SECRET_KEY` — Your Stripe secret key (starts with `sk_live_` or `sk_test_`)
 - `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret (starts with `whsec_`)
-- `STRIPE_PRICE_SENTINEL_MONTHLY` — Stripe Price ID for Sentinel monthly
-- `STRIPE_PRICE_SENTINEL_YEARLY` — Stripe Price ID for Sentinel yearly
-- `STRIPE_PRICE_COMMAND_MONTHLY` — Stripe Price ID for Command monthly
-- `STRIPE_PRICE_COMMAND_YEARLY` — Stripe Price ID for Command yearly
 
-## Price IDs
+## Active Stripe Products & Prices (Sandbox)
 
-```
-STRIPE_PRICE_SENTINEL_MONTHLY=price_1TVcfIIP0whpra1pCMNs9qLc
-STRIPE_PRICE_SENTINEL_YEARLY=price_1TVcfhIP0whpra1ppwPWDSre
-STRIPE_PRICE_COMMAND_MONTHLY=price_1TVcfuIP0whpra1pLqwNSsZ3
-STRIPE_PRICE_COMMAND_YEARLY=price_1TVcgIIP0whpra1pgkPDCcso
-```
+### Guardian-Hub Starter
+- Product ID: `prod_UnIYbD4pZSOCNB`
+- Monthly Price: `price_1TnhxWLcsXgF5wPQ4UZbPMno`
+- Amount: £49/month
+
+### Guardian-Hub Sentinel
+- Product ID: `prod_UUCPIhPTHsRoF2`
+- Monthly Price: `price_1TVE11LcsXgF5wPQONu0hOke`
+- Amount: £99/month
+
+### Guardian-Hub Command
+- Product ID: `prod_UUCbr2wshFKtGv`
+- Monthly Price: `price_1TVECGLcsXgF5wPQoo9FuK3v`
+- Amount: £399/month
+
+### Guardian-Hub Titan
+- Product ID: `prod_UnIZSYOzZGpKVj`
+- No Stripe price (Contact Sales only)
 
 ## Webhook URL
 

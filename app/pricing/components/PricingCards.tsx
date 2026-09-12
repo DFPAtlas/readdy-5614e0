@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useInView } from '../../hooks/useInView';
 import CheckoutButton from './CheckoutButton';
 import Link from 'next/link';
+import { YEARLY_PRICES } from '../../../lib/entitlements';
 
 interface PricingPlan {
   name: string;
-  tagline: string;
+  taglineMonthly: string;
+  taglineYearly: string;
   priceMonthly: string;
   priceYearly: string;
   period: string;
@@ -24,10 +26,11 @@ interface PricingPlan {
 
 const plans: PricingPlan[] = [
   {
-    name: 'Sentinel Starter',
-    tagline: '14-day free trial — no charge to start',
+    name: 'Guardian-Hub Starter',
+    taglineMonthly: '15-day free trial — no charge to start',
+    taglineYearly: '15-day free trial — save 20% annually',
     priceMonthly: '£49',
-    priceYearly: '£49',
+    priceYearly: '£39',
     period: '/month',
     cta: 'Start Free Trial',
     features: [
@@ -43,7 +46,6 @@ const plans: PricingPlan[] = [
       'Client portal',
       'Patrol management',
       'GPS tracking',
-      'Multiple sites',
     ],
     popular: false,
     accent: 'border-white/10',
@@ -52,8 +54,9 @@ const plans: PricingPlan[] = [
     planKey: 'sentinel-starter',
   },
   {
-    name: 'GuardianHub Sentinel',
-    tagline: 'For small security teams',
+    name: 'Guardian-Hub Sentinel',
+    taglineMonthly: '15-day free trial — no charge to start',
+    taglineYearly: '15-day free trial — save 20% annually',
     priceMonthly: '£99',
     priceYearly: '£79',
     period: '/month',
@@ -78,8 +81,9 @@ const plans: PricingPlan[] = [
     planKey: 'sentinel',
   },
   {
-    name: 'GuardianHub Command',
-    tagline: 'For growing security companies',
+    name: 'Guardian-Hub Command',
+    taglineMonthly: '15-day free trial — no charge to start',
+    taglineYearly: '15-day free trial — save 20% annually',
     priceMonthly: '£399',
     priceYearly: '£319',
     period: '/month',
@@ -108,8 +112,9 @@ const plans: PricingPlan[] = [
     planKey: 'command',
   },
   {
-    name: 'GuardianHub Titan',
-    tagline: 'For enterprise security companies',
+    name: 'Guardian-Hub Titan',
+    taglineMonthly: 'For enterprise security companies',
+    taglineYearly: 'For enterprise security companies',
     priceMonthly: 'Custom',
     priceYearly: 'Custom',
     period: 'pricing',
@@ -132,14 +137,70 @@ const plans: PricingPlan[] = [
     badgeColor: 'bg-amber-500',
     href: '/contact?plan=titan',
   },
-];;
+];
 
-export default function PricingCards({ billing }: { billing: 'monthly' | 'yearly' }) {
+export default function PricingCards() {
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
+
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
-      {plans.map((plan) => (
-        <PricingCard key={plan.name} plan={plan} billing={billing} />
-      ))}
+    <div>
+      <div className="flex justify-center mb-10">
+        <div className="inline-flex items-center gap-3 bg-white/[0.04] rounded-full p-1.5 border border-white/8">
+          <button
+            onClick={() => setBilling('monthly')}
+            className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+              billing === 'monthly'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBilling('yearly')}
+            className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap relative ${
+              billing === 'yearly'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Annual
+            <span className="absolute -top-2 -right-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">
+              Save 20%
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
+        {plans.map((plan) => (
+          <PricingCard key={plan.name} plan={plan} billing={billing} />
+        ))}
+      </div>
+
+      <div className="mt-8">
+        <div className="rounded-xl bg-white/[0.03] border border-white/10 p-5 max-w-2xl mx-auto">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-500/10 border border-blue-500/20 shrink-0 mt-0.5">
+              <i className="ri-secure-payment-line text-blue-400" />
+            </div>
+            <div>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Monthly services are billed in advance through Stripe. Third-party subscriptions and usage charges are excluded unless stated otherwise.
+              </p>
+              <p className="text-gray-500 text-xs mt-1.5 leading-relaxed">
+                You can review the order before payment. Your subscription is not active until Stripe confirms checkout.
+              </p>
+              <p className="text-gray-600 text-xs mt-2">
+                By subscribing you agree to our{' '}
+                <Link href="/terms" className="text-blue-400 hover:text-blue-300 underline transition-colors cursor-pointer">Terms &amp; Conditions</Link>
+                {' '}and{' '}
+                <Link href="/privacy" className="text-blue-400 hover:text-blue-300 underline transition-colors cursor-pointer">Privacy Policy</Link>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -147,17 +208,9 @@ export default function PricingCards({ billing }: { billing: 'monthly' | 'yearly
 function PricingCard({ plan, billing }: { plan: PricingPlan; billing: 'monthly' | 'yearly' }) {
   const { ref, isInView } = useInView();
   const isCustom = plan.priceMonthly === 'Custom';
-  const isPayg = plan.name.includes('Pay as You Go');
-  const isStarter = plan.planKey === 'sentinel-starter';
-  const displayPrice = billing === 'yearly' && !isCustom && !isStarter ? plan.priceYearly : plan.priceMonthly;
-  let displayPeriod = '';
-  if (!isCustom) {
-    if (isPayg) {
-      displayPeriod = plan.period;
-    } else {
-      displayPeriod = billing === 'yearly' && !isStarter ? '/month (billed annually)' : plan.period;
-    }
-  }
+  const price = billing === 'yearly' && !isCustom ? plan.priceYearly : plan.priceMonthly;
+  const tagline = billing === 'yearly' ? plan.taglineYearly : plan.taglineMonthly;
+  const billingParam: 'monthly' | 'yearly' = billing;
 
   const buttonClassName = plan.popular
     ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30'
@@ -186,23 +239,22 @@ function PricingCard({ plan, billing }: { plan: PricingPlan; billing: 'monthly' 
         <div className="p-6 flex-1 flex flex-col">
           <div className="mb-4">
             <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
-            <p className="text-gray-400 text-sm">{plan.tagline}</p>
+            {!isCustom && (
+              <p className="text-gray-400 text-sm">{tagline}</p>
+            )}
           </div>
 
           <div className="mb-6">
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-bold text-white tracking-tight">{displayPrice}</span>
+              <span className="text-4xl font-bold text-white tracking-tight">{price}</span>
               {!isCustom && (
-                <span className="text-gray-500 text-sm">{displayPeriod}</span>
+                <span className="text-gray-500 text-sm">{plan.period}</span>
               )}
             </div>
-            {billing === 'yearly' && !isCustom && !isStarter && (
-              <p className="text-green-400 text-sm mt-1">
-                Save 20% with annual billing
+            {billing === 'yearly' && !isCustom && plan.planKey && (
+              <p className="text-green-400/80 text-xs mt-1">
+                Billed annually — save {Math.round((1 - parseInt(plan.priceYearly.replace('£', '')) / parseInt(plan.priceMonthly.replace('£', ''))) * 100)}% vs monthly
               </p>
-            )}
-            {isStarter && (
-              <p className="text-gray-500 text-xs mt-1">Monthly only</p>
             )}
           </div>
 
@@ -228,7 +280,7 @@ function PricingCard({ plan, billing }: { plan: PricingPlan; billing: 'monthly' 
           {plan.planKey ? (
             <CheckoutButton
               plan={plan.planKey}
-              billing={isStarter ? 'monthly' : billing}
+              billing={billingParam}
               className={buttonClassName}
             >
               {plan.cta}

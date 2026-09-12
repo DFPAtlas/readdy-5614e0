@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { GuardShift } from '@/lib/useGuardPortal';
+import { triggerNotificationForAllAdmins } from '@/lib/triggerNotification';
 
 interface IncidentFlowProps {
   todayShift: GuardShift | null;
@@ -74,7 +75,7 @@ export default function IncidentFlow({ todayShift, guardId, companyId, guardName
       const path = `${companyId}/incidents/${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name}`;
       const { data, error } = await supabase.storage.from('incident-media').upload(path, file);
       if (error || !data) continue;
-      const { data: urlData } = await supabase.storage.from('incident-media').createSignedUrl(data.path, 3600);
+      const { data: urlData } = await supabase.storage.from('incident-media').createSignedUrl(data.path, 60 * 60 * 24 * 7);
       if (urlData) {
         setPhotoUrls((prev) => [...prev, urlData.signedUrl]);
         setPhotoPaths((prev) => [...prev, data.path]);
@@ -131,17 +132,29 @@ export default function IncidentFlow({ todayShift, guardId, companyId, guardName
     const location = await getLocation();
     setGps(location);
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || null;
+
     const { data: incidentData, error } = await supabase
       .from('incidents')
       .insert({
         company_id: companyId,
         site_id: todayShift.site_id,
         guard_id: guardId,
+        user_id: userId,
+        shift_id: todayShift.id || null,
         incident_type: incidentType,
         severity,
+        title: incidentType,
         description,
+        location: location.lat && location.lng ? `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}` : null,
+        gps_latitude: location.lat,
+        gps_longitude: location.lng,
         status: 'open',
+        client_visible: true,
+        requires_follow_up: severity === 'critical' || severity === 'high',
         occurred_at: new Date().toISOString(),
+        reported_at: new Date().toISOString(),
       })
       .select()
       .maybeSingle();
@@ -153,9 +166,8 @@ export default function IncidentFlow({ todayShift, guardId, companyId, guardName
 
     if (actionsTaken) {
       await supabase.from('incident_comments').insert({
-        company_id: companyId,
         incident_id: incidentData.id,
-        user_id: guardId,
+        user_id: userId,
         comment: `Actions taken: ${actionsTaken}`,
       });
     }
@@ -169,36 +181,54 @@ export default function IncidentFlow({ todayShift, guardId, companyId, guardName
     });
 
     for (const path of photoPaths) {
-      const { data: permUrl } = await supabase.storage.from('incident-media').createSignedUrl(path, 3600 * 24 * 7);
-      await supabase.from('incident_media').insert({
-        company_id: companyId,
-        incident_id: incidentData.id,
-        file_url: permUrl?.signedUrl || path,
-        media_type: 'image',
-        filename: path.split('/').pop(),
-        uploaded_by: guardId,
-      });
+      const { data: signed } = await supabase.storage.from('incident-media').createSignedUrl(path, 60 * 60 * 24 * 7);
+      const mediaUrl = signed?.signedUrl || path;
+      const { data: mediaRow } = await supabase.from('incident_media')
+        .insert({
+          incident_id: incidentData.id,
+          file_url: mediaUrl,
+          media_type: 'image',
+          filename: path.split('/').pop(),
+          storage_path: path,
+          uploaded_by: guardId,
+          client_visible: true,
+        })
+        .select()
+        .maybeSingle();
+
+      if (mediaRow) {
+        await supabase.from('evidence_files').insert({
+          company_id: companyId,
+          site_id: todayShift.site_id,
+          incident_id: incidentData.id,
+          file_name: path.split('/').pop() || 'image',
+          file_url: mediaUrl,
+          file_type: 'image',
+          storage_bucket: 'incident-media',
+          storage_path: path,
+          uploaded_by: userId,
+          uploaded_by_guard: guardId,
+          linked_to_incident: true,
+          review_status: 'pending',
+        });
+      }
     }
+
+    await supabase.from('incidents').update({
+      linked_evidence_count: photoPaths.length,
+    }).eq('id', incidentData.id);
 
     if (severity === 'critical') {
-      await supabase.from('ai_activity_logs').insert({
-        company_id: companyId,
-        incident_id: incidentData.id,
-        guard_id: guardId,
-        action_type: 'critical_alert_intended',
-        details: { message: 'Critical incident alert intended for on-call ops manager', site: todayShift.site?.site_name },
+      await triggerNotificationForAllAdmins(companyId, {
+        type: 'incident_critical',
+        title: `Critical incident: ${incidentType}`,
+        body: `${guardName} reported ${incidentType} at ${todayShift.site?.site_name || 'site'}. Incident #${incidentData.incident_number}`,
+        link: `/incidents/${incidentData.id}`,
+        relatedId: incidentData.id,
+        relatedType: 'incident',
+        severity: 'critical',
       });
     }
-
-    // Background AI rewrite — don't block
-    // Future: call ai-rewrite-incident edge function when available
-    // (async () => {
-    //   try {
-    //     const { data: fnData } = await supabase.functions.invoke('ai-rewrite-incident', {
-    //       body: { incident_id: incidentData.id },
-    //     });
-    //   } catch { }
-    // })();
 
     if (navigator.vibrate) navigator.vibrate([100, 50, 200]);
     setSubmitting(false);

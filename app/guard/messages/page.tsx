@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 import GuardBottomNav from '../components/GuardBottomNav';
 
 interface Message {
@@ -16,56 +15,54 @@ interface Message {
 }
 
 export default function GuardMessagesPage() {
-  const { currentUser, profile, company, isLoading: authLoading } = useAuth();
-  const router = useRouter();
+  const g = useGuardAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.replace('/login/guard');
-    }
-  }, [currentUser, authLoading, router]);
+  const siteId = g.todayShift?.site_id || g.nextShift?.site_id || null;
+  const siteName = g.todayShift?.site?.site_name || g.nextShift?.site?.site_name || null;
 
   const loadMessages = useCallback(async () => {
-    if (!currentUser || !company?.id) { setLoading(false); return; }
+    if (!g.currentUser || !g.companyId) { setLoading(false); return; }
 
-    const { data: guardData } = await supabase.from('guards').select('id').eq('user_id', currentUser.id).maybeSingle();
-    const guardId = guardData?.id;
+    const items: Message[] = [];
 
-    // Get messages from client_messages table where guard is involved
-    const { data: clientMsgs } = await supabase
-      .from('client_messages')
-      .select('id, sender_name, sender_role, content, created_at, client_id')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    if (siteId && g.guardId) {
+      const { data: clientMsgs } = await supabase
+        .from('client_messages')
+        .select('id, sender_name, sender_role, content, created_at, client_id')
+        .eq('company_id', g.companyId)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-    const items: Message[] = (clientMsgs || []).map((m: any) => ({
-      id: m.id,
-      sender_name: m.sender_name || 'Control Room',
-      sender_role: m.sender_role || 'ops',
-      content: m.content,
-      created_at: m.created_at,
-      is_mine: false,
-    }));
+      (clientMsgs || []).forEach((m: any) => {
+        items.push({
+          id: m.id,
+          sender_name: m.sender_name || 'Control Room',
+          sender_role: m.sender_role || 'ops',
+          content: m.content,
+          created_at: m.created_at,
+          is_mine: false,
+        });
+      });
+    }
 
-    // Also get occurrence book entries as a form of message
-    if (guardId) {
+    if (g.guardId) {
       const { data: obEntries } = await supabase
         .from('occurrence_books')
         .select('id, entry, entry_type, created_at')
-        .eq('guard_id', guardId)
+        .eq('guard_id', g.guardId)
+        .eq('company_id', g.companyId)
         .order('created_at', { ascending: false })
         .limit(20);
 
       (obEntries || []).forEach((ob: any) => {
         items.push({
           id: `ob-${ob.id}`,
-          sender_name: profile?.first_name || 'You',
+          sender_name: g.guardName,
           sender_role: 'guard',
           content: `[${ob.entry_type}] ${ob.entry}`,
           created_at: ob.created_at,
@@ -77,11 +74,11 @@ export default function GuardMessagesPage() {
     items.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     setMessages(items);
     setLoading(false);
-  }, [currentUser, company?.id, profile?.first_name]);
+  }, [g.currentUser, g.companyId, g.guardId, siteId, g.guardName]);
 
   useEffect(() => {
-    if (currentUser) loadMessages();
-  }, [currentUser, loadMessages]);
+    if (g.currentUser) loadMessages();
+  }, [g.currentUser, loadMessages]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -90,15 +87,13 @@ export default function GuardMessagesPage() {
   }, [messages]);
 
   async function handleSend() {
-    if (!input.trim() || !company?.id || !currentUser) return;
+    if (!input.trim() || !g.companyId || !g.currentUser || !g.guardId) return;
     setSending(true);
 
-    const { data: guardData } = await supabase.from('guards').select('id').eq('user_id', currentUser.id).maybeSingle();
-    const guardId = guardData?.id;
-
     await supabase.from('occurrence_books').insert({
-      company_id: company.id,
-      guard_id: guardId,
+      company_id: g.companyId,
+      site_id: siteId,
+      guard_id: g.guardId,
       entry_type: 'Message',
       entry: input.trim(),
     });
@@ -107,7 +102,7 @@ export default function GuardMessagesPage() {
       ...prev,
       {
         id: `tmp-${Date.now()}`,
-        sender_name: profile?.first_name || 'You',
+        sender_name: g.guardName,
         sender_role: 'guard',
         content: input.trim(),
         created_at: new Date().toISOString(),
@@ -128,7 +123,7 @@ export default function GuardMessagesPage() {
     return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
 
-  if (authLoading || !currentUser) {
+  if (g.loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <i className="ri-loader-4-line animate-spin text-[#3b82f6] text-2xl"></i>
@@ -138,13 +133,13 @@ export default function GuardMessagesPage() {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/5">
         <h1 className="text-xl font-bold text-white">Messages</h1>
-        <p className="text-xs text-gray-400 mt-0.5">Control room & shift updates</p>
+        {siteName && (
+          <p className="text-xs text-gray-400 mt-0.5">{siteName}</p>
+        )}
       </div>
 
-      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -156,6 +151,7 @@ export default function GuardMessagesPage() {
               <i className="ri-chat-3-line text-gray-500 text-2xl"></i>
             </div>
             <p className="text-sm text-gray-400">No messages yet</p>
+            <p className="text-xs text-gray-500 mt-1">Messages from control room will appear here</p>
           </div>
         ) : (
           messages.map((msg, i) => {
@@ -188,7 +184,6 @@ export default function GuardMessagesPage() {
         )}
       </div>
 
-      {/* Input */}
       <div className="px-3 py-3 border-t border-white/5 bg-[#0a0a0a]">
         <div className="flex items-center gap-2">
           <input

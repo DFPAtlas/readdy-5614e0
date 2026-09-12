@@ -35,7 +35,7 @@ function statusBadgeStyles(status: string | null | undefined) {
 }
 
 export default function BillingSettings() {
-  const { companyId } = useAuth();
+  const { companyId, refreshCompany } = useAuth();
   const { openPortal, loading: portalLoading } = useStripePortal();
 
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
@@ -55,10 +55,11 @@ export default function BillingSettings() {
         .eq('id', companyId)
         .maybeSingle();
       setCompany(data);
+      if (data) refreshCompany();
     } catch {} finally {
       setCompanyLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, refreshCompany]);
 
   useEffect(() => {
     fetchCompany();

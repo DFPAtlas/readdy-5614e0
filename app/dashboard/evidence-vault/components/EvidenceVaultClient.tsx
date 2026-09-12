@@ -8,12 +8,14 @@ import { useAuth } from '@/lib/auth';
 import { callAgent } from '@/lib/guardianhubAgents';
 import AgentStatusBar from '@/components/AgentStatusBar';
 import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
+import { logEvidenceAccess, logPageAccess } from '@/lib/useEvidenceAuditLog';
 import SummaryCards from './SummaryCards';
 import EvidenceFilters from './EvidenceFilters';
 import EvidenceGallery from './EvidenceGallery';
 import UploadModal from './UploadModal';
 import ReviewModal from './ReviewModal';
 import ViewerModal from './ViewerModal';
+import EvidenceAccessLog from './EvidenceAccessLog';
 import LoadingState from './LoadingState';
 import EmptyState from './EmptyState';
 import { useGuards } from '@/lib/useGuards';
@@ -39,6 +41,7 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
   const [linkIncidentId, setLinkIncidentId] = useState('');
   const [showLink, setShowLink] = useState(false);
   const [allClients, setAllClients] = useState<{ id: string; name: string }[]>([]);
+  const [activeTab, setActiveTab] = useState<'gallery' | 'access-log'>('gallery');
 
   const { files, incidentMedia, stats, loading, error, refetch, uploadFile, markReviewed, linkToIncident, addNote, downloadFile, isSuperAdmin, role } = useEvidenceVault(filters);
   const { sites } = useSites();
@@ -84,9 +87,21 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
   }, [profile?.id, loading]);
 
   useEffect(() => {
+    if (!companyId || !profile?.id) return;
+    logPageAccess({
+      company_id: companyId,
+      user_id: profile.id,
+      user_role: profile.role || 'unknown',
+      source_route: '/dashboard/evidence-vault',
+    });
+  }, [companyId, profile?.id, profile?.role]);
+
+  useEffect(() => {
     if (!companyId) return;
-    supabase.from('clients').select('id, name').eq('company_id', companyId).order('name').then(({ data }) => {
-      setAllClients((data || []).map((c: any) => ({ id: c.id, name: c.name || 'Unnamed' })));
+    supabase.from('clients').select('id, name').eq('company_id', companyId).order('name').then(({ data, error }) => {
+      if (!error && data) {
+        setAllClients((data || []).map((c: any) => ({ id: c.id, name: c.name || 'Unnamed' })));
+      }
     });
   }, [companyId]);
 
@@ -123,6 +138,52 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
 
   const totalItems = files.length + incidentMedia.length;
 
+  const wrappedDownloadFile = useCallback((url: string, name: string) => {
+    if (companyId && profile?.id) {
+      logEvidenceAccess({
+        company_id: companyId,
+        user_id: profile.id,
+        user_role: profile.role || 'unknown',
+        action: 'download',
+        source_route: '/dashboard/evidence-vault',
+        metadata: { file_name: name },
+      });
+    }
+    downloadFile(url, name);
+  }, [companyId, profile?.id, profile?.role, downloadFile]);
+
+  const wrappedUploadFile = useCallback(async (file: File, metadata: any) => {
+    const result = await uploadFile(file, metadata);
+    if (!result.error && companyId && profile?.id) {
+      logEvidenceAccess({
+        company_id: companyId,
+        site_id: metadata.site_id || null,
+        client_id: metadata.client_id || null,
+        user_id: profile.id,
+        user_role: profile.role || 'unknown',
+        evidence_file_id: result.data?.id || null,
+        action: 'upload',
+        source_route: '/dashboard/evidence-vault',
+        metadata: { file_name: file.name, file_size: file.size, file_type: metadata.file_type },
+      });
+    }
+    return result;
+  }, [companyId, profile?.id, profile?.role, uploadFile]);
+
+  const handleView = useCallback((url: string, name: string, type: string) => {
+    if (companyId && profile?.id) {
+      logEvidenceAccess({
+        company_id: companyId,
+        user_id: profile.id,
+        user_role: profile.role || 'unknown',
+        action: 'view',
+        source_route: '/dashboard/evidence-vault',
+        metadata: { file_name: name, file_type: type },
+      });
+    }
+    setViewerFile({ url, name, type });
+  }, [companyId, profile?.id, profile?.role]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -131,6 +192,20 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
           <p className="text-sm text-gray-400 mt-1">Secure photo, video, and document storage</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center bg-gray-800/60 rounded-lg p-0.5">
+            <button
+              onClick={() => setActiveTab('gallery')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'gallery' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Gallery
+            </button>
+            <button
+              onClick={() => setActiveTab('access-log')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'access-log' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Access Log
+            </button>
+          </div>
           <button
             onClick={() => setShowUpload(true)}
             className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap"
@@ -166,7 +241,9 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
         </div>
       )}
 
-      {loading ? (
+      {activeTab === 'access-log' ? (
+        <EvidenceAccessLog />
+      ) : loading ? (
         <LoadingState />
       ) : (
         <>
@@ -190,8 +267,8 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
               <EvidenceGallery
                 files={files}
                 incidentMedia={incidentMedia}
-                onView={(url, name, type) => setViewerFile({ url, name, type })}
-                onDownload={downloadFile}
+                onView={handleView}
+                onDownload={wrappedDownloadFile}
                 onMarkReviewed={handleMarkReviewed}
                 onLinkIncident={(fileId) => { setLinkFile(fileId); setShowLink(true); }}
                 onAddNote={(fileId) => {
@@ -208,7 +285,7 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
         <UploadModal
           sites={allSites}
           clients={allClients}
-          onUpload={uploadFile}
+          onUpload={wrappedUploadFile}
           onClose={() => setShowUpload(false)}
         />
       )}
@@ -227,7 +304,7 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
           fileName={viewerFile.name}
           fileType={viewerFile.type}
           onClose={() => setViewerFile(null)}
-          onDownload={downloadFile}
+          onDownload={wrappedDownloadFile}
         />
       )}
 

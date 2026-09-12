@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useClientPortal } from '@/lib/useClientPortal';
+import { useClientAuth } from '@/lib/useClientAuth';
 import Link from 'next/link';
 
 export default function ClientMessagesPage() {

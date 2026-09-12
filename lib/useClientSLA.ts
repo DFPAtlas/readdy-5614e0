@@ -13,10 +13,6 @@ export interface SLAData {
   slaBreachCount: number;
   firstResponseBreachCount: number;
   resolutionBreachCount: number;
-  loading: boolean;
-  error: string | null;
-  lastUpdated: Date | null;
-  refetch: () => void;
 }
 
 export interface PatrolSLAData {
@@ -133,10 +129,6 @@ export function useClientSLA(filters: FilterOptions = {}) {
     slaBreachCount: 0,
     firstResponseBreachCount: 0,
     resolutionBreachCount: 0,
-    loading: true,
-    error: null,
-    lastUpdated: null,
-    refetch: () => {},
   });
   const [patrolData, setPatrolData] = useState<PatrolSLAData[]>([]);
   const [incidentData, setIncidentData] = useState<IncidentSLAData[]>([]);
@@ -390,10 +382,6 @@ export function useClientSLA(filters: FilterOptions = {}) {
         slaBreachCount,
         firstResponseBreachCount: firstResponseBreaches,
         resolutionBreachCount: resolutionBreaches,
-        loading: false,
-        error: null,
-        lastUpdated: new Date(),
-        refetch: () => {},
       });
       setPatrolData(patrolDataArr);
       setIncidentData(incidentDataArr);
@@ -405,7 +393,6 @@ export function useClientSLA(filters: FilterOptions = {}) {
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load SLA data');
-      setSummary((s) => ({ ...s, loading: false, error: err.message }));
     } finally {
       setLoading(false);
     }
@@ -436,7 +423,7 @@ export function useClientSLA(filters: FilterOptions = {}) {
   }, [companyId, fetchData]);
 
   return {
-    summary: { ...summary, refetch: fetchData },
+    summary,
     patrolData,
     incidentData,
     attendanceData,

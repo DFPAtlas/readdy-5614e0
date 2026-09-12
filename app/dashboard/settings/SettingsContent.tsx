@@ -9,13 +9,14 @@ import SystemSettings from './SystemSettings';
 import BillingSettings from './BillingSettings';
 import RolesAndPermissions from './RolesAndPermissions';
 import AIIntegrationSettings from './AIIntegrationSettings';
+import ComplianceSettings from './compliance/ComplianceSettings';
 
 export default function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams?.get('tab');
-    return tab && ['account','notifications','security','system','billing','roles','ai'].includes(tab) ? tab : 'account';
+    return tab && ['account','notifications','security','system','billing','roles','ai','compliance'].includes(tab) ? tab : 'account';
   });
 
   const tabs = [
@@ -24,6 +25,7 @@ export default function SettingsContent() {
     { id: 'security', name: 'Security', icon: 'ri-shield-line' },
     { id: 'system', name: 'System', icon: 'ri-settings-line' },
     { id: 'ai', name: 'AI & Integrations', icon: 'ri-openai-line' },
+    { id: 'compliance', name: 'Compliance', icon: 'ri-scales-3-line' },
     { id: 'billing', name: 'Billing', icon: 'ri-bank-card-line' },
     { id: 'roles', name: 'Roles & Permissions', icon: 'ri-shield-user-line', external: '/dashboard/settings/roles' }
   ];
@@ -40,6 +42,8 @@ export default function SettingsContent() {
         return <SystemSettings />;
       case 'ai':
         return <AIIntegrationSettings />;
+      case 'compliance':
+        return <ComplianceSettings />;
       case 'billing':
         return <BillingSettings />;
       case 'roles':

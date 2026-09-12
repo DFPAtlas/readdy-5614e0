@@ -23,10 +23,14 @@ export default function QuickEntryBar({ siteId, onAdd, onOpenModal, saving }: Pr
   return (
     <div className="sticky bottom-0 bg-[#0b0f19]/80 backdrop-blur-md border-t border-gray-800 py-3 px-4">
       <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-3xl mx-auto">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-500/10 border border-gray-700 text-[11px] font-medium text-gray-400 flex-shrink-0">
+          <div className="w-3 h-3 flex items-center justify-center"><i className="ri-sticky-note-line"></i></div>
+          Note
+        </span>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={siteId ? 'Quick log entry...' : 'Select a site first'}
+          placeholder={siteId ? 'Quick log a note...' : 'Select a site first'}
           disabled={!siteId || saving}
           className="flex-1 bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-40"
         />

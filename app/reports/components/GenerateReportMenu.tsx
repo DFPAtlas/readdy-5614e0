@@ -21,6 +21,24 @@ export default function GenerateReportMenu({ onClose }: GenerateMenuProps) {
               <p className="text-xs text-gray-500">From any open or closed incident</p>
             </div>
           </button>
+          <Link href="/reports/compliance" onClick={onClose} className="block w-full text-left px-4 py-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors flex items-center gap-3 cursor-pointer">
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <div className="w-5 h-5 flex items-center justify-center text-emerald-400"><i className="ri-shield-check-line"></i></div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">Compliance & Audit Readiness</p>
+              <p className="text-xs text-gray-500">Document expiry, SIA status, vetting and training gaps</p>
+            </div>
+          </Link>
+          <Link href="/reports/patrol-summary" onClick={onClose} className="block w-full text-left px-4 py-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors flex items-center gap-3 cursor-pointer">
+            <div className="w-9 h-9 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+              <div className="w-5 h-5 flex items-center justify-center text-cyan-400"><i className="ri-radar-line"></i></div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">Patrol Performance Summary</p>
+              <p className="text-xs text-gray-500">Guard patrol completion and GPS accuracy per site</p>
+            </div>
+          </Link>
           <Link href="/reports/weekly" onClick={onClose} className="block w-full text-left px-4 py-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors flex items-center gap-3 cursor-pointer">
             <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
               <div className="w-5 h-5 flex items-center justify-center text-amber-400"><i className="ri-building-line"></i></div>

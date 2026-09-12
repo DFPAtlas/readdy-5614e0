@@ -6,6 +6,7 @@ import SitesTable from './components/SitesTable';
 import SiteSetupWizard from './components/SiteSetupWizard';
 import DeleteDialog from './components/DeleteDialog';
 import Toast from './components/Toast';
+import RiskFilterDropdown from './components/RiskFilterDropdown';
 import type { Site } from '@/lib/useSites';
 import { saveSiteShiftPatterns } from '@/lib/useSiteShiftPatterns';
 import { useAuth } from '@/lib/auth';
@@ -15,8 +16,6 @@ import { isTitanOrUnlimited } from '@/lib/featureMap';
 import UpgradeRequiredModal from '@/components/UpgradeRequiredModal';
 import { supabase } from '@/lib/supabase';
 import { SOP_TYPES } from '@/lib/sopTypes';
-
-const riskLevels = ['all', 'low', 'medium', 'high', 'critical'];
 
 export default function SitesPage() {
   const { sites, loading, error, refetch, addSite, updateSite, deleteSite } = useSites();
@@ -43,6 +42,8 @@ export default function SitesPage() {
   const sitesUnlimited = isTitanOrUnlimited(maxSites);
   const atSiteLimit = !sitesUnlimited && sites.filter((s): s is Site => s != null && typeof s === 'object').length >= maxSites;
 
+  const canCreate = can('sites', 'create');
+
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -50,6 +51,11 @@ export default function SitesPage() {
       setSortKey(key);
       setSortDir('asc');
     }
+    setPage(1);
+  };
+
+  const handleRiskChange = (v: string) => {
+    setRiskFilter(v);
     setPage(1);
   };
 
@@ -80,6 +86,21 @@ export default function SitesPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / 25));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * 25, safePage * 25);
+
+  const summary = useMemo(() => {
+    const valid = sites.filter((s): s is Site => s != null && typeof s === 'object');
+    const low = valid.filter((s) => (s.risk_level || 'low') === 'low').length;
+    const medium = valid.filter((s) => s.risk_level === 'medium').length;
+    const high = valid.filter((s) => s.risk_level === 'high' || s.risk_level === 'critical').length;
+    return { total: valid.length, low, medium, high };
+  }, [sites]);
+
+  const summaryCards = [
+    { label: 'Total Sites', value: summary.total, icon: 'ri-building-line', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+    { label: 'Low Risk', value: summary.low, icon: 'ri-shield-check-line', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'Medium Risk', value: summary.medium, icon: 'ri-alert-line', color: 'text-amber-400', bg: 'bg-amber-500/10' },
+    { label: 'High / Critical', value: summary.high, icon: 'ri-error-warning-line', color: 'text-red-400', bg: 'bg-red-500/10' },
+  ];
 
   const openAdd = () => {
     if (atSiteLimit) {
@@ -162,20 +183,34 @@ export default function SitesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Sites</h1>
-          <p className="text-gray-400 text-sm mt-1">Manage all sites your company guards</p>
+          <p className="text-gray-400 text-sm mt-1">Manage and monitor all guarded locations</p>
         </div>
-        {can('sites', 'create') && (
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
-          Add Site
-        </button>
+        {canCreate && (
+          <button
+            onClick={openAdd}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
+            Add Site
+          </button>
         )}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((c) => (
+          <div key={c.label} className="bg-[#0f172a]/70 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-400">{c.label}</span>
+              <div className={`w-7 h-7 rounded-md ${c.bg} flex items-center justify-center`}>
+                <i className={`${c.icon} ${c.color} text-sm`}></i>
+              </div>
+            </div>
+            <div className={`text-2xl font-bold ${c.color} mt-1`}>{c.value}</div>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -191,15 +226,7 @@ export default function SitesPage() {
             className="w-full bg-gray-800/60 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setRiskFilter((r) => (r === 'all' ? 'low' : riskLevels[(riskLevels.indexOf(r) + 1) % riskLevels.length]))}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 bg-gray-800/60 text-gray-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-filter-line"></i></div>
-            {riskFilter === 'all' ? 'All Risk Levels' : `Risk: ${riskFilter.charAt(0).toUpperCase() + riskFilter.slice(1)}`}
-          </button>
-        </div>
+        <RiskFilterDropdown value={riskFilter} onChange={handleRiskChange} />
       </div>
 
       {error && (
@@ -222,6 +249,9 @@ export default function SitesPage() {
         onPageChange={setPage}
         total={filtered.length}
         search={search}
+        hasAnySites={sites.length > 0}
+        canCreate={canCreate}
+        onAdd={openAdd}
       />
 
       {modalOpen && (
@@ -245,7 +275,8 @@ export default function SitesPage() {
       <UpgradeRequiredModal
         isOpen={limitModalOpen}
         onClose={() => setLimitModalOpen(false)}
-        featureName={`Add Site (limit: ${maxSites})`}
+        limitLabel={`Add Site`}
+        limitValue={maxSites}
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

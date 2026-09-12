@@ -5,6 +5,6 @@ export async function generateStaticParams() {
 }
 
 export default async function SiteDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await params;
-  return <SiteDetailClient />;
+  const { id } = await params;
+  return <SiteDetailClient siteId={id} />;
 }

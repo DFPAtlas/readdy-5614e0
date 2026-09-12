@@ -110,6 +110,15 @@ function Field({
   );
 }
 
+function validatePassword(password: string): string | null {
+  if (!password) return 'Password is required';
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+  if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
+  if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
+  return null;
+}
+
 export default function OpsSignup() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -151,8 +160,8 @@ export default function OpsSignup() {
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) nextErrors.email = 'Enter a valid email';
       }
       if (s === 3) {
-        if (!form.password) nextErrors.password = 'Password is required';
-        else if (form.password.length < 6) nextErrors.password = 'Minimum 6 characters';
+        const passwordError = validatePassword(form.password);
+        if (passwordError) nextErrors.password = passwordError;
         if (form.password !== form.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match';
         if (!form.agreeTerms) nextErrors.agreeTerms = 'You must agree to the terms';
       }
@@ -285,7 +294,10 @@ export default function OpsSignup() {
             <h2 className="text-lg font-semibold text-white mb-1">Secure your account</h2>
             <p className="text-sm text-gray-400 mb-5">Create a strong password to protect your operations data.</p>
             <div className="space-y-4">
-              <Field label="Password" name="password" type="password" placeholder="Min 6 characters" required value={form.password} error={errors.password} onChange={(v) => updateField('password', v)} />
+              <Field label="Password" name="password" type="password" placeholder="Min 8 chars, upper, lower, number" required value={form.password} error={errors.password} onChange={(v) => updateField('password', v)} />
+              <div className="text-xs text-gray-500 -mt-2">
+                Must be at least 8 characters with uppercase, lowercase, and a number.
+              </div>
               <Field label="Confirm Password" name="confirmPassword" type="password" placeholder="Repeat password" required value={form.confirmPassword} error={errors.confirmPassword} onChange={(v) => updateField('confirmPassword', v)} />
 
               <div className="mt-2">

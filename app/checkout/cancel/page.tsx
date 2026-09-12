@@ -34,10 +34,10 @@ export default function CheckoutCancelPage() {
           </h1>
 
           <p className="text-gray-400 mb-2 leading-relaxed">
-            No payment was taken and your account has not been charged.
+            No subscription was started through this checkout. You can return to the service plans whenever you{'\u2019'}re ready.
           </p>
           <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-            You can choose a plan again whenever you are ready.
+            No payment was taken and your account has not been charged.
           </p>
 
           <div className="flex flex-col gap-3">
@@ -48,7 +48,17 @@ export default function CheckoutCancelPage() {
               <span className="w-5 h-5 flex items-center justify-center">
                 <i className="ri-arrow-left-line text-sm" />
               </span>
-              Back to pricing
+              Return to service plans
+            </Link>
+
+            <Link
+              href="/contact"
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-medium rounded-xl border border-white/10 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <span className="w-5 h-5 flex items-center justify-center">
+                <i className="ri-customer-service-line text-sm" />
+              </span>
+              Contact GuardianHub
             </Link>
 
             {checking ? (

@@ -3,14 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 
 export default function VisitorLogPage() {
-  const { profile, company } = useAuth();
+  const g = useGuardAuth();
   const router = useRouter();
-  const [guardId, setGuardId] = useState<string | null>(null);
-  const [siteId, setSiteId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [visitors, setVisitors] = useState<any[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -24,40 +21,19 @@ export default function VisitorLogPage() {
     notes: '',
   });
 
+  const siteId = g.todayShift?.site_id || null;
+
   useEffect(() => {
-    if (!profile?.id || !company?.id) return;
-    loadGuardInfo();
-  }, [profile?.id, company?.id]);
+    if (!g.guardId) return;
+    loadVisitors();
+  }, [g.guardId]);
 
-  const loadGuardInfo = async () => {
-    const { data: guardData } = await supabase
-      .from('guards')
-      .select('id')
-      .eq('user_id', profile!.id)
-      .maybeSingle();
-
-    if (guardData) {
-      setGuardId(guardData.id);
-
-      const { data: shiftData } = await supabase
-        .from('shifts')
-        .select('site_id')
-        .eq('guard_id', guardData.id)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (shiftData) setSiteId(shiftData.site_id);
-
-      await loadVisitors(guardData.id);
-    }
-    setLoading(false);
-  };
-
-  const loadVisitors = async (gid: string) => {
+  const loadVisitors = async () => {
+    if (!g.guardId) return;
     const { data } = await supabase
       .from('visitor_logs')
       .select('*')
-      .eq('guard_id', gid)
+      .eq('guard_id', g.guardId)
       .order('time_in', { ascending: false })
       .limit(30);
     setVisitors(data || []);
@@ -69,7 +45,7 @@ export default function VisitorLogPage() {
       setTimeout(() => setToast(null), 3000);
       return;
     }
-    if (!guardId || !company?.id) {
+    if (!g.guardId || !g.companyId) {
       setToast('Unable to identify guard or company');
       setTimeout(() => setToast(null), 3000);
       return;
@@ -77,9 +53,9 @@ export default function VisitorLogPage() {
 
     setSubmitting(true);
     const { error } = await supabase.from('visitor_logs').insert({
-      company_id: company.id,
+      company_id: g.companyId,
       site_id: siteId,
-      guard_id: guardId,
+      guard_id: g.guardId,
       visitor_name: form.visitor_name.trim(),
       company_name: form.company_name.trim() || null,
       person_visiting: form.person_visiting.trim() || null,
@@ -92,7 +68,7 @@ export default function VisitorLogPage() {
     if (!error) {
       setToast('Visitor logged successfully');
       setForm({ visitor_name: '', company_name: '', person_visiting: '', purpose: '', badge_number: '', vehicle_reg: '', notes: '' });
-      loadVisitors(guardId);
+      loadVisitors();
     } else {
       setToast('Failed to log visitor');
     }
@@ -102,10 +78,10 @@ export default function VisitorLogPage() {
 
   const handleSignOut = async (id: string) => {
     await supabase.from('visitor_logs').update({ time_out: new Date().toISOString() }).eq('id', id);
-    loadVisitors(guardId!);
+    loadVisitors();
   };
 
-  if (loading) {
+  if (g.loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>

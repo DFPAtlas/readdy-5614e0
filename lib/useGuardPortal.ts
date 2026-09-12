@@ -50,6 +50,14 @@ export interface PatrolLog {
   checkpoints_completed: number;
 }
 
+export interface GuardAssignedSite {
+  id: string;
+  site_id: string;
+  site_name: string;
+  induction_status: string;
+  status: string;
+}
+
 export interface GuardPortalState {
   todayShift: GuardShift | null;
   nextShift: GuardShift | null;
@@ -58,6 +66,7 @@ export interface GuardPortalState {
   guardId: string | null;
   loading: boolean;
   error: string | null;
+  assignedSites: GuardAssignedSite[];
   refetch: () => void;
 }
 
@@ -67,6 +76,7 @@ export function useGuardPortal(userId: string | null, companyId: string | null):
   const [activeAttendance, setActiveAttendance] = useState<AttendanceLog | null>(null);
   const [activePatrol, setActivePatrol] = useState<PatrolLog | null>(null);
   const [guardId, setGuardId] = useState<string | null>(null);
+  const [assignedSites, setAssignedSites] = useState<GuardAssignedSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,7 +110,7 @@ export function useGuardPortal(userId: string | null, companyId: string | null):
       const sevenDaysLater = new Date(now);
       sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
 
-      const [shiftsRes, attendanceRes, patrolRes] = await Promise.all([
+      const [shiftsRes, attendanceRes, patrolRes, assignmentsRes] = await Promise.all([
         supabase
           .from('shifts')
           .select('id, site_id, guard_id, start_time, end_time, status, notes')
@@ -125,6 +135,12 @@ export function useGuardPortal(userId: string | null, companyId: string | null):
           .eq('status', 'active')
           .order('start_time', { ascending: false })
           .limit(1),
+        supabase
+          .from('guard_site_assignments')
+          .select('id, site_id, status, induction_status')
+          .eq('guard_id', gId)
+          .eq('company_id', companyId)
+          .eq('is_blocked', false),
       ]);
 
       const shifts = shiftsRes.data || [];
@@ -167,6 +183,27 @@ export function useGuardPortal(userId: string | null, companyId: string | null):
 
       setActiveAttendance(attendanceRes.data?.[0] || null);
       setActivePatrol(patrolRes.data?.[0] || null);
+
+      const assignments = assignmentsRes.data || [];
+      const assignedSiteIds = assignments.map((a: any) => a.site_id).filter(Boolean);
+      let assignedSitesData: GuardAssignedSite[] = [];
+      if (assignedSiteIds.length > 0) {
+        const { data: sitesData } = await supabase
+          .from('sites')
+          .select('id, site_name')
+          .in('id', assignedSiteIds)
+          .eq('company_id', companyId);
+        const siteMap: Record<string, string> = {};
+        (sitesData || []).forEach((s: any) => { siteMap[s.id] = s.site_name; });
+        assignedSitesData = assignments.map((a: any) => ({
+          id: a.id,
+          site_id: a.site_id,
+          site_name: siteMap[a.site_id] || 'Unknown Site',
+          induction_status: a.induction_status || 'not_started',
+          status: a.status || 'assigned',
+        }));
+      }
+      setAssignedSites(assignedSitesData);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -178,5 +215,5 @@ export function useGuardPortal(userId: string | null, companyId: string | null):
     fetchData();
   }, [fetchData]);
 
-  return { todayShift, nextShift, activeAttendance, activePatrol, guardId, loading, error, refetch: fetchData };
+  return { todayShift, nextShift, activeAttendance, activePatrol, guardId, loading, error, assignedSites, refetch: fetchData };
 }

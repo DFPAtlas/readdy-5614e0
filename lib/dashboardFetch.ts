@@ -26,8 +26,13 @@ export interface DashboardSite {
   guard_first_name: string | null;
   guard_last_name: string | null;
   critical_incidents: number;
+  open_incidents: number;
   patrol_status: 'complete' | 'partial' | 'missed' | 'none';
   late_minutes?: number;
+  assigned_guards_count: number;
+  patrol_configured: boolean;
+  booked_on_count: number;
+  welfare_status: 'green' | 'amber' | 'red' | null;
 }
 
 export interface RecentIncident {
@@ -170,9 +175,13 @@ export async function fetchDashboard(companyId: string): Promise<DashboardResult
       supabase.from('shifts').select('id, start_time, site_id, guard_id, sites!inner(site_name), guards(first_name, last_name)').eq('company_id', companyId).lt('start_time', nowIso).or('status.eq.scheduled,guard_id.is.null').order('start_time', { ascending: false }).limit(20),
       supabase.from('site_risk_scores').select('site_id, score, level, ai_narrative').eq('company_id', companyId).order('generated_at', { ascending: false }),
       supabase.from('attendance_logs').select('id, guard_id, clock_in, shift_id, shifts!inner(site_id, start_time, sites!inner(site_name)), guards(first_name, last_name)').eq('company_id', companyId).gte('clock_in', todayStartIso).lte('clock_in', todayEndIso),
+      supabase.from('guard_site_assignments').select('site_id, guard_id').eq('company_id', companyId).eq('status', 'assigned'),
+      supabase.from('patrol_checkpoints').select('site_id', { count: 'exact', head: true }).eq('company_id', companyId).eq('is_active', true),
+      supabase.from('lone_worker_sessions').select('id, site_id, status, next_check_in_due_at, alarm_triggered_at, alarm_acknowledged_at, missed_check_ins').eq('company_id', companyId).eq('status', 'active'),
+      supabase.from('incidents').select('id, site_id, incident_type, status').eq('company_id', companyId).in('status', ['open', 'reviewing']).or('incident_type.ilike.%sos%,incident_type.ilike.%panic%'),
     ]);
 
-    const [activeShiftsRes, yesterdayShiftsRes, openIncidentsRes, openShiftsRes, nextOpenShiftRes, sitesRes, activeShiftsListRes, recentIncidentsRes, liveOccurrencesRes, weekShiftsRes, aiLogsRes, patrolLogsRes, lateShiftsRes, missingShiftsRes, riskScoresRes, attendanceTodayRes] = settled.map((r: any) => r.status === 'fulfilled' ? r.value : { data: [], count: 0 });
+    const [activeShiftsRes, yesterdayShiftsRes, openIncidentsRes, openShiftsRes, nextOpenShiftRes, sitesRes, activeShiftsListRes, recentIncidentsRes, liveOccurrencesRes, weekShiftsRes, aiLogsRes, patrolLogsRes, lateShiftsRes, missingShiftsRes, riskScoresRes, attendanceTodayRes, assignmentsRes, checkpointsRes, lwSessionsRes, sosIncidentsRes] = settled.map((r: any) => r.status === 'fulfilled' ? r.value : { data: [], count: 0 });
 
     const openIncidentsList = openIncidentsRes.data || [];
     const highCritical = openIncidentsList.filter((i: any) => i.severity === 'high' || i.severity === 'critical').length;
@@ -210,6 +219,19 @@ export async function fetchDashboard(companyId: string): Promise<DashboardResult
 
     const rawSites = sitesRes.data || [];
 
+    const assignedCountBySite: Record<string, number> = {};
+    (assignmentsRes.data || []).forEach((a: any) => {
+      if (a.site_id) assignedCountBySite[a.site_id] = (assignedCountBySite[a.site_id] || 0) + 1;
+    });
+
+    const patrolSiteIds = new Set((checkpointsRes.data || []).map((c: any) => c.site_id).filter(Boolean));
+
+    const bookedOnBySite: Record<string, number> = {};
+    (attendanceTodayRes.data || []).forEach((a: any) => {
+      const sid = (a as any).shifts?.site_id;
+      if (sid && !a.clock_out) bookedOnBySite[sid] = (bookedOnBySite[sid] || 0) + 1;
+    });
+
     const patrolBySite: Record<string, { total: number; completed: number; last_at: string | null }> = {};
     (patrolLogsRes.data || []).forEach((p: any) => {
       const sid = p.site_id;
@@ -243,13 +265,26 @@ export async function fetchDashboard(companyId: string): Promise<DashboardResult
         guard_first_name: g?.first_name || null,
         guard_last_name: g?.last_name || null,
         critical_incidents: 0,
+        open_incidents: 0,
         patrol_status: patrolStatus,
+        assigned_guards_count: assignedCountBySite[s.id] || 0,
+        patrol_configured: patrolSiteIds.has(s.id),
+        booked_on_count: bookedOnBySite[s.id] || 0,
       };
     });
 
     const incidentsBySite: Record<string, number> = {};
-    openIncidentsList.forEach((i: any) => { if ((i.severity === 'high' || i.severity === 'critical') && i.site_id) { incidentsBySite[i.site_id] = (incidentsBySite[i.site_id] || 0) + 1; } });
-    processedSites.forEach((s) => { s.critical_incidents = incidentsBySite[s.id] || 0; });
+    const openIncidentsBySite: Record<string, number> = {};
+    openIncidentsList.forEach((i: any) => {
+      if (i.site_id) openIncidentsBySite[i.site_id] = (openIncidentsBySite[i.site_id] || 0) + 1;
+      if ((i.severity === 'high' || i.severity === 'critical') && i.site_id) {
+        incidentsBySite[i.site_id] = (incidentsBySite[i.site_id] || 0) + 1;
+      }
+    });
+    processedSites.forEach((s) => {
+      s.critical_incidents = incidentsBySite[s.id] || 0;
+      s.open_incidents = openIncidentsBySite[s.id] || 0;
+    });
 
     const processedIncidents: RecentIncident[] = (recentIncidentsRes.data || []).map((i: any) => ({
       id: i.id, incident_type: i.incident_type, severity: i.severity, status: i.status, created_at: i.created_at, site_name: i.sites?.site_name || 'Unknown', description: i.description,
@@ -349,6 +384,36 @@ export async function fetchDashboard(companyId: string): Promise<DashboardResult
     });
 
     const staffingShortageSites = new Set((openShiftsRes.data || []).map((s: any) => s.site_id)).size;
+
+    const lwSessions = lwSessionsRes.data || [];
+    const sosIncidents = sosIncidentsRes.data || [];
+
+    const nowDate = new Date();
+    const lwAlarmBySite: Record<string, boolean> = {};
+    const lwOverdueBySite: Record<string, boolean> = {};
+    const lwMissedBySite: Record<string, boolean> = {};
+    lwSessions.forEach((s: any) => {
+      const sid = s.site_id;
+      if (!sid) return;
+      if (s.alarm_triggered_at && !s.alarm_acknowledged_at) lwAlarmBySite[sid] = true;
+      if (s.next_check_in_due_at && new Date(s.next_check_in_due_at) < nowDate) lwOverdueBySite[sid] = true;
+      if ((s.missed_check_ins || 0) > 0) lwMissedBySite[sid] = true;
+    });
+
+    const sosBySite: Record<string, boolean> = {};
+    sosIncidents.forEach((i: any) => {
+      if (i.site_id) sosBySite[i.site_id] = true;
+    });
+
+    processedSites.forEach((s) => {
+      if (sosBySite[s.id] || lwAlarmBySite[s.id]) {
+        s.welfare_status = 'red';
+      } else if (lwOverdueBySite[s.id] || lwMissedBySite[s.id]) {
+        s.welfare_status = 'amber';
+      } else {
+        s.welfare_status = 'green';
+      }
+    });
 
     return {
       kpis: {

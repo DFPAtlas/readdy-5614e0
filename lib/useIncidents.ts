@@ -7,13 +7,23 @@ export interface Incident {
   company_id: string | null;
   site_id: string | null;
   guard_id: string | null;
+  user_id: string | null;
+  shift_id: string | null;
+  incident_number: string | null;
   incident_type: string | null;
   severity: string | null;
+  title: string | null;
   description: string | null;
+  location: string | null;
   status: string | null;
   occurred_at: string | null;
+  reported_at: string | null;
   resolved_at: string | null;
   created_at: string | null;
+  client_visible: boolean;
+  requires_follow_up: boolean;
+  follow_up_status: string | null;
+  linked_evidence_count: number | null;
   site_name?: string | null;
   guard_name?: string | null;
 }
@@ -21,11 +31,16 @@ export interface Incident {
 export interface IncidentForm {
   site_id: string;
   guard_id: string | null;
+  shift_id: string | null;
   incident_type: string;
   severity: string;
+  title: string;
   description: string;
+  location: string;
   status: string;
   occurred_at: string;
+  client_visible: boolean;
+  requires_follow_up: boolean;
 }
 
 export interface IncidentFilters {
@@ -71,13 +86,23 @@ export function useIncidents(filters?: IncidentFilters) {
         company_id: row.company_id,
         site_id: row.site_id,
         guard_id: row.guard_id,
+        user_id: row.user_id,
+        shift_id: row.shift_id,
+        incident_number: row.incident_number,
         incident_type: row.incident_type,
         severity: row.severity,
+        title: row.title,
         description: row.description,
+        location: row.location,
         status: row.status,
         occurred_at: row.occurred_at,
+        reported_at: row.reported_at,
         resolved_at: row.resolved_at,
         created_at: row.created_at,
+        client_visible: row.client_visible ?? true,
+        requires_follow_up: row.requires_follow_up ?? false,
+        follow_up_status: row.follow_up_status,
+        linked_evidence_count: row.linked_evidence_count,
         site_name: row.sites?.site_name || null,
         guard_name: row.guards?.first_name && row.guards?.last_name
           ? `${row.guards.first_name} ${row.guards.last_name}`
@@ -141,11 +166,17 @@ export function useIncidents(filters?: IncidentFilters) {
         company_id: companyId,
         site_id: payload.site_id,
         guard_id: payload.guard_id || null,
+        shift_id: payload.shift_id || null,
         incident_type: payload.incident_type,
         severity: payload.severity,
+        title: payload.title || payload.incident_type,
         description: payload.description,
+        location: payload.location || null,
         status: payload.status || 'open',
         occurred_at: payload.occurred_at,
+        client_visible: payload.client_visible ?? true,
+        requires_follow_up: payload.requires_follow_up ?? false,
+        reported_at: new Date().toISOString(),
       })
       .select()
       .maybeSingle();

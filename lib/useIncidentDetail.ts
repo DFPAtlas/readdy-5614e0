@@ -27,6 +27,7 @@ export interface IncidentMedia {
   file_url: string;
   media_type: string;
   filename: string | null;
+  storage_path: string | null;
   uploaded_by: string | null;
   created_at: string;
 }
@@ -36,14 +37,24 @@ export interface IncidentDetail {
   company_id: string | null;
   site_id: string | null;
   guard_id: string | null;
+  user_id: string | null;
+  shift_id: string | null;
+  incident_number: string | null;
   incident_type: string | null;
   severity: string | null;
+  title: string | null;
   description: string | null;
+  location: string | null;
   ai_rewritten_report: string | null;
   status: string | null;
   occurred_at: string | null;
+  reported_at: string | null;
   resolved_at: string | null;
   created_at: string | null;
+  client_visible: boolean;
+  requires_follow_up: boolean;
+  follow_up_status: string | null;
+  linked_evidence_count: number | null;
   site_name?: string | null;
   site_latitude?: number | null;
   site_longitude?: number | null;
@@ -96,19 +107,37 @@ export function useIncidentDetail(incidentId: string) {
         .order('created_at', { ascending: false }),
     ]);
 
+    const mediaRows: any[] = await Promise.all((mediaData || []).map(async (m: any) => {
+      if (m.storage_path) {
+        const { data: signed } = await supabase.storage.from('incident-media').createSignedUrl(m.storage_path, 3600);
+        if (signed?.signedUrl) return { ...m, file_url: signed.signedUrl };
+      }
+      return m;
+    }));
+
     setIncident({
       id: incidentData.id,
       company_id: incidentData.company_id,
       site_id: incidentData.site_id,
       guard_id: incidentData.guard_id,
+      user_id: incidentData.user_id,
+      shift_id: incidentData.shift_id,
+      incident_number: incidentData.incident_number,
       incident_type: incidentData.incident_type,
       severity: incidentData.severity,
+      title: incidentData.title || incidentData.incident_type,
       description: incidentData.description,
+      location: incidentData.location,
       ai_rewritten_report: incidentData.ai_rewritten_report,
       status: incidentData.status,
       occurred_at: incidentData.occurred_at,
+      reported_at: incidentData.reported_at,
       resolved_at: incidentData.resolved_at,
       created_at: incidentData.created_at,
+      client_visible: incidentData.client_visible ?? true,
+      requires_follow_up: incidentData.requires_follow_up ?? false,
+      follow_up_status: incidentData.follow_up_status,
+      linked_evidence_count: incidentData.linked_evidence_count,
       site_name: (incidentData as any).sites?.site_name || null,
       site_latitude: (incidentData as any).sites?.latitude || null,
       site_longitude: (incidentData as any).sites?.longitude || null,
@@ -136,7 +165,7 @@ export function useIncidentDetail(incidentId: string) {
           ? `${t.users.first_name} ${t.users.last_name}`
           : t.users?.first_name || t.users?.last_name || 'Staff',
       })),
-      media: mediaData || [],
+      media: mediaRows,
     });
     setLoading(false);
   }, [companyId, incidentId]);
@@ -187,12 +216,16 @@ export function useIncidentDetail(incidentId: string) {
     });
   };
 
-  const addMedia = async (fileUrl: string, mediaType: string, filename: string) => {
+  const addMedia = async (fileUrl: string, mediaType: string, filename: string, storagePath?: string | null) => {
     const { data, error } = await supabase.from('incident_media')
-      .insert({ incident_id: incidentId, file_url: fileUrl, media_type: mediaType, filename, uploaded_by: currentUser?.id || null })
+      .insert({ incident_id: incidentId, file_url: fileUrl, media_type: mediaType, filename, storage_path: storagePath || null, uploaded_by: currentUser?.id || null, client_visible: true })
       .select()
       .maybeSingle();
-    if (!error) await logTimelineEvent('media_upload', { media_id: data?.id, filename });
+    if (!error) {
+      await logTimelineEvent('media_upload', { media_id: data?.id, filename });
+      const currentCount = incident?.linked_evidence_count ?? 0;
+      await supabase.from('incidents').update({ linked_evidence_count: currentCount + 1 }).eq('id', incidentId);
+    }
     return { data, error };
   };
 

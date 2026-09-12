@@ -1,24 +1,33 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { useDashboard } from '@/lib/useDashboard';
+import { useCommandCentreExtended } from '@/lib/useCommandCentreExtended';
 import { useNotifications } from '@/lib/useNotifications';
 import { useSupportTickets } from '@/lib/useSupportTickets';
 import { useAllRiskScores } from '@/lib/useRiskScores';
 import { useAuth } from '@/lib/auth';
-import { usePanicMode } from '@/app/dashboard/components/PanicModeContext';
-import { callAgent } from '@/lib/guardianhubAgents';
-import AgentStatusBar from '@/components/AgentStatusBar';
+import { useACSCompliance } from '@/lib/useACSCompliance';
 import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
-import AITooledOperationsCopilot from '@/app/dashboard/components/AITooledOperationsCopilot';
 import CommandCentreHeader from '@/app/dashboard/components/CommandCentreHeader';
-import StatusCards from './StatusCards';
+import AITooledOperationsCopilot from '@/app/dashboard/components/AITooledOperationsCopilot';
+import OperatingStateBanner from './OperatingStateBanner';
 import PriorityAlertFeed from './PriorityAlertFeed';
-import SitesNeedingAttentionPanel from './SitesNeedingAttentionPanel';
+import StatusCards from './StatusCards';
+import LoneWorkerAlertsCard from './LoneWorkerAlertsCard';
+import ClientMessagesCard from './ClientMessagesCard';
+import PendingLeaveCard from './PendingLeaveCard';
+import ComplianceExpiryCard from './ComplianceExpiryCard';
+import AgentHealthWidget from './AgentHealthWidget';
+import TodayShiftsWidget from './TodayShiftsWidget';
 import GuardWelfarePanel from './GuardWelfarePanel';
 import HandoverSummary from './HandoverSummary';
+import SitesNeedingAttentionPanel from './SitesNeedingAttentionPanel';
 import QuickActionBar from './QuickActionBar';
 import LoadingState from './LoadingState';
+import SiteActivityTimeline from './SiteActivityTimeline';
+import ReportsWidget from './ReportsWidget';
+import ACSComplianceStatusCard from './ACSComplianceStatusCard';
+import AIOperationsAssistantSection from './AIOperationsAssistantSection';
 
 export default function CommandCentreClient() {
   const { profile } = useAuth();
@@ -38,50 +47,34 @@ export default function CommandCentreClient() {
     refetch,
   } = useDashboard();
 
+  const {
+    loneWorkerAlerts,
+    unreadClientMessages,
+    pendingLeaveRequests,
+    complianceExpiries,
+    agentHealth,
+    loading: extendedLoading,
+    refetch: extendedRefetch,
+  } = useCommandCentreExtended();
+
   const { notifications } = useNotifications(profile?.id || null);
   const { tickets } = useSupportTickets();
   const { scores: riskScores } = useAllRiskScores();
+  const {
+    overallScore, auditFindings, auditRuns, areaScores,
+  } = useACSCompliance();
 
-  const [agentLoading, setAgentLoading] = useState(false);
-  const [agentError, setAgentError] = useState<string | null>(null);
-  const [agentData, setAgentData] = useState<any>(null);
+  const loading = dashLoading || extendedLoading;
+  const criticalFindings = auditFindings.filter(f => f.severity === 'critical' && f.status === 'open');
+  const overdueActions = auditFindings.filter(f => f.status === 'open' && f.due_date && new Date(f.due_date) < new Date()).length;
+  const latestAudit = auditRuns.length > 0 ? auditRuns[0] : null;
 
-  const fetchAgent = useCallback(async () => {
-    if (!profile?.id) return;
-    setAgentLoading(true);
-    setAgentError(null);
-    try {
-      const result = await callAgent(
-        'command_centre',
-        {
-          active_sites: sites.filter(s => s.shift_status === 'active').length,
-          guards_on_duty: guardsOnShift.length,
-          open_incidents: kpis.openIncidents,
-          missed_patrols: kpis.missedPatrols,
-        },
-        {
-          clientId: profile.company_id,
-          userId: profile.id,
-          requestedPage: '/dashboard/command-centre',
-          requestedFeature: 'command_centre',
-        }
-      );
-      if (result.error) setAgentError(result.error);
-      setAgentData(result.data);
-    } catch (err: any) {
-      setAgentError(err.message || 'Agent call failed');
-    } finally {
-      setAgentLoading(false);
-    }
-  }, [profile?.id, profile?.company_id, kpis.openIncidents, kpis.missedPatrols, sites.length, guardsOnShift.length]);
+  const activeSites = sites.filter(s => s.shift_status === 'active').length;
+  const lateGuards = guardsOnShift.filter(g => g.status === 'late' || g.status === 'critical_late').length;
+  const highRiskSites = riskScores.filter(s => s.level === 'high' || s.level === 'critical').length;
+  const loneWorkerAlarmCount = loneWorkerAlerts.filter(a => a.alarm_triggered).length;
 
-  useEffect(() => {
-    if (profile?.id && !dashLoading) {
-      fetchAgent();
-    }
-  }, [profile?.id, dashLoading]);
-
-  if (dashLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -100,15 +93,15 @@ export default function CommandCentreClient() {
     <div className="space-y-6">
       <CommandCentreHeader kpis={kpis} lastUpdated={lastUpdated} onRefresh={refetch} />
 
-      <WidgetBoundary widgetName="CommandCentreAgent" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
-        <AgentStatusBar
-          agentKey="command_centre"
-          loading={agentLoading}
-          error={agentError}
-          data={agentData}
-          onRetry={fetchAgent}
-        />
-      </WidgetBoundary>
+      <OperatingStateBanner
+        kpis={kpis}
+        guardsOnShift={guardsOnShift}
+        missingGuards={missingGuards}
+        staffingAlerts={staffingAlerts}
+        highRiskSiteCount={highRiskSites}
+        loneWorkerAlarmCount={loneWorkerAlarmCount}
+        lastUpdated={lastUpdated}
+      />
 
       {dashError && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-sm">
@@ -121,25 +114,25 @@ export default function CommandCentreClient() {
         </div>
       )}
 
+      <WidgetBoundary widgetName="StatusCards" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+        <StatusCards
+          activeSites={activeSites}
+          totalSites={sites.length}
+          guardsOnDuty={guardsOnShift.length}
+          lateGuards={lateGuards}
+          missingGuards={missingGuards.length}
+          openIncidents={kpis.openIncidents}
+          missedPatrols={kpis.missedPatrols}
+          highRiskSites={highRiskSites}
+        />
+      </WidgetBoundary>
+
       <WidgetBoundary widgetName="QuickActionBar" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
         <QuickActionBar />
       </WidgetBoundary>
 
-      <WidgetBoundary widgetName="StatusCards" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
-        <StatusCards
-          activeSites={sites.filter(s => s.shift_status === 'active').length}
-          totalSites={sites.length}
-          guardsOnDuty={guardsOnShift.length}
-          lateGuards={guardsOnShift.filter(g => g.status === 'late' || g.status === 'critical_late').length}
-          missingGuards={missingGuards.length}
-          openIncidents={kpis.openIncidents}
-          missedPatrols={kpis.missedPatrols}
-          highRiskSites={riskScores.filter(s => s.level === 'high' || s.level === 'critical').length}
-        />
-      </WidgetBoundary>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8">
           <WidgetBoundary widgetName="PriorityAlertFeed" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
             <PriorityAlertFeed
               incidents={recentIncidents}
@@ -150,14 +143,37 @@ export default function CommandCentreClient() {
               missingGuards={missingGuards}
               guardsOnShift={guardsOnShift}
               staffingAlerts={staffingAlerts}
+              loneWorkerAlerts={loneWorkerAlerts}
+              agentHealth={agentHealth}
             />
           </WidgetBoundary>
         </div>
-        <div>
+        <div className="lg:col-span-4">
           <WidgetBoundary widgetName="SitesNeedingAttention" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
             <SitesNeedingAttentionPanel sites={sites} riskScores={riskScores} />
           </WidgetBoundary>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <WidgetBoundary widgetName="TodayShifts" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <TodayShiftsWidget guardsOnShift={guardsOnShift} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="LoneWorkerAlerts" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <LoneWorkerAlertsCard alerts={loneWorkerAlerts} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="AgentHealth" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <AgentHealthWidget agentHealth={agentHealth} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="ClientMessages" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <ClientMessagesCard messages={unreadClientMessages} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="PendingLeave" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <PendingLeaveCard requests={pendingLeaveRequests} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="ComplianceExpiry" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <ComplianceExpiryCard expiries={complianceExpiries} />
+        </WidgetBoundary>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -183,9 +199,31 @@ export default function CommandCentreClient() {
         </WidgetBoundary>
       </div>
 
-      <WidgetBoundary widgetName="AIOperationsCopilot" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
-        <AITooledOperationsCopilot />
+      <WidgetBoundary widgetName="ACSComplianceStatus" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+        <ACSComplianceStatusCard
+          overallScore={overallScore}
+          criticalFindings={criticalFindings}
+          overdueActions={overdueActions}
+          upcomingExpiries={complianceExpiries.length}
+          latestAuditScore={latestAudit?.overall_score ?? null}
+          latestAuditDate={latestAudit?.completed_at ?? latestAudit?.created_at ?? null}
+        />
       </WidgetBoundary>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <WidgetBoundary widgetName="SiteActivityTimeline" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <SiteActivityTimeline sites={sites} incidents={recentIncidents} patrolSummary={patrolSummary} guardsOnShift={guardsOnShift} liveOccurrences={liveOccurrences} />
+        </WidgetBoundary>
+        <WidgetBoundary widgetName="ReportsWidget" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+          <ReportsWidget companyId={profile?.company_id || ''} />
+        </WidgetBoundary>
+      </div>
+
+      <WidgetBoundary widgetName="AIOperationsAssistant" pagePath="/dashboard/command-centre" clientId={profile?.company_id || undefined} userId={profile?.id || undefined}>
+        <AIOperationsAssistantSection agentHealth={agentHealth} loading={extendedLoading} onRefresh={extendedRefetch} />
+      </WidgetBoundary>
+
+      <AITooledOperationsCopilot />
     </div>
   );
 }

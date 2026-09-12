@@ -1,0 +1,52 @@
+{
+  "name": "GuardianHub Report Generation",
+  "version": "1.0.0",
+  "description": "Generates draft reports from authorized GuardianHub records. All reports marked as draft until approved.",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "report-generation", "responseMode": "lastNode", "options": {} },
+      "id": "webhook",
+      "name": "Report Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { company_id, report_type, date_range, site_id, user_id } = body;\n\nreturn {\n  json: {\n    report_id: body.run_id || crypto.randomUUID(),\n    company_id,\n    report_type: report_type || 'daily_summary',\n    date_range: date_range || {},\n    site_id,\n    status: 'draft',\n    generated_at: new Date().toISOString(),\n    generated_by: user_id,\n    source_records_linked: [],\n    warnings: [],\n    content: { title: report_type || 'Report', summary: 'Draft report - awaiting review and approval' }\n  }\n};"
+      },
+      "id": "generate-report",
+      "name": "Generate Report Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id || $input.first().json.body?.run_id }}" },
+            { "name": "status", "value": "completed" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "report_generation" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "report.generated" }
+          ]
+        }
+      },
+      "id": "callback",
+      "name": "Send Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Report Request Webhook": { "main": [[ { "node": "Generate Report Draft", "type": "main", "index": 0 } ]] },
+    "Generate Report Draft": { "main": [[ { "node": "Send Callback", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true }
+}

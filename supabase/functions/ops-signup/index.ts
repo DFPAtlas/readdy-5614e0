@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         trial_ends_at: trialEndDate.toISOString(),
         onboarding_status: 'pending_setup',
         subscription_status: 'trialing',
-        subscription_plan: 'professional',
+        subscription_plan: null,
       })
       .select()
       .single();

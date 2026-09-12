@@ -32,6 +32,7 @@ import ShiftPatternTemplates from './components/ShiftPatternTemplates';
 import ShiftBuilder from './components/ShiftBuilder';
 import type { ShiftPatternTemplate } from '@/lib/useShiftPatternTemplates';
 import PublishRotaBanner from './components/PublishRotaBanner';
+import RotaStatusStrip from './components/RotaStatusStrip';
 
 export default function RotasPage() {
   const { companyId, profile } = useAuth();
@@ -132,6 +133,7 @@ export default function RotasPage() {
   const [dayDrawerDate, setDayDrawerDate] = useState<Date | null>(null);
   const [rosterCollapsed, setRosterCollapsed] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   const [warningFilter, setWarningFilter] = useState<string | null>(null);
   const [sickPanelOpen, setSickPanelOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -706,6 +708,19 @@ export default function RotasPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/80 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded">Workforce Deployment</span>
+          <span className="text-[10px] text-gray-500">Step 2 · Deploy</span>
+        </div>
+        <a
+          href="/dashboard/site-assignments"
+          className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-800 border border-gray-700 text-gray-300 hover:text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+        >
+          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-shield-check-line"></i></div>
+          Deployment Eligibility
+        </a>
+      </div>
       <RotaHeader
         weekRange={weekRange}
         weekStart={weekStart}
@@ -729,6 +744,16 @@ export default function RotasPage() {
         onClearShifts={handleClearShifts}
       />
 
+      <RotaStatusStrip
+        totalShifts={shifts.length}
+        filled={shifts.filter((s) => s.guard_name).length}
+        unassigned={counts.unassigned}
+        conflicts={counts.conflicts}
+        overtime={counts.overtime}
+        leave={counts.leave}
+        published={weekIsLocked}
+      />
+
       <PublishRotaBanner
         published={weekIsLocked}
         publishedByName={published?.published_by_name}
@@ -745,31 +770,6 @@ export default function RotasPage() {
           {error}
         </div>
       )}
-
-      <AIRotaSummaryPanel
-        weekStart={weekStart}
-        shifts={shifts}
-        counts={counts}
-        criticalCount={criticalCount}
-        pendingSuggestions={aiRota.pending}
-        sickCoverData={sickCover.data}
-        timeOff={timeOff}
-        onGenerateAI={weekIsLocked ? undefined : handleGenerateAI}
-        onOpenSickCover={weekIsLocked ? undefined : () => {
-          setSickPanelOpen(true);
-          if (companyId) sickCover.generate(companyId, weekStart);
-        }}
-        onOpenSuggestions={weekIsLocked ? undefined : () => setAiPanelOpen(true)}
-        onApproveAllHigh={weekIsLocked ? undefined : handleApproveAllHighClick}
-        onOpenConflicts={weekIsLocked ? undefined : () => setWarningFilter(warningFilter === 'conflict' ? null : 'conflict')}
-        onTestAIConnection={handleTestAIConnection}
-        generating={aiSuggestions.loading || aiRota.loading}
-        approvingAll={approvingAll}
-        canApprove={can('rotas', 'edit') && !weekIsLocked}
-        lastAIError={lastAIError}
-        aiTestStatus={aiTestStatus}
-        weekIsLocked={weekIsLocked}
-      />
 
       <RotaWarningBar
         counts={counts}
@@ -800,16 +800,10 @@ export default function RotasPage() {
         />
       )}
 
-      <div className="flex gap-0">
-        <GuardRosterPanel
-          guards={guards}
-          guardStats={guardStats}
-          collapsed={rosterCollapsed}
-          onToggleCollapse={() => setRosterCollapsed((v) => !v)}
-        />
-        <div className="flex-1 min-w-0">
+      <div className="grid grid-cols-12 gap-4 items-start">
+        <div className="col-span-12 xl:col-span-9 min-w-0">
           {view === 'week' ? (
-            <div className="bg-[#111827]/60 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-[#0a0e1a]/80 border border-gray-800 rounded-xl overflow-hidden">
               <WeekGrid
                 weekStart={weekStart}
                 shifts={filteredShifts}
@@ -824,7 +818,7 @@ export default function RotasPage() {
               />
             </div>
           ) : (
-            <div className="bg-[#111827]/60 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-[#0a0e1a]/80 border border-gray-800 rounded-xl overflow-hidden">
               <MonthView
                 currentDate={currentDate}
                 shifts={filteredShifts}
@@ -836,6 +830,15 @@ export default function RotasPage() {
               />
             </div>
           )}
+        </div>
+
+        <div className="col-span-12 xl:col-span-3 min-w-0">
+          <GuardRosterPanel
+            guards={guards}
+            guardStats={guardStats}
+            collapsed={rosterCollapsed}
+            onToggleCollapse={() => setRosterCollapsed((v) => !v)}
+          />
         </div>
       </div>
 
@@ -911,6 +914,82 @@ export default function RotasPage() {
           periodLabel={periodLabel}
         />
       )}
+
+      <section className="bg-[#0a0e1a] border border-gray-800 rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-5 h-5 rounded-lg bg-blue-600/20 flex items-center justify-center">
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-tools-line text-blue-400"></i></div>
+          </div>
+          <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Rota Tools</h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => can('shift_patterns', 'view') && setTemplatesOpen(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800/60 hover:bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-folders-line text-violet-400"></i></div>
+            Shift Templates
+          </button>
+          <button
+            onClick={() => can('shift_patterns', 'create') && setBuilderOpen(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800/60 hover:bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-stack-line text-blue-400"></i></div>
+            Shift Builder
+          </button>
+        </div>
+      </section>
+
+      <section className="bg-[#0a0e1a] border border-gray-800 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setAiAssistantOpen((v) => !v)}
+          className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-800/30 transition-colors cursor-pointer"
+        >
+          <div className="w-5 h-5 rounded-lg bg-violet-600/20 flex items-center justify-center">
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-robot-2-line text-violet-400"></i></div>
+          </div>
+          <div className="text-left">
+            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">AI Rota Assistant</h2>
+            <p className="text-xs text-gray-500">Advisory suggestions — AI never changes the live rota without approval.</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {aiRota.pending.length > 0 && (
+              <span className="text-[11px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">{aiRota.pending.length} pending</span>
+            )}
+            <div className="w-4 h-4 flex items-center justify-center text-gray-500">
+              <i className={aiAssistantOpen ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'}></i>
+            </div>
+          </div>
+        </button>
+        {aiAssistantOpen && (
+          <div className="border-t border-gray-800">
+            <AIRotaSummaryPanel
+              weekStart={weekStart}
+              shifts={shifts}
+              counts={counts}
+              criticalCount={criticalCount}
+              pendingSuggestions={aiRota.pending}
+              sickCoverData={sickCover.data}
+              timeOff={timeOff}
+              onGenerateAI={weekIsLocked ? undefined : handleGenerateAI}
+              onOpenSickCover={weekIsLocked ? undefined : () => {
+                setSickPanelOpen(true);
+                if (companyId) sickCover.generate(companyId, weekStart);
+              }}
+              onOpenSuggestions={weekIsLocked ? undefined : () => setAiPanelOpen(true)}
+              onApproveAllHigh={weekIsLocked ? undefined : handleApproveAllHighClick}
+              onOpenConflicts={weekIsLocked ? undefined : () => setWarningFilter(warningFilter === 'conflict' ? null : 'conflict')}
+              onTestAIConnection={handleTestAIConnection}
+              generating={aiSuggestions.loading || aiRota.loading}
+              approvingAll={approvingAll}
+              canApprove={can('rotas', 'edit') && !weekIsLocked}
+              lastAIError={lastAIError}
+              aiTestStatus={aiTestStatus}
+              weekIsLocked={weekIsLocked}
+            />
+          </div>
+        )}
+      </section>
 
       <AISuggestionsPanel
         isOpen={aiPanelOpen}

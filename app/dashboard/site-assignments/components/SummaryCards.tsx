@@ -18,27 +18,34 @@ export default function SummaryCards({
   available: number;
 }) {
   const cards = [
-    { label: 'Total Guards', value: totalGuards, icon: 'ri-shield-user-line', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Total Sites', value: totalSites, icon: 'ri-building-line', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-    { label: 'Assigned', value: assigned, icon: 'ri-check-double-line', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { label: 'Approved', value: approved, icon: 'ri-shield-check-line', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Available', value: available, icon: 'ri-user-add-line', color: 'text-gray-400', bg: 'bg-gray-500/10' },
-    { label: 'Not Trained', value: notTrained, icon: 'ri-alert-line', color: 'text-orange-400', bg: 'bg-orange-500/10' },
-    { label: 'Blocked', value: blocked, icon: 'ri-forbid-line', color: 'text-red-400', bg: 'bg-red-500/10' },
-    { label: 'Expired Docs', value: expired, icon: 'ri-file-warning-line', color: 'text-rose-400', bg: 'bg-rose-500/10' },
+    { label: 'Guards', value: totalGuards, icon: 'ri-shield-user-line', accent: 'bg-blue-500/15 text-blue-400', critical: false },
+    { label: 'Sites', value: totalSites, icon: 'ri-building-line', accent: 'bg-cyan-500/15 text-cyan-400', critical: false },
+    { label: 'Assigned', value: assigned, icon: 'ri-check-double-line', accent: 'bg-emerald-500/15 text-emerald-400', critical: false },
+    { label: 'Approved', value: approved, icon: 'ri-shield-check-line', accent: 'bg-blue-500/15 text-blue-400', critical: false },
+    { label: 'Available', value: available, icon: 'ri-user-add-line', accent: 'bg-sky-500/15 text-sky-400', critical: false },
+    { label: 'Not Trained', value: notTrained, icon: 'ri-alert-line', accent: 'bg-amber-500/15 text-amber-400', critical: notTrained > 0 },
+    { label: 'Blocked', value: blocked, icon: 'ri-forbid-line', accent: 'bg-red-500/15 text-red-400', critical: blocked > 0 },
+    { label: 'Expired Docs', value: expired, icon: 'ri-file-warning-line', accent: 'bg-rose-500/15 text-rose-400', critical: expired > 0 },
   ];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
       {cards.map((card) => (
-        <div key={card.label} className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center`}>
-              <i className={`${card.icon} ${card.color} text-sm`}></i>
+        <div
+          key={card.label}
+          className={`rounded-xl px-3.5 py-3 border ${
+            card.critical ? 'bg-red-500/5 border-red-500/20' : 'bg-[#0a0e1a] border-gray-800'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${card.accent}`}>
+              <div className="w-4 h-4 flex items-center justify-center"><i className={card.icon}></i></div>
+            </div>
+            <div className="min-w-0">
+              <p className={`text-lg font-bold leading-tight ${card.critical ? 'text-red-400' : 'text-white'}`}>{card.value}</p>
+              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider truncate">{card.label}</p>
             </div>
           </div>
-          <div className={`text-2xl font-bold ${card.color}`}>{card.value}</div>
-          <div className="text-xs text-gray-500 mt-0.5">{card.label}</div>
         </div>
       ))}
     </div>

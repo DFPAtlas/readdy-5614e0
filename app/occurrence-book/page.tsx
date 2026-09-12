@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, subDays } from 'date-fns';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useOccurrenceBook, type OBEntry } from '@/lib/useOccurrenceBook';
 import { useAISummary } from '@/lib/useAISummary';
@@ -14,8 +15,7 @@ import DailyDigestModal from './components/DailyDigestModal';
 import Toast from '@/app/sites/components/Toast';
 
 export default function OccurrenceBookPage() {
-  const { companyId, user } = useAuth();
-  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin' || user?.role === 'operations_manager';
+  const { companyId } = useAuth();
 
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
   const [guardFilter, setGuardFilter] = useState('');
@@ -36,6 +36,15 @@ export default function OccurrenceBookPage() {
   const [digestDate, setDigestDate] = useState('');
   const [summarisingAll, setSummarisingAll] = useState(false);
   const [aiUsageWarning, setAiUsageWarning] = useState<string | null>(null);
+
+  const [sites, setSites] = useState<{ id: string; site_name: string }[]>([]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    supabase.from('sites').select('id, site_name').eq('company_id', companyId).order('site_name').then(({ data }) => {
+      if (data) setSites(data);
+    });
+  }, [companyId]);
 
   const {
     entries, loading, error, hasMore, refetch, loadMore, addEntry, updateEntry, deleteEntry,
@@ -215,9 +224,9 @@ export default function OccurrenceBookPage() {
   };
 
   const selectedSiteName = useMemo(() => {
-    const site = entries.find((e) => e.site_id === selectedSite);
+    const site = sites.find((s) => s.id === selectedSite);
     return site?.site_name || 'Site';
-  }, [entries, selectedSite]);
+  }, [sites, selectedSite]);
 
   const uniqueGuards = useMemo(() => {
     const seen = new Map<string, { id: string; name: string }>();
@@ -235,34 +244,23 @@ export default function OccurrenceBookPage() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Occurrence Book</h1>
-          <p className="text-gray-400 text-sm mt-1">Live activity log across all your sites</p>
+          <p className="text-gray-400 text-sm mt-1">Live chronological record of site activity</p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedSite && (
-            <>
-              <button
-                onClick={handleExportCSV}
-                className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-700/50 border border-gray-700 text-white text-sm font-medium px-3 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-              >
-                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-download-2-line"></i></div>
-                Export CSV
-              </button>
-              <button
-                onClick={() => { setEditingEntry(null); setModalOpen(true); }}
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-              >
-                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
-                New Entry
-              </button>
-            </>
-          )}
+          <Link
+            href="/incidents"
+            className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-700/50 border border-gray-700 text-gray-300 hover:text-white text-sm font-medium px-3.5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-alarm-warning-line"></i></div>
+            View Incidents
+          </Link>
         </div>
       </div>
 
       {/* AI usage warning */}
       {aiUsageWarning && (
-        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
-          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-error-warning-line"></i></div>
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
+          <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-error-warning-line"></i></div>
           {aiUsageWarning}
         </div>
       )}
@@ -274,18 +272,61 @@ export default function OccurrenceBookPage() {
 
       {selectedSite && (
         <>
+          {/* Persistent site header */}
+          <div className="bg-[#111827]/60 border border-gray-800 rounded-xl px-4 py-3.5 flex flex-col md:flex-row md:items-center gap-3">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <div className="w-5 h-5 flex items-center justify-center text-blue-400"><i className="ri-building-line"></i></div>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-white truncate">{selectedSiteName}</h2>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex-shrink-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span className="text-[11px] text-emerald-400 font-medium">Live</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
+                  {format(new Date(fromDate + 'T00:00:00'), 'd MMM yyyy')} — {format(new Date(toDate + 'T00:00:00'), 'd MMM yyyy')} · {entries.length} entries
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={handleDailyDigest}
+                disabled={summarisingDay}
+                className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-700/50 border border-gray-700 text-gray-300 hover:text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-article-line"></i></div>
+                Daily Digest
+              </button>
+              <button
+                onClick={handleExportCSV}
+                className="inline-flex items-center gap-2 bg-gray-800/60 hover:bg-gray-700/50 border border-gray-700 text-gray-300 hover:text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-download-2-line"></i></div>
+                Export CSV
+              </button>
+              <button
+                onClick={() => { setEditingEntry(null); setModalOpen(true); }}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3.5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
+                New Entry
+              </button>
+            </div>
+          </div>
+
           {/* Filters */}
           <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4 space-y-3">
             <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-              <select
-                value={selectedSite || ''}
-                onChange={(e) => setSelectedSite(e.target.value || null)}
-                className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8 flex-shrink-0"
+              <button
+                onClick={() => setSelectedSite(null)}
+                className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap"
               >
-                <option value="">Change site...</option>
-                <option disabled>—</option>
-                <option value="">(choose from list)</option>
-              </select>
+                <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-arrow-left-s-line"></i></div>
+                Change site
+              </button>
 
               <div className="relative flex-1 max-w-sm">
                 <div className="w-5 h-5 flex items-center justify-center absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -306,18 +347,18 @@ export default function OccurrenceBookPage() {
                 className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
               >
                 <option value="">All types</option>
-                <option value="Shift Start">Shift Start</option>
-                <option value="Shift End">Shift End</option>
-                <option value="Patrol Check">Patrol Check</option>
-                <option value="Visitor">Visitor</option>
-                <option value="Delivery">Delivery</option>
-                <option value="Incident">Incident</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Communication">Communication</option>
-                <option value="Health & Safety">Health & Safety</option>
-                <option value="Lost Property">Lost Property</option>
-                <option value="Note">Note</option>
-                <option value="Other">Other</option>
+                <option value="general_note">General Note</option>
+                <option value="handover">Handover</option>
+                <option value="incident_note">Incident Note</option>
+                <option value="patrol_note">Patrol Note</option>
+                <option value="visitor_note">Visitor Note</option>
+                <option value="maintenance_issue">Maintenance Issue</option>
+                <option value="health_safety">Health & Safety</option>
+                <option value="client_update">Client Update</option>
+                <option value="security_alert">Security Alert</option>
+                <option value="lost_property">Lost Property</option>
+                <option value="key_log">Key Log</option>
+                <option value="other">Other</option>
               </select>
 
               <select
@@ -330,7 +371,7 @@ export default function OccurrenceBookPage() {
               </select>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-gray-800/70 pt-3">
               <div className="flex items-center gap-2">
                 <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
                 <input
@@ -349,18 +390,15 @@ export default function OccurrenceBookPage() {
                   className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <div className="flex items-center gap-2 ml-auto">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className="text-xs text-emerald-400 font-medium">Live</span>
+              <button
+                onClick={() => setNewestFirst(!newestFirst)}
+                className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap ml-auto"
+              >
+                <div className="w-3.5 h-3.5 flex items-center justify-center">
+                  <i className={newestFirst ? 'ri-sort-desc' : 'ri-sort-asc'}></i>
                 </div>
-                <button
-                  onClick={() => setNewestFirst(!newestFirst)}
-                  className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  {newestFirst ? 'Newest first' : 'Oldest first'}
-                </button>
-              </div>
+                {newestFirst ? 'Newest first' : 'Oldest first'}
+              </button>
             </div>
           </div>
 
@@ -381,7 +419,7 @@ export default function OccurrenceBookPage() {
               <div className="w-12 h-12 mx-auto flex items-center justify-center text-gray-600 mb-3">
                 <i className="ri-book-open-line text-2xl"></i>
               </div>
-              <p className="text-sm text-gray-500">No entries for this site and date range.</p>
+              <p className="text-sm text-gray-500">No occurrence entries for this period.</p>
             </div>
           ) : (
             <OBFeed

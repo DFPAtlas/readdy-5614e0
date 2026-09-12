@@ -12,7 +12,7 @@ const faqs = [
   {
     question: 'Is there a free trial available?',
     answer:
-      'Yes. Both Sentinel and Command plans include a 14-day free trial with full access to all features. No credit card required to start. Titan plans begin with a guided onboarding call.',
+      'Yes. Starter, Sentinel, and Command plans all include a 15-day free trial with full access to all features. No credit card required to start. Titan plans begin with a guided onboarding call.',
   },
   {
     question: 'What happens when I exceed my guard or site limit?',
@@ -22,7 +22,7 @@ const faqs = [
   {
     question: 'Do you offer annual billing discounts?',
     answer:
-      'Yes. Annual billing saves you 20% compared to monthly. The discount is automatically applied when you select yearly billing at checkout.',
+      'Yes. Save 20% when you choose annual billing on any plan. Annual plans are billed once per year with the same great features at a reduced monthly-equivalent rate. You can switch between monthly and annual billing at any time.',
   },
   {
     question: 'What payment methods do you accept?',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRequireEntitlement } from '@/lib/useRequireEntitlement';
 import AIChat from './AIChat';
 import AIInsights from './AIInsights';
 import VoiceCommands from './VoiceCommands';
@@ -11,6 +12,7 @@ import { useAvailableSOPs } from '@/lib/useAvailableSOPs';
 import { useSOPIndex } from '@/lib/useSOPIndex';
 
 export default function AIAssistant() {
+  const { allowed, loading: entGuardLoading } = useRequireEntitlement('hasAiRota');
   const [activeTab, setActiveTab] = useState('chat');
   const [aiStatus, setAiStatus] = useState('online');
   const [voiceActive, setVoiceActive] = useState(false);
@@ -219,7 +221,17 @@ export default function AIAssistant() {
           </div>
 
           <div className="p-6">
-            {renderActiveTab()}
+            {entGuardLoading && (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+              </div>
+            )}
+            {!entGuardLoading && !allowed && (
+              <div className="flex items-center justify-center py-20">
+                <p className="text-gray-400 text-sm">Redirecting to plans...</p>
+              </div>
+            )}
+            {allowed && renderActiveTab()}
           </div>
         </div>
       </div>

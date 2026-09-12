@@ -1,11 +1,12 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../lib/auth';
+import { clearEntitlementsCache } from '../../../lib/entitlements';
 
 interface CompanyData {
   name: string | null;
@@ -18,9 +19,14 @@ interface CompanyData {
   account_status: string | null;
 }
 
+const POLL_INTERVAL = 2000;
+const POLL_MAX_ATTEMPTS = 15;
+
 function useCompanyStatus() {
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pollCount, setPollCount] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -64,10 +70,31 @@ function useCompanyStatus() {
     fetchStatus();
   }, []);
 
+  useEffect(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const status = company?.subscription_status;
+    const isReady = status === 'active' || status === 'trialing';
+
+    if (isReady || pollCount >= POLL_MAX_ATTEMPTS) return;
+
+    timerRef.current = setTimeout(() => {
+      setPollCount((c) => c + 1);
+      fetchStatus();
+    }, POLL_INTERVAL);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [company?.subscription_status, pollCount]);
+
   const status = company?.subscription_status;
   const isReady = status === 'active' || status === 'trialing';
 
-  return { company, loading, isReady, refetch: fetchStatus };
+  return { company, loading, isReady, refetch: fetchStatus, pollCount };
 }
 
 function formatDate(dateStr: string | null) {
@@ -77,14 +104,23 @@ function formatDate(dateStr: string | null) {
 }
 
 export default function CheckoutSuccessContent() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
-  const { company, loading, isReady, refetch } = useCompanyStatus();
+  const { company, loading, isReady, refetch, pollCount } = useCompanyStatus();
+  const { refreshCompany } = useAuth();
+  const refreshedRef = useRef(false);
+
+  useEffect(() => {
+    if (isReady && !refreshedRef.current) {
+      refreshedRef.current = true;
+      clearEntitlementsCache();
+      refreshCompany();
+    }
+  }, [isReady, refreshCompany]);
 
   const status = company?.subscription_status;
   const showFinalising = !loading && status !== null && !isReady;
   const showActive = !loading && isReady;
   const showUnknown = loading || status === null;
+  const pollingActive = showFinalising && pollCount < POLL_MAX_ATTEMPTS;
 
   return (
     <div className="min-h-screen bg-[#0a0e1a] flex flex-col">
@@ -98,41 +134,35 @@ export default function CheckoutSuccessContent() {
             </div>
 
             <h1 className="text-3xl font-bold text-white mb-3">
-              Subscription setup complete
+              Checkout received
             </h1>
 
             <p className="text-gray-400 mb-2 leading-relaxed max-w-sm mx-auto">
-              Stripe is finalising your subscription. This may take a few seconds.
+              Stripe has returned your checkout to GuardianHub. We are confirming the subscription and your Billing &amp; Services page will update once confirmation is complete.
             </p>
-
-            {sessionId && (
-              <p className="text-gray-600 text-xs font-mono mt-2">
-                Session: {sessionId.slice(0, 20)}…
-              </p>
-            )}
           </div>
 
           <div className="mb-8 rounded-xl bg-white/[0.03] border border-white/10 overflow-hidden">
             <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Account Status
+                Confirmation Status
               </span>
               {isReady && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-500/15 text-green-400 text-xs font-semibold rounded-full border border-green-500/20">
                   <i className="ri-check-double-line" />
-                  Active
+                  Confirmed
                 </span>
               )}
               {showFinalising && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/15 text-amber-400 text-xs font-semibold rounded-full border border-amber-500/20">
                   <i className="ri-time-line" />
-                  {status}
+                  {pollingActive ? 'Confirmation in progress' : status || 'Waiting'}
                 </span>
               )}
               {showUnknown && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/5 text-gray-500 text-xs font-semibold rounded-full border border-white/10">
                   <i className="ri-loader-4-line animate-spin" />
-                  Checking…
+                  Checking...
                 </span>
               )}
             </div>
@@ -152,19 +182,35 @@ export default function CheckoutSuccessContent() {
                       <i className="ri-time-line" />
                     </span>
                     <div>
-                      <p className="font-medium">Finalising setup…</p>
+                      <p className="font-medium">
+                        {pollingActive ? 'Activating your plan…' : 'Finalising setup…'}
+                      </p>
                       <p className="text-amber-500/70 text-xs">
-                        Current status: <span className="capitalize">{status || 'unknown'}</span>
+                        {pollingActive
+                          ? `Checking ${pollCount + 1} of ${POLL_MAX_ATTEMPTS}`
+                          : `Current status: ${status || 'unknown'}`}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={refetch}
-                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-blue-400 hover:text-blue-300 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <i className="ri-refresh-line" />
-                    Refresh status
-                  </button>
+
+                  {pollingActive && (
+                    <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500/40 rounded-full transition-all duration-500"
+                        style={{ width: `${((pollCount + 1) / POLL_MAX_ATTEMPTS) * 100}%` }}
+                      />
+                    </div>
+                  )}
+
+                  {!pollingActive && (
+                    <button
+                      onClick={refetch}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-blue-400 hover:text-blue-300 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      <i className="ri-refresh-line" />
+                      Refresh status
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -219,22 +265,22 @@ export default function CheckoutSuccessContent() {
 
           <div className="flex flex-col gap-3">
             <Link
-              href="/dashboard"
+              href="/client/billing"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-colors cursor-pointer whitespace-nowrap"
             >
-              Go to Dashboard
               <span className="w-5 h-5 flex items-center justify-center">
-                <i className="ri-arrow-right-line text-sm" />
+                <i className="ri-bank-card-line text-sm" />
               </span>
+              Open Billing &amp; Services
             </Link>
             <Link
-              href="/dashboard/settings"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-medium rounded-xl border border-white/10 transition-colors cursor-pointer whitespace-nowrap"
+              href="/dashboard"
+              className={`inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-medium rounded-xl border border-white/10 transition-colors cursor-pointer whitespace-nowrap ${!isReady ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <span className="w-5 h-5 flex items-center justify-center">
-                <i className="ri-settings-4-line text-sm" />
+                <i className="ri-dashboard-line text-sm" />
               </span>
-              Billing Settings
+              Return to Dashboard
             </Link>
           </div>
         </div>

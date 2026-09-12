@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { RecentIncident, AIAlert, GuardOnShift, MissingGuard, PatrolSummary, StaffingAlert } from '@/lib/useDashboard';
 import type { Notification } from '@/lib/useNotifications';
+import type { LoneWorkerAlert, AgentHealth } from '@/lib/useCommandCentreExtended';
 import { getCategoryLabel, getStatusBadge } from '@/lib/useSupportTickets';
 import type { SupportTicket } from '@/lib/useSupportTickets';
 
@@ -28,6 +29,8 @@ interface PriorityAlertFeedProps {
   missingGuards: MissingGuard[];
   guardsOnShift: GuardOnShift[];
   staffingAlerts: StaffingAlert[];
+  loneWorkerAlerts: LoneWorkerAlert[];
+  agentHealth: AgentHealth | null;
 }
 
 function mapSeverity(source: string): 'critical' | 'high' | 'medium' | 'low' {
@@ -61,14 +64,45 @@ const typeIcons: Record<string, string> = {
   patrol: 'ri-route-line',
   guard: 'ri-shield-user-line',
   staffing: 'ri-team-line',
+  loneworker: 'ri-radar-line',
+  agent: 'ri-robot-2-line',
+  webhook: 'ri-link',
 };
 
+type FilterKey = 'all' | 'critical' | 'staffing' | 'incidents' | 'patrols' | 'ai';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'critical', label: 'Critical' },
+  { key: 'staffing', label: 'Staffing' },
+  { key: 'incidents', label: 'Incidents' },
+  { key: 'patrols', label: 'Patrols' },
+  { key: 'ai', label: 'AI' },
+];
+
+function matchesFilter(alert: UnifiedAlert, f: FilterKey): boolean {
+  switch (f) {
+    case 'critical':
+      return alert.severity === 'critical';
+    case 'staffing':
+      return alert.type === 'staffing' || alert.type === 'guard';
+    case 'incidents':
+      return alert.type === 'incident';
+    case 'patrols':
+      return alert.type === 'patrol';
+    case 'ai':
+      return alert.type === 'ai' || alert.type === 'agent' || alert.type === 'webhook';
+    default:
+      return true;
+  }
+}
+
 export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
-  const { incidents, notifications, aiAlerts, tickets, patrolSummary, missingGuards, guardsOnShift, staffingAlerts } = props;
-  const [filter, setFilter] = useState<'all' | 'critical' | 'high' | 'medium'>('all');
+  const { incidents, notifications, aiAlerts, tickets, patrolSummary, missingGuards, guardsOnShift, staffingAlerts, loneWorkerAlerts, agentHealth } = props;
+  const [filter, setFilter] = useState<FilterKey>('all');
 
   const alerts: UnifiedAlert[] = [
-    ...incidents.map(i => ({
+    ...incidents.filter(i => i.severity === 'critical' || i.severity === 'high').map(i => ({
       id: `inc-${i.id}`,
       type: 'incident',
       title: i.incident_type,
@@ -79,7 +113,27 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
       source: 'Incident',
       meta: i.severity,
     })),
-    ...notifications.map(n => ({
+    ...loneWorkerAlerts.filter(a => a.alarm_triggered).map(a => ({
+      id: `lw-${a.id}`,
+      type: 'loneworker',
+      title: `${a.guard_name} — Lone Worker Alarm`,
+      description: a.site_name,
+      severity: 'critical',
+      timestamp: a.last_check_in_at || new Date().toISOString(),
+      link: '/dashboard/lone-worker',
+      source: 'Lone Worker',
+    })),
+    ...loneWorkerAlerts.filter(a => a.missed_check_ins > 0 && !a.alarm_triggered).map(a => ({
+      id: `lw-miss-${a.id}`,
+      type: 'loneworker',
+      title: `${a.guard_name} — Missed check-in`,
+      description: `${a.missed_check_ins} missed at ${a.site_name}`,
+      severity: 'high',
+      timestamp: a.next_check_in_due_at || new Date().toISOString(),
+      link: '/dashboard/lone-worker',
+      source: 'Lone Worker',
+    })),
+    ...notifications.filter(n => n.severity === 'critical').map(n => ({
       id: `notif-${n.id}`,
       type: 'notification',
       title: n.title,
@@ -89,7 +143,7 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
       link: n.link || '#',
       source: 'Notification',
     })),
-    ...aiAlerts.filter(a => !a.dismissed).map(a => ({
+    ...aiAlerts.filter(a => !a.dismissed && (a.severity === 'critical' || a.severity === 'high')).map(a => ({
       id: `ai-${a.id}`,
       type: 'ai',
       title: a.action_type.replace(/_/g, ' '),
@@ -99,7 +153,7 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
       link: a.details?.site_id ? `/sites/${a.details.site_id}` : '#',
       source: 'AI',
     })),
-    ...tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved').map(t => ({
+    ...tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved' && (t.priority === 'urgent' || t.priority === 'high')).map(t => ({
       id: `ticket-${t.id}`,
       type: 'ticket',
       title: t.subject,
@@ -109,12 +163,12 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
       link: `/client/support/${t.id}`,
       source: 'Ticket',
     })),
-    ...patrolSummary.filter(p => p.status === 'missed' || p.status === 'partial').map(p => ({
+    ...patrolSummary.filter(p => p.status === 'missed').map(p => ({
       id: `patrol-${p.site_name}`,
       type: 'patrol',
-      title: `${p.site_name} — ${p.status} patrol`,
+      title: `${p.site_name} — Missed patrol`,
       description: `${p.checkpoints_completed}/${p.checkpoints_total} checkpoints`,
-      severity: p.status === 'missed' ? 'high' : 'medium',
+      severity: 'high',
       timestamp: p.last_patrol_at || new Date().toISOString(),
       link: '/dashboard/patrol-monitoring',
       source: 'Patrol',
@@ -129,26 +183,56 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
       link: '/guards',
       source: 'Guard',
     })),
-    ...guardsOnShift.filter(g => g.status === 'late' || g.status === 'critical_late').map(g => ({
+    ...guardsOnShift.filter(g => g.status === 'critical_late').map(g => ({
       id: `late-${g.id}`,
       type: 'guard',
-      title: `${g.name} — ${g.status === 'critical_late' ? 'Critical late' : 'Late'}`,
-      description: `${g.site_name} — +${g.late_minutes}m late`,
-      severity: g.status === 'critical_late' ? 'critical' : 'high',
+      title: `${g.name} — Critical late (+${g.late_minutes}m)`,
+      description: g.site_name,
+      severity: 'critical',
       timestamp: g.clock_in,
       link: '/guards',
       source: 'Guard',
     })),
-    ...staffingAlerts.map(s => ({
+    ...staffingAlerts.filter(s => s.severity === 'high').map(s => ({
       id: `staffing-${s.site_name}-${s.shift_time}`,
       type: 'staffing',
-      title: `${s.site_name} — understaffed`,
+      title: `${s.site_name} — Understaffed`,
       description: `${s.guard_needed} guard needed`,
       severity: mapSeverity(s.severity),
       timestamp: s.shift_time,
       link: '/rotas',
       source: 'Rota',
     })),
+    ...(agentHealth && agentHealth.failed_executions_24h > 0 ? [{
+      id: 'agent-failures',
+      type: 'agent',
+      title: `Agent failures detected`,
+      description: `${agentHealth.failed_executions_24h} execution(s) failed in the last 24 hours`,
+      severity: 'high' as const,
+      timestamp: agentHealth.last_execution_at || new Date().toISOString(),
+      link: '/dashboard/command-centre',
+      source: 'Agent',
+    }] : []),
+    ...(agentHealth && agentHealth.pending_webhook_events > 0 ? [{
+      id: 'agent-webhooks-pending',
+      type: 'webhook',
+      title: `Stuck webhook events`,
+      description: `${agentHealth.pending_webhook_events} webhook event(s) pending processing`,
+      severity: 'medium' as const,
+      timestamp: agentHealth.last_execution_at || new Date().toISOString(),
+      link: '/dashboard/command-centre',
+      source: 'Webhook',
+    }] : []),
+    ...(agentHealth && agentHealth.last_execution_status === 'failed' && agentHealth.failed_executions_24h === 0 ? [{
+      id: 'agent-last-failed',
+      type: 'agent',
+      title: `Last agent execution failed`,
+      description: `Most recent agent run did not complete successfully`,
+      severity: 'medium' as const,
+      timestamp: agentHealth.last_execution_at || new Date().toISOString(),
+      link: '/dashboard/command-centre',
+      source: 'Agent',
+    }] : []),
   ];
 
   const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
@@ -159,7 +243,7 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
-  const filtered = filter === 'all' ? alerts : alerts.filter(a => a.severity === filter || (filter === 'high' && a.severity === 'high'));
+  const filtered = filter === 'all' ? alerts : alerts.filter(a => matchesFilter(a, filter));
   const display = filtered.slice(0, 20);
 
   const criticalCount = alerts.filter(a => a.severity === 'critical').length;
@@ -172,7 +256,7 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
           <div className="w-5 h-5 flex items-center justify-center text-red-400">
             <i className="ri-flashlight-line text-sm"></i>
           </div>
-          <h3 className="text-sm font-semibold text-white">Priority Alert Feed</h3>
+          <h3 className="text-sm font-semibold text-white">Priority Alerts</h3>
         </div>
         <div className="flex items-center gap-2">
           {criticalCount > 0 && (
@@ -188,14 +272,14 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
         </div>
       </div>
 
-      <div className="flex px-4 pb-2 gap-1">
-        {(['all', 'critical', 'high', 'medium'] as const).map(f => (
+      <div className="flex flex-wrap px-4 pb-2 gap-1">
+        {FILTERS.map(f => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer whitespace-nowrap ${filter === f ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer whitespace-nowrap ${filter === f.key ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
-            {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+            {f.label}
           </button>
         ))}
       </div>

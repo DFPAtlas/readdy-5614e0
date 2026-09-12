@@ -13,12 +13,17 @@ const TABS = [
   { label: 'ACS Hub', href: '/client/acs', icon: 'ri-shield-star-line' },
   { label: 'Overview', href: '/client', icon: 'ri-dashboard-line' },
   { label: 'Information', href: '/client/information', icon: 'ri-building-2-line' },
-  { label: 'Sites', href: '/client/sites', icon: 'ri-building-line' },
+  { label: 'Site Dashboards', href: '/client/sites', icon: 'ri-building-line' },
+  { label: 'Clocking', href: '/client/clocking', icon: 'ri-time-line' },
   { label: 'Incidents', href: '/client/incidents', icon: 'ri-alarm-warning-line' },
   { label: 'Reports', href: '/client/reports', icon: 'ri-file-list-3-line' },
   { label: 'Patrols', href: '/client/patrol-monitoring', icon: 'ri-route-line' },
+  { label: 'Requests', href: '/client/service-requests', icon: 'ri-question-answer-line' },
+  { label: 'SLA', href: '/client/sla', icon: 'ri-bar-chart-line' },
   { label: 'Messages', href: '/client/messages', icon: 'ri-mail-line' },
   { label: 'Support', href: '/client/support', icon: 'ri-customer-service-line' },
+  { label: 'Billing', href: '/client/billing', icon: 'ri-bank-card-line' },
+  { label: 'Invoices', href: '/client/invoices', icon: 'ri-bill-line' },
   { label: 'Settings', href: '/client/settings', icon: 'ri-settings-3-line' },
 ];
 

@@ -1,0 +1,350 @@
+{
+  "name": "GuardianHub Orchestrator",
+  "version": "1.0.0",
+  "description": "Master workflow that receives signed gateway requests and routes to correct agent workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "orchestrator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Gateway Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify HMAC signature\nconst crypto = require('crypto');\nconst secret = process.env.N8N_GUARDIANHUB_SIGNING_SECRET || '';\nconst signature = $input.first().json.headers['x-gh-signature'] || '';\nconst timestamp = $input.first().json.headers['x-gh-timestamp'] || '';\nconst nonce = $input.first().json.headers['x-gh-nonce'] || '';\n\nconst body = $input.first().json.body;\nconst payloadStr = JSON.stringify(body);\n\nconst expectedSig = crypto.createHmac('sha256', secret).update(payloadStr).digest('hex');\n\nconst now = Date.now();\nconst ts = parseInt(timestamp);\nconst isExpired = Math.abs(now - ts) > 5 * 60 * 1000;\n\nif (signature !== expectedSig || isExpired) {\n  throw new Error('Invalid signature or expired request');\n}\n\nconst receivedNonces = $getWorkflowStaticData('global').nonces || [];\nif (receivedNonces.includes(nonce)) {\n  throw new Error('Replayed nonce detected');\n}\nreceivedNonces.push(nonce);\nif (receivedNonces.length > 10000) receivedNonces.shift();\n$getWorkflowStaticData('global').nonces = receivedNonces;\n\nreturn {\n  json: {\n    verified: true,\n    agent_key: body.agent_key,\n    event_type: body.event_type,\n    company_id: body.company_id,\n    correlation_id: body.correlation_id,\n    run_id: body.run_id,\n    payload: body\n  }\n};"
+      },
+      "id": "verify-signature",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": [
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "incident_triage", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "incident_triage"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "sos_escalation", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "sos_escalation"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "attendance_exceptions", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "attendance_exceptions"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "rota_assistance", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "rota_assistance"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "compliance_monitoring", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "compliance_monitoring"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "report_generation", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "report_generation"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "notification_escalation", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "notification_escalation"
+            },
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "automation_health", "operator": { "type": "string", "operation": "equals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "automation_health"
+            }
+          ]
+        }
+      },
+      "id": "route-by-agent",
+      "name": "Route by Agent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/incident-triage",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-incident-triage",
+      "name": "Execute Incident Triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 100]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/sos-escalation",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-sos-escalation",
+      "name": "Execute SOS Escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/attendance-exceptions",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-attendance-exceptions",
+      "name": "Execute Attendance Exceptions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/rota-assistance",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-rota-assistance",
+      "name": "Execute Rota Assistance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/compliance-monitoring",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-compliance-monitoring",
+      "name": "Execute Compliance Monitoring",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 500]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/report-generation",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-report-generation",
+      "name": "Execute Report Generation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 600]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/notification-escalation",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-notification-escalation",
+      "name": "Execute Notification Escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 700]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_GUARDIANHUB_BASE_URL }}/webhook/automation-health",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json.payload) }}" }
+          ]
+        }
+      },
+      "id": "exec-automation-health",
+      "name": "Execute Automation Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 800]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": [
+            {
+              "conditions": [
+                { "leftValue": "={{ $json.agent_key }}", "rightValue": "unknown", "operator": { "type": "string", "operation": "notEquals" } }
+              ],
+              "renameOutput": true,
+              "outputKey": "known"
+            }
+          ],
+          "fallbackOutput": "unknown"
+        }
+      },
+      "id": "check-result",
+      "name": "Check Result",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-GH-Signature", "value": "={{ $json.signature || '' }}" },
+            { "name": "X-GH-Timestamp", "value": "={{ Date.now() }}" },
+            { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id || '' }}" }
+          ]
+        },
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id }}" },
+            { "name": "status", "value": "={{ $json.status || 'completed' }}" },
+            { "name": "result", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "agent_key", "value": "={{ $json.agent_key }}" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" },
+            { "name": "event_type", "value": "={{ $json.event_type }}" }
+          ]
+        }
+      },
+      "id": "send-callback-success",
+      "name": "Send Success Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/n8n-callback",
+        "method": "POST",
+        "sendBody": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-GH-Timestamp", "value": "={{ Date.now() }}" },
+            { "name": "X-GH-Correlation-Id", "value": "={{ $json.correlation_id || '' }}" }
+          ]
+        },
+        "bodyParameters": {
+          "parameters": [
+            { "name": "run_id", "value": "={{ $json.run_id }}" },
+            { "name": "status", "value": "failed" },
+            { "name": "error", "value": "Unknown agent or workflow not found" },
+            { "name": "agent_key", "value": "={{ $json.agent_key || 'unknown' }}" },
+            { "name": "company_id", "value": "={{ $json.company_id }}" }
+          ]
+        }
+      },
+      "id": "send-callback-failure",
+      "name": "Send Failure Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { received: true, correlation_id: $json.correlation_id } }}"
+      },
+      "id": "response-node",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1750, 300]
+    }
+  ],
+  "connections": {
+    "Gateway Webhook": { "main": [[ { "node": "Verify Signature", "type": "main", "index": 0 } ]] },
+    "Verify Signature": { "main": [[ { "node": "Route by Agent", "type": "main", "index": 0 } ]] },
+    "Route by Agent": {
+      "main": [
+        [{ "node": "Execute Incident Triage", "type": "main", "index": 0 }],
+        [{ "node": "Execute SOS Escalation", "type": "main", "index": 0 }],
+        [{ "node": "Execute Attendance Exceptions", "type": "main", "index": 0 }],
+        [{ "node": "Execute Rota Assistance", "type": "main", "index": 0 }],
+        [{ "node": "Execute Compliance Monitoring", "type": "main", "index": 0 }],
+        [{ "node": "Execute Report Generation", "type": "main", "index": 0 }],
+        [{ "node": "Execute Notification Escalation", "type": "main", "index": 0 }],
+        [{ "node": "Execute Automation Health", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute Incident Triage": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute SOS Escalation": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute Attendance Exceptions": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute Rota Assistance": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute Compliance Monitoring": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute Report Generation": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute Notification Escalation": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Execute Automation Health": { "main": [[ { "node": "Send Success Callback", "type": "main", "index": 0 } ]] },
+    "Send Success Callback": { "main": [[ { "node": "Respond 200", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
+  "staticData": null
+}

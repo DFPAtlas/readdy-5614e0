@@ -1,0 +1,1 @@
+export type UserRole = 'super_admin' | 'company_admin' | 'operations_manager' | 'guard' | 'client';

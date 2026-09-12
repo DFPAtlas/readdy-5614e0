@@ -1,9 +1,10 @@
 import DashboardShell from './components/DashboardShell';
+import DashboardPageWrapper from './components/DashboardPageWrapper';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardShell>
-      {children}
+      <DashboardPageWrapper>{children}</DashboardPageWrapper>
     </DashboardShell>
   );
 }

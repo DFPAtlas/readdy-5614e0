@@ -1,6 +1,7 @@
 'use client';
 
 import { useClientPortal } from '@/lib/useClientPortal';
+import { useClientAuth } from '@/lib/useClientAuth';
 import AgentGate from '@/components/AgentGate';
 import { useAuth } from '@/lib/auth';
 import { callAgent, logWebhookEvent } from '@/lib/guardianhubAgents';

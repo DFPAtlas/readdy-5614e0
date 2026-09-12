@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
+import { useGuardAuth } from '@/lib/useGuardAuth';
 import { useCoverOffers } from '@/lib/useCoverOffers';
 import GuardTopBar from '../components/GuardTopBar';
 import GuardBottomNav from '../components/GuardBottomNav';
@@ -28,11 +28,10 @@ function countdown(deadline: string): string {
 }
 
 export default function GuardCoverOffersPage() {
-  const { currentUser, profile } = useAuth();
-  const router = useRouter();
+  const g = useGuardAuth();
   const { offers, loading, actionLoading, acceptOffer, declineOffer } = useCoverOffers(
-    currentUser?.id || null,
-    profile?.company_id || null
+    g.currentUser?.id || null,
+    g.companyId
   );
 
   const [toast, setToast] = useState<string | null>(null);
@@ -74,11 +73,18 @@ export default function GuardCoverOffersPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  if (g.loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <i className="ri-loader-4-line animate-spin text-[#3b82f6] text-2xl"></i>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       <GuardTopBar siteName="Cover Offers" />
       <main className="flex-1 pt-14 pb-[72px] overflow-y-auto max-w-lg mx-auto w-full">
-        {/* Toast */}
         {toast && (
           <div className="px-4 pt-4">
             <div

@@ -27,10 +27,7 @@ serve(async (req) => {
     });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const token = authHeader.replace("Bearer ", "");
   const { data: { user }, error: userErr } = await supabase.auth.getUser(token);
   if (userErr || !user) {
@@ -50,9 +47,9 @@ serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2024-12-18.acacia" });
 
-  const results = { invoices: 0, charges: 0, refunds: 0, disputes: 0 };
+  const results = { invoices: 0, charges: 0, refunds: 0, disputes: 0, plans_reconciled: 0 };
 
   try {
     const invoices = await stripe.invoices.list({ limit: 100 });
@@ -153,6 +150,42 @@ serve(async (req) => {
       }, { onConflict: "stripe_dispute_id" });
     }
     results.disputes = disputes.data.length;
+
+    const { data: plans } = await admin.from("plans").select("*").eq("is_active", true);
+    if (plans) {
+      for (const plan of plans) {
+        for (const interval of ["monthly", "yearly"]) {
+          const col = interval === "yearly" ? "stripe_price_id_yearly" : "stripe_price_id_monthly";
+          const existingId = (plan as any)[col];
+          const lookupKey = `${plan.slug}-${interval}`;
+
+          if (!existingId) {
+            const prices = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 });
+            if (prices.data.length > 0) {
+              await admin.from("plans").update({ [col]: prices.data[0].id, updated_at: new Date().toISOString() }).eq("id", plan.id);
+              results.plans_reconciled++;
+            }
+          } else {
+            try {
+              const price = await stripe.prices.retrieve(existingId);
+              if (!price.active) {
+                await admin.from("plans").update({ [col]: null, updated_at: new Date().toISOString() }).eq("id", plan.id);
+              }
+            } catch {
+              await admin.from("plans").update({ [col]: null, updated_at: new Date().toISOString() }).eq("id", plan.id);
+            }
+          }
+        }
+      }
+    }
+
+    await admin.from("admin_activity_log").insert({
+      action: "billing_backfill",
+      description: `Stripe backfill completed: ${results.invoices} invoices, ${results.charges} charges, ${results.refunds} refunds, ${results.disputes} disputes, ${results.plans_reconciled} plans reconciled`,
+      company_id: null,
+      performed_by: user.id,
+      metadata: results,
+    });
 
     return new Response(JSON.stringify({ success: true, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
