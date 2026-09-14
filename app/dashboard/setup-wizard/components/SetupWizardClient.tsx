@@ -213,7 +213,6 @@ export default function SetupWizardClient() {
       }
       callAgent(
         'setup_wizard',
-        'health.status',
         {
           client_id: companyId,
           user_id: profile?.id,
@@ -226,6 +225,8 @@ export default function SetupWizardClient() {
           source: 'guardianhub_web_app',
         },
         {
+          clientId: companyId,
+          userId: profile?.id,
           requestedPage: '/dashboard/setup-wizard',
           requestedFeature: 'setup_wizard',
         }

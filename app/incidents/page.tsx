@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, useMemo, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import Link from 'next/link';

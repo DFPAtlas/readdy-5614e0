@@ -1,4 +1,4 @@
-import FeaturePageContent from '../components/FeaturePageContent';
+import FeaturePageContent from './components/FeaturePageContent';
 
 const allFeatures = [
   'command-centre', 'guard-management', 'rota-scheduling', 'attendance',
@@ -10,7 +10,6 @@ export async function generateStaticParams() {
   return allFeatures.map((slug) => ({ slug }));
 }
 
-export default async function FeaturePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  return <FeaturePageContent slug={slug} />;
+export default function FeaturePage({ params }: { params: { slug: string } }) {
+  return <FeaturePageContent slug={params.slug} />;
 }

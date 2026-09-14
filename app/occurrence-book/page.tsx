@@ -107,15 +107,14 @@ export default function OccurrenceBookPage() {
 
   const handleAddEntry = async (payload: any) => {
     setSaving(true);
-    const { request_ai_summary: requestAiSummary, ...entryPayload } = payload;
-    const { data, error } = await addEntry(entryPayload);
+    const { data, error } = await addEntry(payload);
     if (!error) {
       setToast('Entry saved');
       setModalOpen(false);
       refetch();
-      const newId = (data as any)?.id;
-      if (newId && entryPayload.entry && (requestAiSummary || entryPayload.entry.length > 200)) {
-        summarizeEntry(newId).catch(() => {});
+      const newId = data?.id;
+      if (newId && payload.entry && payload.entry.length > 200) {
+        maybeSummarise(newId, payload.entry);
       }
     } else {
       setToast('Failed to save entry');
@@ -136,7 +135,7 @@ export default function OccurrenceBookPage() {
     if (!error) {
       setToast('Entry saved');
       refetch();
-      const newId = (data as any)?.id;
+      const newId = data?.id;
       if (newId && text.length > 200) {
         maybeSummarise(newId, text);
       }
@@ -149,15 +148,14 @@ export default function OccurrenceBookPage() {
   const handleEdit = async (payload: any) => {
     if (!editingEntry) return;
     setSaving(true);
-    const { request_ai_summary: requestAiSummary, ...entryPayload } = payload;
-    const { error } = await updateEntry(editingEntry.id, entryPayload);
+    const { error } = await updateEntry(editingEntry.id, payload);
     if (!error) {
       setToast('Entry updated');
       setModalOpen(false);
       setEditingEntry(null);
       refetch();
-      if (entryPayload.entry && (requestAiSummary || entryPayload.entry.length > 200) && !editingEntry.ai_summary) {
-        summarizeEntry(editingEntry.id).catch(() => {});
+      if (payload.entry && payload.entry.length > 200 && !editingEntry.ai_summary) {
+        maybeSummarise(editingEntry.id, payload.entry);
       }
     } else {
       setToast('Failed to update entry');

@@ -30,13 +30,14 @@ export default function GuardWelfareClient() {
     try {
       const result = await callAgent(
         'guard_welfare',
-        'health.status',
         {
           guards_active: guards.length,
           sessions_active: sessions.length,
           incidents_count: welfareIncidents.length,
         },
         {
+          clientId: profile.company_id,
+          userId: profile.id,
           requestedPage: '/dashboard/guard-welfare',
           requestedFeature: 'guard_welfare',
         }

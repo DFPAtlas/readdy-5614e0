@@ -59,13 +59,14 @@ export default function EvidenceVaultClient({ initialClientId, initialSiteId }: 
     try {
       const result = await callAgent(
         'compliance',
-        'health.status',
         {
           total_files: stats?.total || 0,
           reviewed: stats?.reviewed || 0,
           flagged: stats?.flagged || 0,
         },
         {
+          clientId: companyId,
+          userId: profile.id,
           requestedPage: '/dashboard/evidence-vault',
           requestedFeature: 'compliance',
         }

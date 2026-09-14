@@ -38,6 +38,8 @@ export function useClientTeam() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [guards, setGuards] = useState<AssignedGuard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [guardsError, setGuardsError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -48,6 +50,8 @@ export function useClientTeam() {
       return;
     }
     setLoading(true);
+    setMembersError(null);
+    setGuardsError(null);
 
     const { data: me } = await supabase
       .from('client_users')
@@ -75,6 +79,7 @@ export function useClientTeam() {
 
     if (cuError) {
       setMembers([]);
+      setMembersError(cuError.message);
     } else {
       const mapped: TeamMember[] = (cuData || []).map((item: any) => ({
         id: item.id,
@@ -92,14 +97,23 @@ export function useClientTeam() {
           : null,
       }));
       setMembers(mapped);
+      setMembersError(null);
     }
 
     // Fetch assigned guards
-    const { data: sitesData } = await supabase
+    const { data: sitesData, error: sitesError } = await supabase
       .from('sites')
       .select('id, site_name, risk_level')
       .eq('client_id', cid)
       .eq('company_id', companyId);
+
+    if (sitesError) {
+      setGuards([]);
+      setGuardsError(sitesError.message);
+      setLoading(false);
+      return;
+    }
+
     const mySites = sitesData || [];
     const siteIds = mySites.map((s) => s.id);
 
@@ -109,11 +123,18 @@ export function useClientTeam() {
       return;
     }
 
-    const { data: shiftsData } = await supabase
+    const { data: shiftsData, error: shiftsError } = await supabase
       .from('shifts')
       .select('guard_id, site_id')
       .in('site_id', siteIds)
       .eq('status', 'active');
+
+    if (shiftsError) {
+      setGuards([]);
+      setGuardsError(shiftsError.message);
+      setLoading(false);
+      return;
+    }
 
     const guardSitePairs = shiftsData || [];
     const uniqueGuardIds = [...new Set(guardSitePairs.map((s) => s.guard_id).filter(Boolean))];
@@ -124,11 +145,18 @@ export function useClientTeam() {
       return;
     }
 
-    const { data: guardsData } = await supabase
+    const { data: guardsData, error: guardsErrorRes } = await supabase
       .from('guards')
       .select('id, first_name, last_name, phone, sia_licence, status, skills')
       .in('id', uniqueGuardIds)
       .order('first_name', { ascending: true });
+
+    if (guardsErrorRes) {
+      setGuards([]);
+      setGuardsError(guardsErrorRes.message);
+      setLoading(false);
+      return;
+    }
 
     const mappedGuards: AssignedGuard[] = (guardsData || []).map((g) => {
       const gSites = guardSitePairs
@@ -150,6 +178,7 @@ export function useClientTeam() {
     });
 
     setGuards(mappedGuards);
+    setGuardsError(null);
     setLoading(false);
   }, [currentUser, companyId]);
 
@@ -258,6 +287,8 @@ export function useClientTeam() {
     members,
     guards,
     loading,
+    membersError,
+    guardsError,
     toast,
     isAdmin,
     clientId,

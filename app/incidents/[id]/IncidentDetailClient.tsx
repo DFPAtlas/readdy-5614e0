@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { addDays, format, subDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { useIncidentDetail, type IncidentDetail } from '@/lib/useIncidentDetail';
 import { SEVERITY_COLORS, INCIDENT_TYPES } from '@/lib/useIncidents';
 import { useAuth } from '@/lib/auth';
@@ -32,47 +32,8 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'comments' | 'reports'>('overview');
   const [tabToast, setTabToast] = useState<string | null>(null);
-  const [relatedLoading, setRelatedLoading] = useState(false);
-  const [relatedShifts, setRelatedShifts] = useState<any[]>([]);
-  const [relatedIncidents, setRelatedIncidents] = useState<any[]>([]);
 
   const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin';
-
-  useEffect(() => {
-    if (!incident?.site_id || !incident.company_id) return;
-    let active = true;
-    const anchor = new Date(incident.occurred_at || incident.created_at || new Date().toISOString());
-    setRelatedLoading(true);
-
-    Promise.all([
-      supabase
-        .from('shifts')
-        .select('id, start_time, end_time, status, shift_type, guard_id, guards(first_name, last_name)')
-        .eq('company_id', incident.company_id)
-        .eq('site_id', incident.site_id)
-        .gte('start_time', subDays(anchor, 1).toISOString())
-        .lte('start_time', addDays(anchor, 1).toISOString())
-        .order('start_time', { ascending: false })
-        .limit(5),
-      supabase
-        .from('incidents')
-        .select('id, incident_number, title, incident_type, severity, status, occurred_at, created_at')
-        .eq('company_id', incident.company_id)
-        .eq('site_id', incident.site_id)
-        .neq('id', incident.id)
-        .gte('occurred_at', subDays(anchor, 30).toISOString())
-        .lte('occurred_at', addDays(anchor, 1).toISOString())
-        .order('occurred_at', { ascending: false })
-        .limit(5),
-    ]).then(([shiftsResult, incidentsResult]) => {
-      if (!active) return;
-      setRelatedShifts(shiftsResult.data || []);
-      setRelatedIncidents(incidentsResult.data || []);
-      setRelatedLoading(false);
-    });
-
-    return () => { active = false; };
-  }, [incident?.id, incident?.site_id, incident?.company_id, incident?.occurred_at, incident?.created_at]);
 
   const handleStatusChange = async (newStatus: string) => {
     setSaving(true);
@@ -568,48 +529,14 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
           {/* Linked records */}
           <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4 space-y-3">
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Related</h3>
-            {relatedLoading ? (
-              <div className="flex items-center gap-2 py-3 text-xs text-gray-500">
-                <div className="w-4 h-4 border border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-                Loading related activity...
-              </div>
-            ) : (
-              <>
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">Shifts within 24 hours</div>
-                  <div className="space-y-2">
-                    {relatedShifts.length === 0 && <p className="text-xs text-gray-500">No nearby shifts found.</p>}
-                    {relatedShifts.map((shift) => {
-                      const guardName = [shift.guards?.first_name, shift.guards?.last_name].filter(Boolean).join(' ') || 'Unassigned';
-                      return (
-                        <div key={shift.id} className="rounded-lg border border-gray-800 bg-gray-800/30 px-3 py-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-gray-300 truncate">{guardName}</span>
-                            <span className="text-[10px] text-gray-500 capitalize">{shift.status || 'Unknown'}</span>
-                          </div>
-                          <p className="text-[11px] text-gray-500 mt-1">{format(new Date(shift.start_time), 'dd MMM yyyy · HH:mm')}–{format(new Date(shift.end_time), 'HH:mm')}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="pt-1">
-                  <div className="text-xs text-gray-500 mb-2">Other incidents in 30 days</div>
-                  <div className="space-y-2">
-                    {relatedIncidents.length === 0 && <p className="text-xs text-gray-500">No related incidents found.</p>}
-                    {relatedIncidents.map((item) => (
-                      <Link key={item.id} href={`/incidents/${item.id}`} className="block rounded-lg border border-gray-800 bg-gray-800/30 px-3 py-2 hover:border-gray-700 transition-colors">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-gray-300 truncate">{item.title || item.incident_type || 'Incident'}</span>
-                          <span className="text-[10px] text-gray-500 capitalize">{item.severity || 'Unrated'}</span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 mt-1">{item.incident_number || 'No reference'} · {format(new Date(item.occurred_at || item.created_at), 'dd MMM yyyy')}</p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Related Shifts</div>
+              <p className="text-sm text-gray-400">Shift history at this site around incident time — coming soon.</p>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Related Incidents</div>
+              <p className="text-sm text-gray-400">Other incidents at this site in last 30 days — coming soon.</p>
+            </div>
           </div>
         </div>
       </div>
