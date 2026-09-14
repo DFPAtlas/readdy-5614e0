@@ -1,4 +1,4 @@
-import FeaturePageContent from './components/FeaturePageContent';
+import FeaturePageContent from '../components/FeaturePageContent';
 
 const allFeatures = [
   'command-centre', 'guard-management', 'rota-scheduling', 'attendance',

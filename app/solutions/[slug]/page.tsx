@@ -1,4 +1,4 @@
-import SolutionPageContent from './components/SolutionPageContent';
+import SolutionPageContent from '../components/SolutionPageContent';
 
 const allSolutions = [
   'security-guarding', 'mobile-patrol', 'event-security', 'corporate-security',

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 
@@ -35,38 +35,65 @@ export function useGuards() {
   const { companyId } = useAuth();
   const [guards, setGuards] = useState<Guard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
+  const hasLoadedOnceRef = useRef(false);
 
-  const loadGuards = useCallback(async () => {
-    if (!companyId) {
+  const loadGuards = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      if (!companyId) {
+        setLoading(false);
+        return;
+      }
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+
+      if (mode === 'refresh' && hasLoadedOnceRef.current) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const { data, error: err } = await supabase
+        .from('guards')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+
+      if (err) setError(err.message);
+      else {
+        setGuards(data || []);
+        hasLoadedOnceRef.current = true;
+      }
       setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    const { data, error: err } = await supabase
-      .from('guards')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
-    if (err) setError(err.message);
-    else setGuards(data || []);
-    setLoading(false);
-  }, [companyId]);
+      setRefreshing(false);
+      inFlightRef.current = false;
+    },
+    [companyId]
+  );
 
   useEffect(() => {
     if (!companyId) return;
-    loadGuards();
+    loadGuards('initial');
 
-    // Poll every 30s instead of realtime — avoids Supabase channel lifecycle bugs
     const interval = setInterval(() => {
-      loadGuards();
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadGuards('refresh');
+      }
     }, 30000);
 
-    return () => {
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [companyId, loadGuards]);
+
+  const refetch = useCallback(() => {
+    loadGuards(hasLoadedOnceRef.current ? 'refresh' : 'initial');
+  }, [loadGuards]);
+
+  const refresh = useCallback(() => {
+    loadGuards('refresh');
+  }, [loadGuards]);
 
   const addGuard = async (payload: GuardForm) => {
     if (!companyId) return { error: new Error('No company') };
@@ -94,14 +121,10 @@ export function useGuards() {
       .from('guards')
       .update(payload)
       .eq('id', id)
+      .eq('company_id', companyId)
       .select()
       .maybeSingle();
     return { data, error };
-  };
-
-  const deleteGuard = async (id: string) => {
-    const { error } = await supabase.from('guards').delete().eq('id', id);
-    return { error };
   };
 
   const setGuardStatus = async (id: string, status: string) => {
@@ -109,6 +132,7 @@ export function useGuards() {
       .from('guards')
       .update({ status })
       .eq('id', id)
+      .eq('company_id', companyId)
       .select()
       .maybeSingle();
     return { data, error };
@@ -117,11 +141,12 @@ export function useGuards() {
   return {
     guards,
     loading,
+    refreshing,
     error,
-    refetch: loadGuards,
+    refetch,
+    refresh,
     addGuard,
     updateGuard,
-    deleteGuard,
     setGuardStatus,
   };
 }

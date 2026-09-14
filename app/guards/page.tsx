@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useGuards, getDaysUntil, getSIAStatus, type Guard } from '@/lib/useGuards';
+import { useGuards, getSIAStatus, type Guard } from '@/lib/useGuards';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
 import { useEntitlements } from '@/lib/useEntitlements';
@@ -26,13 +26,14 @@ const STATUS_OPTIONS = [
 
 const SIA_OPTIONS = [
   { value: 'all', label: 'All SIA', dot: 'bg-gray-400' },
+  { value: 'expired_or_expiring', label: 'Expired or Expiring', dot: 'bg-red-500' },
   { value: 'valid', label: 'Valid', dot: 'bg-emerald-500' },
   { value: 'expiring_soon', label: 'Expiring Soon', dot: 'bg-amber-500' },
   { value: 'expired', label: 'Expired', dot: 'bg-red-500' },
 ];
 
 export default function GuardsPage() {
-  const { guards, loading, error, refetch, addGuard, updateGuard, deleteGuard, setGuardStatus } = useGuards();
+  const { guards, loading, refreshing, error, refetch, refresh, addGuard, updateGuard, setGuardStatus } = useGuards();
   const { profile } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, profile?.company_id || null);
   const { entitlements } = useEntitlements();
@@ -48,14 +49,16 @@ export default function GuardsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingGuard, setEditingGuard] = useState<Guard | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const [profileGuard, setProfileGuard] = useState<Guard | null>(null);
 
-  const [deleteTarget, setDeleteTarget] = useState<Guard | null>(null);
-  const [processingDelete, setProcessingDelete] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<Guard | null>(null);
+  const [processingDeactivate, setProcessingDeactivate] = useState(false);
 
   const [limitModalOpen, setLimitModalOpen] = useState(false);
+
+  const canEdit = can('staff', 'edit');
+  const canCreate = can('staff', 'create');
 
   const maxGuards = entitlements?.maxGuards ?? 0;
   const guardsUnlimited = isTitanOrUnlimited(maxGuards);
@@ -89,7 +92,11 @@ export default function GuardsPage() {
       result = result.filter((g) => (g.status || 'active').toLowerCase() === statusFilter);
     }
 
-    if (siaFilter !== 'all') {
+    if (siaFilter === 'expired_or_expiring') {
+      result = result.filter((g) =>
+        ['expired', 'expiring_soon'].includes(getSIAStatus(g.sia_expiry))
+      );
+    } else if (siaFilter !== 'all') {
       result = result.filter((g) => getSIAStatus(g.sia_expiry) === siaFilter);
     }
 
@@ -115,13 +122,6 @@ export default function GuardsPage() {
     return guards.filter((g) => getSIAStatus(g.sia_expiry) === 'expired').length;
   }, [guards]);
 
-  const expiringCount = useMemo(() => {
-    return guards.filter((g) => {
-      const days = getDaysUntil(g.sia_expiry);
-      return days != null && days >= 0 && days <= 30;
-    }).length;
-  }, [guards]);
-
   const expiringSoonCount = useMemo(() => {
     return guards.filter((g) => getSIAStatus(g.sia_expiry) === 'expiring_soon').length;
   }, [guards]);
@@ -135,6 +135,8 @@ export default function GuardsPage() {
     { label: 'SIA Expiring Soon', value: expiringSoonCount, icon: 'ri-time-line', accent: 'bg-amber-500/15 text-amber-400' },
     { label: 'SIA Expired', value: expiredCount, icon: 'ri-close-circle-line', accent: 'bg-red-500/15 text-red-400' },
   ];
+
+  const filtersActive = search.trim().length > 0 || statusFilter !== 'all' || siaFilter !== 'all';
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / 25));
   const safePage = Math.min(page, totalPages);
@@ -154,49 +156,59 @@ export default function GuardsPage() {
     setModalOpen(true);
   };
 
-  const handleSave = async (payload: any) => {
-    setSaving(true);
+  const handleSave = async (payload: any): Promise<{ success: boolean; message?: string }> => {
     if (editingGuard) {
       const { error } = await updateGuard(editingGuard.id, payload);
-      if (!error) setToast('Guard updated');
-      else setToast(error.message || 'Failed to update guard');
-    } else {
-      const { error } = await addGuard(payload);
-      if (!error) setToast('Guard added');
-      else setToast(error.message || 'Failed to add guard');
+      if (error) return { success: false, message: error.message || 'Failed to update guard' };
+      setToast('Guard updated');
+      setModalOpen(false);
+      refresh();
+      return { success: true };
     }
-    setSaving(false);
+
+    if (atGuardLimit) {
+      return { success: false, message: `Guard limit of ${maxGuards} reached. Upgrade your plan to add more guards.` };
+    }
+
+    const { error } = await addGuard(payload);
+    if (error) return { success: false, message: error.message || 'Failed to add guard' };
+    setToast('Guard added');
     setModalOpen(false);
-    refetch();
+    refresh();
+    return { success: true };
   };
 
-  const handleSetInactive = async () => {
-    if (!deleteTarget) return;
-    setProcessingDelete(true);
-    const { error } = await setGuardStatus(deleteTarget.id, 'inactive');
-    if (!error) setToast(`${deleteTarget.first_name || 'Guard'} set to Inactive`);
-    else setToast('Failed to update status');
-    setProcessingDelete(false);
-    setDeleteTarget(null);
-    refetch();
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setProcessingDeactivate(true);
+    const { error } = await setGuardStatus(deactivateTarget.id, 'inactive');
+    if (!error) setToast(`${deactivateTarget.first_name || 'Guard'} deactivated`);
+    else setToast('Failed to deactivate guard');
+    setProcessingDeactivate(false);
+    setDeactivateTarget(null);
+    refresh();
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setProcessingDelete(true);
-    const { error } = await deleteGuard(deleteTarget.id);
-    if (!error) setToast('Guard deleted permanently');
-    else setToast('Failed to delete guard');
-    setProcessingDelete(false);
-    setDeleteTarget(null);
-    refetch();
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setSiaFilter('all');
+    setPage(1);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Guards</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white">Guards</h1>
+            {refreshing && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                <div className="w-3.5 h-3.5 border-2 border-gray-600 border-t-gray-300 rounded-full animate-spin"></div>
+                Refreshing…
+              </span>
+            )}
+          </div>
           <p className="text-gray-400 text-sm mt-1">Manage security personnel, credentials and employment status.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -207,7 +219,7 @@ export default function GuardsPage() {
             <div className="w-4 h-4 flex items-center justify-center"><i className="ri-dashboard-line"></i></div>
             Workforce Operations
           </Link>
-          {can('staff', 'create') && (
+          {canCreate && (
             <button
               onClick={openAdd}
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
@@ -224,8 +236,8 @@ export default function GuardsPage() {
       {!bannerDismissed && (
         <ExpiryAlertBanner
           expiredCount={expiredCount}
-          expiringCount={expiringCount}
-          onReview={() => { setSiaFilter('expiring_soon'); setBannerDismissed(true); }}
+          expiringCount={expiringSoonCount}
+          onReview={() => { setSiaFilter('expired_or_expiring'); setPage(1); }}
           onDismiss={() => setBannerDismissed(true)}
         />
       )}
@@ -240,6 +252,7 @@ export default function GuardsPage() {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search by name, email, or SIA licence..."
+            aria-label="Search guards"
             className="w-full bg-gray-800/60 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -259,10 +272,32 @@ export default function GuardsPage() {
         />
       </div>
 
+      <div className="flex items-center justify-between gap-3 min-h-[24px]">
+        <p className="text-sm text-gray-500" aria-live="polite">
+          {loading ? '' : `${filtered.length} ${filtered.length === 1 ? 'guard' : 'guards'}`}
+        </p>
+        {filtersActive && (
+          <button
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-circle-line"></i></div>
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
           <div className="w-4 h-4 flex items-center justify-center"><i className="ri-error-warning-line"></i></div>
-          {error}
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-red-300 hover:text-red-200 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center"><i className="ri-refresh-line"></i></div>
+            Retry
+          </button>
         </div>
       )}
 
@@ -274,13 +309,15 @@ export default function GuardsPage() {
         onSort={handleSort}
         onView={setProfileGuard}
         onEdit={openEdit}
-        onDelete={setDeleteTarget}
+        onDeactivate={setDeactivateTarget}
         page={safePage}
         totalPages={totalPages}
         onPageChange={setPage}
         total={filtered.length}
-        canEdit={can('staff', 'edit')}
-        canDelete={can('staff', 'delete')}
+        totalAll={guards.length}
+        hasFilters={filtersActive}
+        canEdit={canEdit}
+        canDeactivate={canEdit}
       />
 
       {modalOpen && (
@@ -288,23 +325,24 @@ export default function GuardsPage() {
           editingGuard={editingGuard}
           onSave={handleSave}
           onClose={() => setModalOpen(false)}
-          saving={saving}
         />
       )}
 
       <GuardProfileDrawer
+        key={profileGuard?.id ?? 'none'}
         guard={profileGuard}
         onClose={() => setProfileGuard(null)}
         onEdit={openEdit}
+        canEdit={canEdit}
+        canViewIncidents={can('incidents', 'view')}
       />
 
-      {deleteTarget && (
+      {deactivateTarget && (
         <GuardDeleteDialog
-          guard={deleteTarget}
-          onSetInactive={handleSetInactive}
-          onDelete={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-          processing={processingDelete}
+          guard={deactivateTarget}
+          onConfirm={handleDeactivate}
+          onCancel={() => setDeactivateTarget(null)}
+          processing={processingDeactivate}
         />
       )}
 

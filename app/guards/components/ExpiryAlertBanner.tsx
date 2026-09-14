@@ -37,21 +37,29 @@ export default function ExpiryAlertBanner({ expiredCount, expiringCount, onRevie
               <span className="font-semibold">{expiredCount} guard{expiredCount !== 1 ? 's' : ''}</span> have{' '}
               <span className="font-semibold">expired</span> SIA licences
               {hasExpiring ? (
-                <> and <span className="font-semibold">{expiringCount}</span> expiring within 30 days</>
+                <> and <span className="font-semibold">{expiringCount}</span> expiring soon</>
               ) : null}
               .
             </>
           ) : (
             <>
-              <span className="font-semibold">{expiringCount} guard{expiringCount !== 1 ? 's' : ''}</span> have SIA licences expiring in the next 30 days.
+              <span className="font-semibold">{expiringCount} guard{expiringCount !== 1 ? 's' : ''}</span> have SIA licences expiring soon.
             </>
           )}
         </p>
       </div>
-      <button onClick={onReview} className={`text-sm ${tone.button} font-medium cursor-pointer whitespace-nowrap shrink-0`}>
+      <button
+        onClick={onReview}
+        aria-label="Review guards with expired or expiring SIA licences"
+        className={`text-sm ${tone.button} font-medium cursor-pointer whitespace-nowrap shrink-0`}
+      >
         Review now
       </button>
-      <button onClick={onDismiss} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-300 rounded-lg transition-colors cursor-pointer shrink-0">
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss alert"
+        className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-300 rounded-lg transition-colors cursor-pointer shrink-0"
+      >
         <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-line"></i></div>
       </button>
     </div>

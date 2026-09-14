@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
 import type { Guard } from '@/lib/useGuards';
-import { SKILL_OPTIONS } from '@/lib/useGuards';
+import { SKILL_OPTIONS, getSIAStatus } from '@/lib/useGuards';
 
 interface GuardForm {
   first_name: string;
@@ -14,14 +16,23 @@ interface GuardForm {
   status: string;
 }
 
-interface Props {
-  editingGuard: Guard | null;
-  onSave: (payload: any) => Promise<void>;
-  onClose: () => void;
-  saving: boolean;
+interface SaveResult {
+  success: boolean;
+  message?: string;
 }
 
-export default function GuardModal({ editingGuard, onSave, onClose, saving }: Props) {
+interface Props {
+  editingGuard: Guard | null;
+  onSave: (payload: any) => Promise<SaveResult>;
+  onClose: () => void;
+}
+
+function normalizeSIA(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  return digits.replace(/(\d{4})(?=\d)/g, '$1-');
+}
+
+export default function GuardModal({ editingGuard, onSave, onClose }: Props) {
   const [form, setForm] = useState<GuardForm>({
     first_name: '',
     last_name: '',
@@ -34,8 +45,26 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
     status: 'active',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [dirtyWarning, setDirtyWarning] = useState(false);
   const [skillDropdownOpen, setSkillDropdownOpen] = useState(false);
   const [customSkill, setCustomSkill] = useState('');
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const dirtyRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (editingGuard) {
@@ -57,7 +86,62 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
       });
     }
     setErrors({});
+    setSubmitError(null);
+    setDirty(false);
+    setDirtyWarning(false);
+    setCustomSkill('');
+    setSkillDropdownOpen(false);
   }, [editingGuard]);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    firstFieldRef.current?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (dirtyRef.current) setDirtyWarning(true);
+        else onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const container = modalRef.current;
+      if (!container) return;
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      previousFocusRef.current?.focus?.();
+    };
+  }, []);
+
+  const update = (field: keyof GuardForm, value: any) => {
+    setForm((f) => ({ ...f, [field]: value }));
+    setDirty(true);
+    setDirtyWarning(false);
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const n = { ...prev };
+      delete n[field];
+      return n;
+    });
+  };
 
   const validate = () => {
     const next: Record<string, string> = {};
@@ -68,37 +152,54 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       next.email = 'Enter a valid email address';
     }
-    if (!form.phone.trim()) next.phone = 'Phone is required';
-    if (!form.sia_licence.trim()) next.sia_licence = 'SIA licence is required';
-    else if (!/^\d{4}-\d{4}-\d{4}-\d{4}$/.test(form.sia_licence)) next.sia_licence = 'Format: 1010-2030-4050-6070';
-    if (!form.sia_expiry) {
-      next.sia_expiry = 'Expiry date is required';
-    } else {
-      const exp = new Date(form.sia_expiry);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (exp < today) next.sia_expiry = 'Date is in the past';
-    }
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    if (!form.phone.trim()) next.phone = 'Phone number is required';
+    else if (phoneDigits.length < 7 || phoneDigits.length > 15) next.phone = 'Enter a valid phone number';
+
+    const siaDigits = form.sia_licence.replace(/\D/g, '');
+    if (!form.sia_licence.trim()) next.sia_licence = 'SIA licence number is required';
+    else if (siaDigits.length !== 16) next.sia_licence = 'SIA licence must be 16 digits';
+
+    if (!form.sia_expiry) next.sia_expiry = 'Expiry date is required';
+
+    const rate = parseFloat(form.hourly_rate);
     if (!form.hourly_rate.trim()) next.hourly_rate = 'Hourly rate is required';
-    else if (isNaN(parseFloat(form.hourly_rate)) || parseFloat(form.hourly_rate) <= 0) next.hourly_rate = 'Enter a valid amount';
+    else if (isNaN(rate) || rate <= 0) next.hourly_rate = 'Enter a valid amount';
+    else if (rate > 5000) next.hourly_rate = 'Rate seems too high';
+
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     if (!validate()) return;
-    await onSave({
+    setSubmitError(null);
+    setSubmitting(true);
+    const res = await onSave({
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
-      sia_licence: form.sia_licence.trim(),
+      sia_licence: normalizeSIA(form.sia_licence),
       sia_expiry: form.sia_expiry,
       hourly_rate: parseFloat(form.hourly_rate),
       skills: form.skills,
       status: form.status,
     });
+    if (!res.success) {
+      setSubmitError(res.message || 'Failed to save guard');
+      setSubmitting(false);
+    }
+  };
+
+  const closeModal = () => {
+    if (dirtyRef.current) {
+      setDirtyWarning(true);
+      return;
+    }
+    onClose();
   };
 
   const toggleSkill = (skill: string) => {
@@ -106,6 +207,8 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
     if (set.has(skill)) set.delete(skill);
     else set.add(skill);
     setForm({ ...form, skills: Array.from(set) });
+    setDirty(true);
+    setDirtyWarning(false);
   };
 
   const addCustomSkill = () => {
@@ -113,27 +216,67 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
     if (!s) return;
     if (!form.skills.includes(s)) {
       setForm({ ...form, skills: [...form.skills, s] });
+      setDirty(true);
+      setDirtyWarning(false);
     }
     setCustomSkill('');
+    setSkillDropdownOpen(false);
   };
 
+  const editingExpired = editingGuard ? getSIAStatus(editingGuard.sia_expiry) === 'expired' : false;
+  const enteredExpiryInPast = form.sia_expiry ? new Date(form.sia_expiry) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+  const changingActiveStatus =
+    editingGuard &&
+    (editingGuard.status || 'active').toLowerCase() === 'active' &&
+    (form.status === 'suspended' || form.status === 'inactive');
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#111827] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-[#111827]">
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={editingGuard ? 'Edit guard' : 'Add guard'}
+        className="bg-[#111827] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+      >
+        <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-[#111827] z-10">
           <h2 className="text-lg font-semibold text-white">{editingGuard ? 'Edit Guard' : 'Add Guard'}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer">
+          <button
+            onClick={closeModal}
+            aria-label="Close"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+          >
             <div className="w-4 h-4 flex items-center justify-center"><i className="ri-close-line"></i></div>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5" noValidate>
+          {editingExpired && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm px-4 py-3 rounded-lg flex items-start gap-2.5">
+              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mt-0.5"><i className="ri-alert-line"></i></div>
+              <span>This guard&apos;s SIA licence is expired. You can still correct unrelated profile details.</span>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm px-4 py-3 rounded-lg flex items-start gap-2.5" role="alert">
+              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mt-0.5"><i className="ri-error-warning-line"></i></div>
+              <span>{submitError}</span>
+            </div>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">First Name *</label>
               <input
+                ref={firstFieldRef}
                 value={form.first_name}
-                onChange={(e) => { setForm({ ...form, first_name: e.target.value }); setErrors({ ...errors, first_name: '' }); }}
+                onChange={(e) => update('first_name', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.first_name ? 'border-red-500/50' : 'border-gray-700'}`}
                 placeholder="John"
               />
@@ -143,7 +286,7 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Last Name *</label>
               <input
                 value={form.last_name}
-                onChange={(e) => { setForm({ ...form, last_name: e.target.value }); setErrors({ ...errors, last_name: '' }); }}
+                onChange={(e) => update('last_name', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.last_name ? 'border-red-500/50' : 'border-gray-700'}`}
                 placeholder="Smith"
               />
@@ -154,7 +297,7 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               <input
                 type="email"
                 value={form.email}
-                onChange={(e) => { setForm({ ...form, email: e.target.value }); setErrors({ ...errors, email: '' }); }}
+                onChange={(e) => update('email', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.email ? 'border-red-500/50' : 'border-gray-700'}`}
                 placeholder="john@example.com"
               />
@@ -164,7 +307,7 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Phone *</label>
               <input
                 value={form.phone}
-                onChange={(e) => { setForm({ ...form, phone: e.target.value }); setErrors({ ...errors, phone: '' }); }}
+                onChange={(e) => update('phone', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.phone ? 'border-red-500/50' : 'border-gray-700'}`}
                 placeholder="+44 7123 456789"
               />
@@ -174,7 +317,7 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               <label className="block text-sm font-medium text-gray-300 mb-1.5">SIA Licence Number *</label>
               <input
                 value={form.sia_licence}
-                onChange={(e) => { setForm({ ...form, sia_licence: e.target.value }); setErrors({ ...errors, sia_licence: '' }); }}
+                onChange={(e) => update('sia_licence', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.sia_licence ? 'border-red-500/50' : 'border-gray-700'}`}
                 placeholder="1010-2030-4050-6070"
               />
@@ -185,18 +328,22 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               <input
                 type="date"
                 value={form.sia_expiry}
-                onChange={(e) => { setForm({ ...form, sia_expiry: e.target.value }); setErrors({ ...errors, sia_expiry: '' }); }}
+                onChange={(e) => update('sia_expiry', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.sia_expiry ? 'border-red-500/50' : 'border-gray-700'}`}
               />
               {errors.sia_expiry && <p className="text-xs text-red-400 mt-1">{errors.sia_expiry}</p>}
+              {enteredExpiryInPast && (
+                <p className="text-xs text-amber-400 mt-1">This date is in the past — the licence is expired.</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Hourly Rate (£) *</label>
               <input
                 type="number"
                 step="0.01"
+                min="0.01"
                 value={form.hourly_rate}
-                onChange={(e) => { setForm({ ...form, hourly_rate: e.target.value }); setErrors({ ...errors, hourly_rate: '' }); }}
+                onChange={(e) => update('hourly_rate', e.target.value)}
                 className={`w-full bg-gray-800/60 border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${errors.hourly_rate ? 'border-red-500/50' : 'border-gray-700'}`}
                 placeholder="15.50"
               />
@@ -206,13 +353,16 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                onChange={(e) => update('status', e.target.value)}
                 className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 appearance-none pr-8"
               >
                 <option value="active">Active</option>
                 <option value="suspended">Suspended</option>
                 <option value="inactive">Inactive</option>
               </select>
+              {changingActiveStatus && (
+                <p className="text-xs text-amber-400 mt-1">You are changing an active guard to {form.status}. This may affect scheduled shifts.</p>
+              )}
             </div>
           </div>
 
@@ -222,7 +372,7 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
               {form.skills.map((skill) => (
                 <span key={skill} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
                   {skill}
-                  <button type="button" onClick={() => toggleSkill(skill)} className="cursor-pointer">
+                  <button type="button" onClick={() => toggleSkill(skill)} aria-label={`Remove ${skill}`} className="cursor-pointer">
                     <div className="w-3 h-3 flex items-center justify-center"><i className="ri-close-line text-[10px]"></i></div>
                   </button>
                 </span>
@@ -275,17 +425,25 @@ export default function GuardModal({ editingGuard, onSave, onClose, saving }: Pr
             </div>
           </div>
 
+          {dirtyWarning && (
+            <p className="text-xs text-amber-400" role="alert">You have unsaved changes. Click Cancel to discard them.</p>
+          )}
+
           <div className="flex justify-end gap-3 pt-2 border-t border-gray-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={submitting}
               className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap inline-flex items-center gap-2"
             >
-              {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
-              {saving ? 'Saving...' : (editingGuard ? 'Update Guard' : 'Add Guard')}
+              {submitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+              {submitting ? 'Saving...' : (editingGuard ? 'Update Guard' : 'Add Guard')}
             </button>
           </div>
         </form>

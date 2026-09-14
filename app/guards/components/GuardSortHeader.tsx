@@ -14,21 +14,26 @@ export default function GuardSortHeader({
   const active = activeKey === sortKey;
   return (
     <th
-      onClick={() => onSort(sortKey)}
-      className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-white transition-colors"
+      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
     >
-      <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        aria-label={`Sort by ${label}${active ? ` (currently ${dir === 'asc' ? 'ascending' : 'descending'})` : ''}`}
+        className="inline-flex items-center gap-1 cursor-pointer select-none hover:text-white transition-colors uppercase tracking-wider"
+      >
         {label}
-        {active && (
-          <div className="w-3 h-3 flex items-center justify-center">
-            {dir === 'asc' ? (
+        <span aria-hidden="true" className="w-3 h-3 flex items-center justify-center">
+          {active ? (
+            dir === 'asc' ? (
               <i className="ri-arrow-up-s-line text-gray-300"></i>
             ) : (
               <i className="ri-arrow-down-s-line text-gray-300"></i>
-            )}
-          </div>
-        )}
-      </div>
+            )
+          ) : null}
+        </span>
+      </button>
     </th>
   );
 }
