@@ -23,8 +23,9 @@ export default function ClientIncidentsPage() {
     try {
       await callAgent(
         'dob_incident',
+        'health.status',
         { incidents_count: incidents.length, open_count: incidents.filter(i => i.status === 'open').length },
-        { clientId: profile.company_id, userId: profile.id, requestedPage: '/client/incidents', requestedFeature: 'dob_incident' }
+        { requestedPage: '/client/incidents', requestedFeature: 'dob_incident' }
       );
     } catch {}
   }, [profile?.id, profile?.company_id, incidents.length]);

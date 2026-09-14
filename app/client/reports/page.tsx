@@ -18,8 +18,9 @@ export default function ClientReportsPage() {
     try {
       await callAgent(
         'report_generator',
+        'health.status',
         { reports_available: reports.filter(r => r.status === 'sent').length },
-        { clientId: profile.company_id, userId: profile.id, requestedPage: '/client/reports', requestedFeature: 'report_generator' }
+        { requestedPage: '/client/reports', requestedFeature: 'report_generator' }
       );
     } catch {}
   }, [profile?.id, profile?.company_id, reports.length]);

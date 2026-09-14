@@ -38,8 +38,9 @@ export default function SiteAssignmentClient() {
     try {
       const result = await callAgent(
         'client_dashboard',
+        'health.status',
         { total_guards: rows.length, total_sites: columns.length },
-        { clientId: companyId, userId: profile.id, requestedPage: '/dashboard/site-assignments', requestedFeature: 'site_assignments' }
+        { requestedPage: '/dashboard/site-assignments', requestedFeature: 'site_assignments' }
       );
       if (result.error) setAgentError(result.error);
       setAgentData(result.data);

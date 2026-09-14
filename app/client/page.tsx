@@ -36,6 +36,7 @@ export default function ClientOverviewPage() {
     try {
       const result = await callAgent(
         'client_dashboard',
+        'health.status',
         {
           sites_count: sites.length,
           incidents_count: incidents.length,
@@ -43,8 +44,6 @@ export default function ClientOverviewPage() {
           shifts_active: currentShifts.length,
         },
         {
-          clientId: profile.company_id,
-          userId: profile.id,
           requestedPage: '/client',
           requestedFeature: 'client_dashboard',
         }

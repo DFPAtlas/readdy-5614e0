@@ -21,8 +21,9 @@ export default function AdminActivityPage() {
     try {
       const result = await callAgent(
         'super_admin_audit',
+        'audit.activity.inspect',
         { total_logs: logs.length, recent_actions: logs.slice(0, 5).map((l: any) => l.action) },
-        { clientId: profile.company_id, userId: profile.id, requestedPage: '/admin/activity', requestedFeature: 'super_admin_audit' }
+        { requestedPage: '/admin/activity', requestedFeature: 'super_admin_audit' }
       );
       if (result.error) setAgentError(result.error);
       setAgentData(result.data);

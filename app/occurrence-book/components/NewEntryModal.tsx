@@ -30,7 +30,7 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
   const [clientVisible, setClientVisible] = useState(false);
   const [visibility, setVisibility] = useState('internal');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showAiToggle, setShowAiToggle] = useState(false);
+  const [generateAiSummary, setGenerateAiSummary] = useState(false);
 
   useEffect(() => {
     if (!companyId) return;
@@ -59,6 +59,7 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
       setOccurredAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       setEntryText('');
     }
+    setGenerateAiSummary(false);
     setErrors({});
   }, [editingEntry, preselectedSiteId]);
 
@@ -86,6 +87,7 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
       occurred_at: new Date(occurredAt).toISOString(),
       client_visible: clientVisible,
       visibility: clientVisible ? 'client_visible' : visibility,
+      request_ai_summary: generateAiSummary,
     });
   };
 
@@ -177,7 +179,7 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -187,14 +189,20 @@ export default function NewEntryModal({ editingEntry, preselectedSiteId, onSave,
               />
               <span className="text-sm text-gray-400">Visible to client</span>
             </label>
-            <button
-              type="button"
-              onClick={() => setShowAiToggle(!showAiToggle)}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              Generate AI Summary
-            </button>
-            {showAiToggle && <span className="text-[11px] text-gray-500">(placeholder — wired up later)</span>}
+            <label className={`flex items-center gap-2 ${entryText.trim().length >= 50 ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+              <input
+                type="checkbox"
+                checked={generateAiSummary}
+                disabled={entryText.trim().length < 50}
+                onChange={(e) => setGenerateAiSummary(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span className="text-sm text-gray-400 flex items-center gap-1.5">
+                <i className="ri-sparkling-line text-blue-400"></i>
+                Generate AI summary
+              </span>
+            </label>
+            {entryText.trim().length > 0 && entryText.trim().length < 50 && <span className="text-[11px] text-gray-500">Available from 50 characters</span>}
           </div>
         </div>
 

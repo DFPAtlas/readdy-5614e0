@@ -49,14 +49,13 @@ export default function ComplianceDocumentsClient() {
     try {
       const result = await callAgent(
         'compliance',
+        'health.status',
         {
           expired: summary?.expired || 0,
           expiring_soon: summary?.expiringSoon || 0,
           total_docs: summary?.total || 0,
         },
         {
-          clientId: companyId,
-          userId: profile.id,
           requestedPage: '/dashboard/compliance/documents',
           requestedFeature: 'compliance',
         }
