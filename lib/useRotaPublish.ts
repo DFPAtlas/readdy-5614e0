@@ -103,6 +103,12 @@ export function useRotaPublish() {
         return { error: err.message };
       }
 
+      if (!data) {
+        const msg = 'Failed to publish rota';
+        setError(msg);
+        return { error: msg };
+      }
+
       setPublished({
         id: data.id,
         company_id: data.company_id,

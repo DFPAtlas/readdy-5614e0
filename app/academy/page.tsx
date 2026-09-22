@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAcademy } from '@/lib/useAcademy';
@@ -69,7 +70,7 @@ export default function AcademyPage() {
                 const myAttempts = attempts.filter((x) => x.assessment_id === a.id).length;
                 return (
                   <div className="mt-6 max-w-2xl">
-                    <KnowledgeCheck assessment={a} attempts={myAttempts} onSubmit={(score, passed, answers) => submitAttempt(a, score, passed, answers)} />
+                    <KnowledgeCheck assessment={a} attempts={myAttempts} onSubmit={async (score, passed, answers) => { await submitAttempt(a, score, passed, answers); }} />
                   </div>
                 );
               })()}
@@ -82,9 +83,9 @@ export default function AcademyPage() {
         <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center">
           <h2 className="text-2xl font-bold text-white mb-3">Questions about training?</h2>
           <p className="text-gray-400 text-sm mb-6">Your administrator assigns company training and renewal requirements.</p>
-          <a href="/help?category=guards-compliance" className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-6 py-3 rounded-lg font-semibold text-sm transition-colors cursor-pointer whitespace-nowrap">
+          <Link href="/help?category=guards-compliance" className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-6 py-3 rounded-lg font-semibold text-sm transition-colors cursor-pointer whitespace-nowrap">
             <i className="ri-book-open-line"></i> View compliance guides
-          </a>
+          </Link>
         </div>
       </section>
 

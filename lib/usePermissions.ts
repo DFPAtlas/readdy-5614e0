@@ -70,6 +70,66 @@ export interface Site {
   address: string | null;
 }
 
+interface RoleLike {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string | null;
+  is_system: boolean | null;
+  is_default: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+interface UserRoleRowLike {
+  id: string;
+  user_id: string;
+  role_id: string;
+  company_id: string;
+  assigned_at: string | null;
+  assigned_by: string | null;
+  is_primary: boolean | null;
+  role?: RoleLike | null;
+  user?: { id: string; first_name: string | null; last_name: string | null; email: string | null } | null;
+}
+
+const PERMISSION_LEVELS: PermissionLevel[] = ['no_access', 'view', 'create', 'edit', 'approve', 'delete', 'manage'];
+
+function toPermissionLevel(value: string | null | undefined): PermissionLevel {
+  return value && (PERMISSION_LEVELS as string[]).includes(value) ? (value as PermissionLevel) : 'no_access';
+}
+
+function toAccessType(value: string | null | undefined): UserSiteAccess['access_type'] {
+  return value === 'all' || value === 'selected' || value === 'region' || value === 'own' ? value : 'all';
+}
+
+function mapRole(r: RoleLike): Role {
+  return {
+    id: r.id,
+    company_id: r.company_id,
+    name: r.name,
+    description: r.description,
+    is_system: r.is_system ?? false,
+    is_default: r.is_default ?? false,
+    created_at: r.created_at ?? '',
+    updated_at: r.updated_at ?? '',
+  };
+}
+
+function mapUserRole(r: UserRoleRowLike): UserRole {
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    role_id: r.role_id,
+    company_id: r.company_id,
+    assigned_at: r.assigned_at ?? '',
+    assigned_by: r.assigned_by,
+    is_primary: r.is_primary ?? false,
+    role: r.role ? mapRole(r.role) : undefined,
+    user: r.user ? { id: r.user.id, first_name: r.user.first_name, last_name: r.user.last_name, email: r.user.email } : undefined,
+  };
+}
+
 const DEFAULT_ROLES = [
   { name: 'Account Owner', description: 'Full access to all features and company management', is_system: true, is_default: false },
   { name: 'Superuser', description: 'Full access to all features except billing', is_system: true, is_default: false },
@@ -170,7 +230,16 @@ export function usePermissions(companyId: string | null) {
       .from('user_site_access')
       .select('*')
       .eq('company_id', companyId);
-    if (!error && data) setUserSiteAccess(data || []);
+    if (!error && data) {
+      setUserSiteAccess(data.map((r) => ({
+        id: r.id,
+        user_id: r.user_id,
+        company_id: r.company_id,
+        site_id: r.site_id,
+        access_type: toAccessType(r.access_type),
+        region: r.region,
+      })));
+    }
   }, [companyId]);
 
   const setDefaultRole = async (roleId: string) => {
@@ -250,11 +319,11 @@ export function usePermissions(companyId: string | null) {
       await seedDefaultRoles(companyId);
       const { data: seeded } = await supabase.from('roles').select('*').eq('company_id', companyId).order('is_system', { ascending: false }).order('name');
       if (seeded) {
-        const rolePerms = await loadRolePermissions(seeded);
+        const rolePerms = await loadRolePermissions(seeded.map(mapRole));
         setRoles(rolePerms);
       }
     } else {
-      const rolePerms = await loadRolePermissions(rolesData);
+      const rolePerms = await loadRolePermissions(rolesData.map(mapRole));
       setRoles(rolePerms);
     }
     setLoading(false);
@@ -269,9 +338,9 @@ export function usePermissions(companyId: string | null) {
       .in('role_id', rolesList.map(r => r.id));
 
     const permsMap: Record<string, Record<string, PermissionLevel>> = {};
-    (permsData || []).forEach((p: RolePermission) => {
+    (permsData || []).forEach((p) => {
       if (!permsMap[p.role_id]) permsMap[p.role_id] = {};
-      permsMap[p.role_id][p.permission_key] = p.level;
+      permsMap[p.role_id][p.permission_key] = toPermissionLevel(p.level);
     });
 
     return rolesList.map(r => ({ ...r, permissions: permsMap[r.id] || {} }));
@@ -402,7 +471,7 @@ export function usePermissions(companyId: string | null) {
       .from('user_roles')
       .select('*, role:roles(*), user:users(id,first_name,last_name,email)')
       .eq('company_id', companyId);
-    if (data) setUserRoles(data || []);
+    if (data) setUserRoles(data.map((r) => mapUserRole(r)));
   }, [companyId]);
 
   const assignRole = async (userId: string, roleId: string, isPrimary: boolean = false) => {
@@ -411,7 +480,7 @@ export function usePermissions(companyId: string | null) {
     const { data, error } = await supabase.from('user_roles').insert({
       user_id: userId, role_id: roleId, company_id: companyId, is_primary: isPrimary,
     }).select('*, role:roles(*), user:users(id,first_name,last_name,email)').maybeSingle();
-    if (!error && data) setUserRoles(prev => [...prev, data]);
+    if (!error && data) setUserRoles(prev => [...prev, mapUserRole(data)]);
     setSaving(false);
   };
 

@@ -51,7 +51,7 @@ export default function ComplianceDocumentsClient() {
         'compliance',
         {
           expired: summary?.expired || 0,
-          expiring_soon: summary?.expiringSoon || 0,
+          expiring_soon: summary?.expiring7Days || 0,
           total_docs: summary?.total || 0,
         },
         {
@@ -66,7 +66,7 @@ export default function ComplianceDocumentsClient() {
       if (summary?.expired > 0) {
         logWebhookEvent('compliance', 'compliance_warning', {
           expired_count: summary.expired,
-          expiring_soon: summary.expiringSoon,
+          expiring_soon: summary.expiring7Days,
         }, companyId);
       }
     } catch (err: any) {
@@ -74,7 +74,7 @@ export default function ComplianceDocumentsClient() {
     } finally {
       setAgentLoading(false);
     }
-  }, [profile?.id, companyId, summary?.expired, summary?.expiringSoon, summary?.total]);
+  }, [profile?.id, companyId, summary?.expired, summary?.expiring7Days, summary?.total]);
 
   useEffect(() => {
     if (profile?.id && !loading) fetchAgent();

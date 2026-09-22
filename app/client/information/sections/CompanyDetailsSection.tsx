@@ -13,7 +13,7 @@ interface Props {
 
 
 export default function CompanyDetailsSection({ profile, canEdit, saving, onSave }: Props) {
-  const [form, setForm] = useState<Partial<ClientProfile>>();
+  const [form, setForm] = useState<Partial<ClientProfile>>({});
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 

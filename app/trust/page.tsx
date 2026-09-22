@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import GlassCard from '../components/GlassCard';
@@ -135,9 +136,9 @@ export default function TrustPage() {
             <GlassCard className="p-6">
               <h4 className="text-base font-semibold text-white mb-2">Data subject rights</h4>
               <p className="text-gray-400 text-sm mb-4">Submit an access, erasure or other privacy request.</p>
-              <a href="/privacy/request" className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-sm font-medium cursor-pointer">
+              <Link href="/privacy/request" className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-sm font-medium cursor-pointer">
                 Make a request <i className="ri-arrow-right-line"></i>
-              </a>
+              </Link>
             </GlassCard>
             <GlassCard className="p-6">
               <h4 className="text-base font-semibold text-white mb-2">Responsible disclosure</h4>
