@@ -41,5 +41,6 @@
     "test:run": "vitest run",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "packageManager": "npm@10.8.2"
 }
