@@ -16,22 +16,30 @@
     "recharts": "^3.0.2"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "15.3.2",
     "postcss": "^8.5.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   },
   "name": "next-app",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:run": "vitest run",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "version": "0.1.0"
 }
