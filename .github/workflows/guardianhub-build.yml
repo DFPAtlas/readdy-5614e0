@@ -33,8 +33,7 @@ jobs:
           cache: npm
 
       - name: Install locked dependencies
-        run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+        run: npm ci
 
       - name: TypeScript
         run: npm run typecheck
