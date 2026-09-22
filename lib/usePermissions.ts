@@ -158,10 +158,10 @@ export function usePermissions(companyId: string | null) {
     if (!companyId) return;
     const { data, error } = await supabase
       .from('sites')
-      .select('id, name, region, address')
+      .select('id, site_name, region, address')
       .eq('company_id', companyId)
-      .order('name');
-    if (!error && data) setSites(data);
+      .order('site_name');
+    if (!error && data) setSites(data.map((s) => ({ id: s.id, name: s.site_name, region: s.region, address: s.address })));
   }, [companyId]);
 
   const loadUserSiteAccess = useCallback(async () => {

@@ -268,7 +268,7 @@ export function useOperationsCommand(): UseOperationsCommandReturn {
           .gte('start_time', now)
           .lte('start_time', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()),
         supabase.from('compliance_documents')
-          .select('id, site_id, company_id, status')
+          .select('id, company_id, entity_type, entity_id, status')
           .in('company_id', allowedCompanyIds)
           .eq('status', 'expired'),
       ]);
@@ -557,13 +557,14 @@ export function useOperationsCommand(): UseOperationsCommandReturn {
       });
 
       expiredCompliance.slice(0, 5).forEach((c: any) => {
+        const cSiteId = c.entity_type === 'site' ? c.entity_id : null;
         insights.push({
           id: `compliance-${c.id}`,
           category: 'compliance_failure',
-          title: `Compliance expired: ${siteMap[c.site_id] || 'Unknown'}`,
+          title: `Compliance expired: ${siteMap[cSiteId] || 'Unknown'}`,
           description: 'Document expired and needs renewal',
           severity: 'high',
-          siteName: siteMap[c.site_id],
+          siteName: siteMap[cSiteId],
           companyName: companyMap[c.company_id] || 'Unknown',
         });
       });

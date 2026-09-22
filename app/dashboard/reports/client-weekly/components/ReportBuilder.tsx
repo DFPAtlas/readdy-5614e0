@@ -95,13 +95,12 @@ export default function ReportBuilder({ onPreview, onExportPDF, onExportCSV, onE
     let shiftsQuery = supabase.from('shifts').select('id, guard_id, start_time, end_time, status, site_id, shift_type').eq('company_id', companyId).gte('start_time', fromISO).lte('start_time', toISO);
     if (selectedSite) shiftsQuery = shiftsQuery.eq('site_id', selectedSite);
 
-    let attendanceQuery = supabase.from('attendance_logs').select('id, guard_id, clock_in, clock_out, site_id').eq('company_id', companyId).gte('clock_in', fromISO).lte('clock_in', toISO);
-    if (selectedSite) attendanceQuery = attendanceQuery.eq('site_id', selectedSite);
+    const attendanceQuery = supabase.from('attendance_logs').select('id, guard_id, clock_in, clock_out, shift_id').eq('company_id', companyId).gte('clock_in', fromISO).lte('clock_in', toISO);
 
     let patrolQuery = supabase.from('patrol_logs').select('id, site_id, status, start_time, end_time, checkpoints_total, checkpoints_completed').eq('company_id', companyId).gte('start_time', fromISO).lte('start_time', toISO);
     if (selectedSite) patrolQuery = patrolQuery.eq('site_id', selectedSite);
 
-    let incidentsQuery = supabase.from('incidents').select('id, name, status, severity, occurred_at, resolved_at, site_id').eq('company_id', companyId).gte('occurred_at', fromISO).lte('occurred_at', toISO);
+    let incidentsQuery = supabase.from('incidents').select('id, title, status, severity, occurred_at, resolved_at, site_id').eq('company_id', companyId).gte('occurred_at', fromISO).lte('occurred_at', toISO);
     if (selectedSite) incidentsQuery = incidentsQuery.eq('site_id', selectedSite);
 
     let obQuery = supabase.from('occurrence_books').select('id, site_id, entry_type, entry, title, occurred_at, created_at, client_visible').eq('company_id', companyId).eq('client_visible', true).gte('created_at', fromISO).lte('created_at', toISO);
@@ -139,16 +138,20 @@ export default function ReportBuilder({ onPreview, onExportPDF, onExportCSV, onE
       ticketsQuery,
     ]);
 
+    const siteShiftIds = new Set((shifts || []).map((s: any) => s.id));
+    const scopedAttendance = selectedSite ? (attendance || []).filter((a: any) => siteShiftIds.has(a.shift_id)) : (attendance || []);
+    const scopedIncidents = (incidents || []).map((i: any) => ({ ...i, name: i.title }));
+
     const completedPatrols = patrolLogs?.filter((p: any) => p.status === 'completed').length || 0;
     const totalPatrols = patrolLogs?.length || 1;
     const patrolCompletionRate = totalPatrols > 0 ? Math.round((completedPatrols / totalPatrols) * 100) : 0;
     const missedPatrols = patrolLogs?.filter((p: any) => p.status === 'missed').length || 0;
     const lateStarts = 0;
-    const attendanceRate = attendance && attendance.length > 0
-      ? Math.round((attendance.filter((a: any) => a.clock_in && a.clock_out).length / attendance.length) * 100)
+    const attendanceRate = scopedAttendance.length > 0
+      ? Math.round((scopedAttendance.filter((a: any) => a.clock_in && a.clock_out).length / scopedAttendance.length) * 100)
       : 0;
-    const openIncidents = incidents?.filter((i: any) => i.status === 'open').length || 0;
-    const closedIncidents = incidents?.filter((i: any) => i.status === 'resolved' || i.status === 'closed').length || 0;
+    const openIncidents = scopedIncidents.filter((i: any) => i.status === 'open').length;
+    const closedIncidents = scopedIncidents.filter((i: any) => i.status === 'resolved' || i.status === 'closed').length;
     const missedWelfare = 0;
     const openTickets = supportTickets?.filter((t: any) => t.status === 'open').length || 0;
 
@@ -162,9 +165,9 @@ export default function ReportBuilder({ onPreview, onExportPDF, onExportCSV, onE
       dateTo,
       generatedAt: new Date().toISOString(),
       shifts: enabledSectionIds.includes('guard_attendance') ? shifts || [] : [],
-      attendance: enabledSectionIds.includes('guard_attendance') ? attendance || [] : [],
+      attendance: enabledSectionIds.includes('guard_attendance') ? scopedAttendance : [],
       patrolLogs: enabledSectionIds.includes('patrol_completion') || enabledSectionIds.includes('missed_patrols') ? patrolLogs || [] : [],
-      incidents: enabledSectionIds.includes('incidents') ? incidents || [] : [],
+      incidents: enabledSectionIds.includes('incidents') ? scopedIncidents : [],
       occurrenceBooks: enabledSectionIds.includes('dob_summary') ? occurrenceBooks || [] : [],
       welfareCheckins: enabledSectionIds.includes('welfare_summary') ? welfareCheckins || [] : [],
       evidenceFiles: enabledSectionIds.includes('evidence_summary') ? evidenceFiles || [] : [],
@@ -173,7 +176,7 @@ export default function ReportBuilder({ onPreview, onExportPDF, onExportCSV, onE
         totalShifts: shifts?.length || 0,
         totalPatrols: totalPatrols,
         patrolCompletionRate,
-        incidentsOpened: incidents?.length || 0,
+        incidentsOpened: scopedIncidents.length,
         incidentsClosed: closedIncidents,
         lateStarts,
         openIssues: openIncidents + openTickets,

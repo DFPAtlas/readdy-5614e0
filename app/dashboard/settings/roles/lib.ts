@@ -103,8 +103,8 @@ export function useRolesManager() {
 
   const loadSites = useCallback(async () => {
     if (!companyId) return;
-    const { data } = await supabase.from('sites').select('id,name,region,address').eq('company_id', companyId).order('name');
-    if (data) setSites(data);
+    const { data } = await supabase.from('sites').select('id,site_name,region,address').eq('company_id', companyId).order('site_name');
+    if (data) setSites(data.map((s) => ({ id: s.id, name: s.site_name, region: s.region, address: s.address })));
   }, [companyId]);
 
   const loadUserSiteAccess = useCallback(async () => {

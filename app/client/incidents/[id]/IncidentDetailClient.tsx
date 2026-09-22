@@ -114,10 +114,10 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
 
         const { data: timelineData } = await supabase
           .from('incident_timeline')
-          .select('id, status, changed_at, notes')
+          .select('id, event_type, metadata, created_at')
           .eq('incident_id', incidentId)
           .in('event_type', ['created', 'status_change', 'severity_change', 'media_upload'])
-          .order('changed_at', { ascending: true });
+          .order('created_at', { ascending: true });
 
         setDetail({
           ...incident,
@@ -125,7 +125,14 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
           officer_name: guardData ? `${guardData.first_name} ${guardData.last_name}` : null,
           site_name: siteName?.site_name || null,
           media: mediaRows || [],
-          timeline: timelineData || [],
+          timeline: (timelineData || []).map((t: any) => ({
+            id: t.id,
+            status: t.event_type === 'status_change'
+              ? (t.metadata?.values?.status || t.metadata?.status || t.event_type)
+              : t.event_type,
+            changed_at: t.created_at,
+            notes: t.metadata?.comment_text || null,
+          })),
         });
       } catch (err: any) {
         setError(err.message || 'Failed to load incident data');

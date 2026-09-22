@@ -164,10 +164,10 @@ export function useComplianceDocuments(): ComplianceData {
         supabase.from('guard_certifications').select(`*, guards:guard_id(first_name, last_name)`).eq('company_id', companyId).order('expiry_date', { ascending: true }),
         supabase.from('guard_vetting_records').select(`*, guards:guard_id(first_name, last_name)`).eq('company_id', companyId).order('rtw_expiry', { ascending: true }),
         supabase.from('acs_evidence').select('*').eq('company_id', companyId).order('expiry_date', { ascending: true }),
-        supabase.from('client_documents').select(`*, clients:client_id(client_name)`).eq('client_id', (q: any) => q.select('id').from('clients').eq('company_id', companyId)),
+        supabase.from('client_documents').select(`*, clients:client_id(name)`).eq('client_id', (q: any) => q.select('id').from('clients').eq('company_id', companyId)),
         supabase.from('guards').select('id, first_name, last_name').eq('company_id', companyId).eq('status', 'active'),
         supabase.from('sites').select('id, site_name').eq('company_id', companyId),
-        supabase.from('clients').select('id, client_name').eq('company_id', companyId),
+        supabase.from('clients').select('id, name').eq('company_id', companyId),
       ]);
 
       if (compRes.error) throw new Error(compRes.error.message);
@@ -181,7 +181,7 @@ export function useComplianceDocuments(): ComplianceData {
 
       const guardMap = new Map((guardsRes.data || []).map((g: any) => [g.id, `${g.first_name || ''} ${g.last_name || ''}`.trim() || 'Unknown']));
       const siteMap = new Map((sitesRes.data || []).map((s: any) => [s.id, s.site_name]));
-      const clientMap = new Map((clientsRes.data || []).map((c: any) => [c.id, c.client_name]));
+      const clientMap = new Map((clientsRes.data || []).map((c: any) => [c.id, c.name]));
 
       const processedCerts: GuardCert[] = (certRes.data || []).map((c: any) => ({
         ...c,
@@ -195,7 +195,7 @@ export function useComplianceDocuments(): ComplianceData {
 
       const processedClientDocs: ClientDoc[] = (clientRes.data || []).map((d: any) => ({
         ...d,
-        client_name: d.clients?.client_name || clientMap.get(d.client_id) || 'Unknown',
+        client_name: d.clients?.name || clientMap.get(d.client_id) || 'Unknown',
       }));
 
       const processedComplianceDocs: ComplianceDoc[] = (compRes.data || []).map((d: any) => ({
