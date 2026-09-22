@@ -36,15 +36,16 @@ export default function ClientOverviewPage() {
     try {
       const result = await callAgent(
         'client_dashboard',
+        'dashboard_view',
         {
           sites_count: sites.length,
           incidents_count: incidents.length,
           reports_count: reports.length,
           shifts_active: currentShifts.length,
+          client_id: profile.company_id,
+          user_id: profile.id,
         },
         {
-          clientId: profile.company_id,
-          userId: profile.id,
           requestedPage: '/client',
           requestedFeature: 'client_dashboard',
         }

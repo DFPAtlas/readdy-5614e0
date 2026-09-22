@@ -85,7 +85,7 @@ export default function ClientServiceRequestsPage() {
 
     const { data: reqs } = await supabase.from('service_requests').select('*').eq('client_id', clientId).eq('company_id', companyId).order('created_at', { ascending: false }).limit(50);
 
-    let enriched = (reqs || []).map((r: any) => ({
+    const enriched = (reqs || []).map((r: any) => ({
       ...r,
       site_name: (sitesData || []).find((s: any) => s.id === r.site_id)?.site_name || null,
     }));

@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function NewTicketPage() {
   const router = useRouter();
-  const { profile, companyId } = useAuth();
+  const { profile } = useAuth();
   const { createTicket } = useSupportTickets();
 
   const [subject, setSubject] = useState('');

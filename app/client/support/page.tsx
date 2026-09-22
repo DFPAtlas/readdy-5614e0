@@ -2,16 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useSupportTickets, getStatusBadge, getPriorityBadge, getCategoryLabel, CATEGORIES, PRIORITIES } from '@/lib/useSupportTickets';
-import { useAuth } from '@/lib/auth';
+import { useSupportTickets, getStatusBadge, getPriorityBadge, getCategoryLabel } from '@/lib/useSupportTickets';
 import { useClientAuth } from '@/lib/useClientAuth';
 
 export default function ClientSupportPage() {
   const { isClientUser } = useClientAuth();
-  const { tickets, loading, error, refresh } = useSupportTickets(isClientUser ? true : false);
+  const { tickets, loading, error } = useSupportTickets(isClientUser ? true : false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const { profile } = useAuth();
 
   const filtered = statusFilter === 'all'
     ? tickets

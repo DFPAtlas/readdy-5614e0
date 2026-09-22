@@ -68,7 +68,7 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
 
         const { data: allSites } = await supabase
           .from('sites')
-          .select('id')
+          .select('id, site_name')
           .eq('client_id', cu.client_id)
           .eq('company_id', companyId);
 
@@ -93,7 +93,7 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
           return;
         }
 
-        const siteName = allSites?.find((s) => s.id === incident.site_id) as any;
+        const siteName = allSites?.find((s) => s.id === incident.site_id);
         const { data: guardData } = incident.guard_id
           ? await supabase.from('guards').select('first_name, last_name, sia_licence').eq('id', incident.guard_id).maybeSingle()
           : { data: null };

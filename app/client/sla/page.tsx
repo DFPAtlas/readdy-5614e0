@@ -41,7 +41,7 @@ const METRIC_ICONS: Record<string, string> = {
 
 export default function ClientSLAPage() {
   const { companyId } = useAuth();
-  const { clientId, siteIds } = useClientAuth();
+  const { clientId } = useClientAuth();
   const { sites } = useClientPortal();
   const [metrics, setMetrics] = useState<SLAMetric[]>([]);
   const [results, setResults] = useState<SLAResult[]>([]);

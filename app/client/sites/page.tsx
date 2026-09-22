@@ -2,13 +2,11 @@
 
 import Link from 'next/link';
 import { useClientPortal } from '@/lib/useClientPortal';
-import { useClientAuth } from '@/lib/useClientAuth';
 import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import WidgetFallback from '@/components/dashboard/WidgetFallback';
 
 export default function ClientSitesPage() {
   const { sites, currentShifts, isLoading } = useClientPortal();
-  const { isClientUser, loading: authLoading } = useClientAuth();
 
   if (isLoading) {
     return (

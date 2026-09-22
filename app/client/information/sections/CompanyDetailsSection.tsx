@@ -43,7 +43,6 @@ export default function CompanyDetailsSection({ profile, canEdit, saving, onSave
     let logoUrl = profile?.logo_url;
     if (logoFile) {
       const { supabase } = await import('@/lib/supabase');
-      const { data: { session } } = await supabase.auth.getSession();
       const cid = profile?.client_id || '';
       const path = `${cid}/logo_${Date.now()}_${logoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const { error: upError } = await supabase.storage.from('client-documents').upload(path, logoFile, { upsert: true });

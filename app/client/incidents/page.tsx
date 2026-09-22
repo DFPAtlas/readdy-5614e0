@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useClientPortal } from '@/lib/useClientPortal';
-import { supabase } from '@/lib/supabase';
 import AgentGate from '@/components/AgentGate';
 import { useAuth } from '@/lib/auth';
-import { callAgent, logWebhookEvent } from '@/lib/guardianhubAgents';
+import { callAgent } from '@/lib/guardianhubAgents';
 import { useEffect, useCallback } from 'react';
 import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import WidgetFallback from '@/components/dashboard/WidgetFallback';
@@ -23,8 +22,14 @@ export default function ClientIncidentsPage() {
     try {
       await callAgent(
         'dob_incident',
-        { incidents_count: incidents.length, open_count: incidents.filter(i => i.status === 'open').length },
-        { clientId: profile.company_id, userId: profile.id, requestedPage: '/client/incidents', requestedFeature: 'dob_incident' }
+        'incidents_view',
+        {
+          incidents_count: incidents.length,
+          open_count: incidents.filter(i => i.status === 'open').length,
+          client_id: profile.company_id,
+          user_id: profile.id,
+        },
+        { requestedPage: '/client/incidents', requestedFeature: 'dob_incident' }
       );
     } catch {}
   }, [profile?.id, profile?.company_id, incidents.length]);

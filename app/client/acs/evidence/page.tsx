@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useACS } from '@/lib/useACS';
 import { useAuth } from '@/lib/auth';
-import { logEvidenceAccess, logPageAccess } from '@/lib/useEvidenceAuditLog';
+import { logPageAccess } from '@/lib/useEvidenceAuditLog';
 
 const ACS_AREAS = [
   'Strategy',
