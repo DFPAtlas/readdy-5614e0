@@ -111,7 +111,6 @@ export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: 
       emergency_contact: form.emergency_contact || null,
       patrol_enabled: form.patrol_enabled,
       patrol_interval: form.patrol_interval,
-      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase
