@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
+
+type SitesUpdate = Database['public']['Tables']['sites']['Update'];
 
 interface SiteInstructionsEditorProps {
   siteId: string;
@@ -73,11 +76,7 @@ export default function SiteInstructionsEditor({ siteId, auth, onSaved, showToas
       site_rules: form.site_rules,
     };
 
-    const payload: {
-      assignment_instructions: string | null;
-      security_requirements: Record<string, string>;
-      updated_at: string;
-    } = {
+    const payload: SitesUpdate = {
       assignment_instructions: form.assignment_instructions || null,
       security_requirements: securityRequirements,
       updated_at: new Date().toISOString(),

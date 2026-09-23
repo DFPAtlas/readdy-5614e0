@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
+
+type SitesUpdate = Database['public']['Tables']['sites']['Update'];
 
 interface SiteProfileEditorProps {
   siteId: string;
@@ -27,25 +30,6 @@ interface SiteProfileForm {
   patrol_enabled: boolean;
   patrol_interval: number;
 }
-
-type SiteProfileUpdatePayload = {
-  site_name: string;
-  address: string;
-  postcode: string | null;
-  site_type: string | null;
-  risk_level: string | null;
-  status: string;
-  primary_contact_name: string | null;
-  primary_contact_phone: string | null;
-  primary_contact_email: string | null;
-  site_contact_name: string | null;
-  site_contact_phone: string | null;
-  site_contact_email: string | null;
-  emergency_contact: string | null;
-  patrol_enabled: boolean;
-  patrol_interval: number;
-  updated_at: string;
-};
 
 export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: SiteProfileEditorProps) {
   const [saving, setSaving] = useState(false);
@@ -111,7 +95,7 @@ export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: 
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    const payload: SiteProfileUpdatePayload = {
+    const payload: SitesUpdate = {
       site_name: form.site_name.trim(),
       address: form.address.trim(),
       postcode: form.postcode || null,
