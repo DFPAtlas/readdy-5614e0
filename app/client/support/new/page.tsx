@@ -29,6 +29,10 @@ export default function NewTicketPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject.trim() || !description.trim() || !consent) return;
+    if (!profile?.id) {
+      setToast('Your session has expired. Please sign in again.');
+      return;
+    }
 
     setSubmitting(true);
     setToast(null);
@@ -55,7 +59,7 @@ export default function NewTicketPage() {
             file_path: path,
             file_size: file.size,
             mime_type: file.type,
-            uploaded_by: profile?.id,
+            uploaded_by: profile.id,
           });
         }
       }

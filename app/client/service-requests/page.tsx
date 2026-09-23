@@ -13,9 +13,9 @@ interface ServiceRequest {
   description: string;
   status: string;
   site_id: string | null;
-  site_name?: string;
-  assigned_to_name?: string;
-  resolution?: string;
+  site_name: string | null;
+  assigned_to_name: string | null;
+  resolution: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
@@ -85,9 +85,20 @@ export default function ClientServiceRequestsPage() {
 
     const { data: reqs } = await supabase.from('service_requests').select('*').eq('client_id', clientId).eq('company_id', companyId).order('created_at', { ascending: false }).limit(50);
 
-    const enriched = (reqs || []).map((r: any) => ({
-      ...r,
-      site_name: (sitesData || []).find((s: any) => s.id === r.site_id)?.site_name || null,
+    const enriched: ServiceRequest[] = (reqs || []).map((r: any) => ({
+      id: r.id,
+      request_type: r.request_type ?? 'general_enquiry',
+      priority: r.priority ?? 'normal',
+      description: r.description ?? '',
+      status: r.status ?? 'submitted',
+      site_id: r.site_id ?? null,
+      site_name: (sitesData || []).find((s: any) => s.id === r.site_id)?.site_name ?? null,
+      assigned_to_name: r.assigned_to_name ?? null,
+      resolution: r.resolution ?? null,
+      created_at: r.created_at ?? '',
+      updated_at: r.updated_at ?? '',
+      closed_at: r.closed_at ?? null,
+      sla_due_at: r.sla_due_at ?? null,
     }));
     setRequests(enriched);
     setLoading(false);
@@ -98,12 +109,16 @@ export default function ClientServiceRequestsPage() {
   const handleSubmit = async () => {
     if (!form.description.trim()) { setToast({ msg: 'Please enter a description', type: 'error' }); return; }
     if (!clientId) return;
+    if (!profile?.id || !companyId) {
+      setToast({ msg: 'Your session has expired. Please sign in again.', type: 'error' });
+      return;
+    }
     setSubmitting(true);
     const { error } = await supabase.from('service_requests').insert({
       company_id: companyId,
       client_id: clientId,
       site_id: form.site_id || null,
-      requester_id: profile?.id,
+      requester_id: profile.id,
       request_type: form.request_type,
       priority: form.priority,
       description: form.description,

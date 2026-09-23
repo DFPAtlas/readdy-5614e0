@@ -10,9 +10,27 @@ interface SiteProfileEditorProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
+interface SiteProfileForm {
+  site_name: string;
+  address: string;
+  postcode: string;
+  site_type: string;
+  risk_level: string;
+  site_status: string;
+  primary_contact_name: string;
+  primary_contact_phone: string;
+  primary_contact_email: string;
+  site_contact_name: string;
+  site_contact_phone: string;
+  site_contact_email: string;
+  emergency_contact: string;
+  patrol_enabled: boolean;
+  patrol_interval: number;
+}
+
 export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: SiteProfileEditorProps) {
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SiteProfileForm>({
     site_name: '',
     address: '',
     postcode: '',
@@ -51,7 +69,7 @@ export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: 
     });
   }, [auth.site]);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = <K extends keyof SiteProfileForm>(field: K, value: SiteProfileForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 

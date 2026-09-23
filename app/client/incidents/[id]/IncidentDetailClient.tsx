@@ -5,10 +5,24 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 
+interface IncidentMedia {
+  id: string;
+  file_url: string;
+  media_type: string;
+  client_visible: boolean;
+}
+
+interface IncidentTimelineEntry {
+  id: string;
+  status: string;
+  changed_at: string;
+  notes: string | null;
+}
+
 interface IncidentDetail {
   id: string;
-  site_id: string;
-  guard_id: string;
+  site_id: string | null;
+  guard_id: string | null;
   incident_number: string | null;
   incident_type: string;
   severity: string;
@@ -22,8 +36,29 @@ interface IncidentDetail {
   site_name: string | null;
   officer_name: string | null;
   officer_sia: string | null;
-  media: { id: string; file_url: string; media_type: string; client_visible: boolean }[];
-  timeline: { id: string; status: string; changed_at: string; notes: string | null }[];
+  media: IncidentMedia[];
+  timeline: IncidentTimelineEntry[];
+}
+
+function readMetadataString(metadata: unknown, key: string): string | null {
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    const value = (metadata as Record<string, unknown>)[key];
+    if (typeof value === 'string') return value;
+  }
+  return null;
+}
+
+function readMetadataStatus(metadata: unknown): string | null {
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    const record = metadata as Record<string, unknown>;
+    const values = record.values;
+    if (values && typeof values === 'object' && !Array.isArray(values)) {
+      const status = (values as Record<string, unknown>).status;
+      if (typeof status === 'string') return status;
+    }
+    if (typeof record.status === 'string') return record.status;
+  }
+  return null;
 }
 
 export default function ClientIncidentDetailPage({ incidentId }: { incidentId: string }) {
@@ -87,7 +122,7 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
           return;
         }
 
-        if (!siteIds.includes(incident.site_id)) {
+        if (!incident.site_id || !siteIds.includes(incident.site_id)) {
           setAccessDenied(true);
           setLoading(false);
           return;
@@ -104,13 +139,20 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
           .eq('incident_id', incidentId)
           .eq('client_visible', true);
 
-        const mediaRows = await Promise.all((mediaData || []).map(async (m: any) => {
+        const mediaRows: IncidentMedia[] = [];
+        for (const m of mediaData || []) {
+          let fileUrl = m.file_url;
           if (m.storage_path) {
             const { data: signed } = await supabase.storage.from('incident-media').createSignedUrl(m.storage_path, 3600);
-            if (signed?.signedUrl) return { ...m, file_url: signed.signedUrl };
+            if (signed?.signedUrl) fileUrl = signed.signedUrl;
           }
-          return m;
-        }));
+          mediaRows.push({
+            id: m.id,
+            file_url: fileUrl,
+            media_type: m.media_type,
+            client_visible: m.client_visible ?? false,
+          });
+        }
 
         const { data: timelineData } = await supabase
           .from('incident_timeline')
@@ -120,18 +162,30 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
           .order('created_at', { ascending: true });
 
         setDetail({
-          ...incident,
-          officer_sia: guardData?.sia_licence || null,
-          officer_name: guardData ? `${guardData.first_name} ${guardData.last_name}` : null,
-          site_name: siteName?.site_name || null,
-          media: mediaRows || [],
-          timeline: (timelineData || []).map((t: any) => ({
+          id: incident.id,
+          site_id: incident.site_id,
+          guard_id: incident.guard_id,
+          incident_number: incident.incident_number ?? null,
+          incident_type: incident.incident_type ?? 'Incident',
+          severity: incident.severity ?? 'low',
+          description: incident.description ?? null,
+          ai_rewritten_report: incident.ai_rewritten_report ?? null,
+          status: incident.status ?? 'open',
+          client_visible: incident.client_visible ?? false,
+          created_at: incident.created_at ?? new Date().toISOString(),
+          occurred_at: incident.occurred_at ?? incident.created_at ?? new Date().toISOString(),
+          resolved_at: incident.resolved_at ?? null,
+          site_name: siteName?.site_name ?? null,
+          officer_sia: guardData?.sia_licence ?? null,
+          officer_name: guardData
+            ? `${guardData.first_name ?? ''} ${guardData.last_name ?? ''}`.trim() || 'Officer'
+            : null,
+          media: mediaRows,
+          timeline: (timelineData || []).map((t) => ({
             id: t.id,
-            status: t.event_type === 'status_change'
-              ? (t.metadata?.values?.status || t.metadata?.status || t.event_type)
-              : t.event_type,
-            changed_at: t.created_at,
-            notes: t.metadata?.comment_text || null,
+            status: t.event_type === 'status_change' ? readMetadataStatus(t.metadata) ?? t.event_type : t.event_type,
+            changed_at: t.created_at ?? new Date().toISOString(),
+            notes: readMetadataString(t.metadata, 'comment_text'),
           })),
         });
       } catch (err: any) {
