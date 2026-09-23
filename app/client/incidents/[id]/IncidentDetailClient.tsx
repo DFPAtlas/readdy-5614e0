@@ -81,6 +81,9 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
       return;
     }
 
+    const userId = profile.id;
+    const company = companyId;
+
     async function load() {
       setLoading(true);
       setAccessDenied(false);
@@ -91,8 +94,8 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
         const { data: cu } = await supabase
           .from('client_users')
           .select('client_id')
-          .eq('user_id', profile!.id)
-          .eq('company_id', companyId)
+          .eq('user_id', userId)
+          .eq('company_id', company)
           .maybeSingle();
 
         if (!cu?.client_id) {
@@ -105,7 +108,7 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
           .from('sites')
           .select('id, site_name')
           .eq('client_id', cu.client_id)
-          .eq('company_id', companyId);
+          .eq('company_id', company);
 
         const siteIds = (allSites || []).map((s) => s.id);
 
@@ -198,22 +201,24 @@ export default function ClientIncidentDetailPage({ incidentId }: { incidentId: s
   }, [incidentId, profile?.id, companyId]);
 
   async function handleSendMessage() {
-    if (!msgSubject.trim() || !msgBody.trim() || !profile?.id) return;
+    if (!msgSubject.trim() || !msgBody.trim() || !profile?.id || !companyId) return;
+    const userId = profile.id;
+    const company = companyId;
     setSending(true);
     try {
       const { data: cu } = await supabase
         .from('client_users')
         .select('client_id')
-        .eq('user_id', profile.id)
-        .eq('company_id', companyId)
+        .eq('user_id', userId)
+        .eq('company_id', company)
         .maybeSingle();
 
       await supabase.from('client_messages').insert({
-        company_id: companyId,
+        company_id: company,
         client_id: cu?.client_id,
         site_id: detail?.site_id || null,
         incident_id: incidentId,
-        from_user_id: profile.id,
+        from_user_id: userId,
         subject: msgSubject.trim(),
         body: msgBody.trim(),
         is_from_client: true,

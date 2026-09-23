@@ -56,24 +56,36 @@ export default function SiteInstructionsEditor({ siteId, auth, onSaved, showToas
   }, [auth.site]);
 
   const handleChange = (key: InstructionField, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next: InstructionsForm = { ...prev };
+      next[key] = value;
+      return next;
+    });
   };
 
   const handleSave = async () => {
     setSaving(true);
+    const securityRequirements: Record<string, string> = {
+      emergency_procedures: form.emergency_procedures,
+      access_instructions: form.access_instructions,
+      keyholding_notes: form.keyholding_notes,
+      alarm_response: form.alarm_response,
+      site_rules: form.site_rules,
+    };
+
+    const payload: {
+      assignment_instructions: string | null;
+      security_requirements: Record<string, string>;
+      updated_at: string;
+    } = {
+      assignment_instructions: form.assignment_instructions || null,
+      security_requirements: securityRequirements,
+      updated_at: new Date().toISOString(),
+    };
+
     const { error } = await supabase
       .from('sites')
-      .update({
-        assignment_instructions: form.assignment_instructions || null,
-        security_requirements: {
-          emergency_procedures: form.emergency_procedures || '',
-          access_instructions: form.access_instructions || '',
-          keyholding_notes: form.keyholding_notes || '',
-          alarm_response: form.alarm_response || '',
-          site_rules: form.site_rules || '',
-        },
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', siteId);
 
     setSaving(false);

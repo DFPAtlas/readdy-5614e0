@@ -13,7 +13,7 @@ interface Props {
   onDelete: (contactId: string) => Promise<{ error: any }>;
 }
 
-const CONTACT_TYPES: Array<ClientContact['contact_type']> = ['Operations', 'Finance', 'Emergency', 'Site Contact', 'Contract Manager'];
+const CONTACT_TYPES: Array<NonNullable<ClientContact['contact_type']>> = ['Operations', 'Finance', 'Emergency', 'Site Contact', 'Contract Manager'];
 
 const TYPE_COLORS: Record<string, string> = {
   'Operations': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
