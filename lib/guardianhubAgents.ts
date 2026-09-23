@@ -70,7 +70,7 @@ export async function callAgent(
   const idempotencyKey = `${agentKey}:${eventType}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
   try {
-    const { data, error } = await supabase.functions.invoke('n8n-gateway', {
+    const { data, error } = await supabase.functions.invoke('automation-gateway', {
       body: {
         agent_key: agentKey,
         event_type: eventType,
@@ -128,13 +128,15 @@ export async function callAgentWithApproval(
   payload: Record<string, any> = {}
 ): Promise<AgentCallResult> {
   try {
-    const { data, error } = await supabase.functions.invoke('n8n-gateway', {
+    const { data, error } = await supabase.functions.invoke('automation-gateway', {
       body: {
         agent_key: agentKey,
         event_type: eventType,
-        payload: { ...payload },
-        pre_approved: true,
-        approval_id: approvalId,
+        payload: {
+          ...payload,
+          approval_id: approvalId,
+          pre_approved: true,
+        },
       },
     });
 

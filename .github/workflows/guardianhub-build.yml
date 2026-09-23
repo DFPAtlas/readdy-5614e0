@@ -1,0 +1,64 @@
+name: GuardianHub Build Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - repair/guardianhub-p0-readiness
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guardianhub-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: TypeScript
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: ESLint
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Unit tests
+        id: tests
+        continue-on-error: true
+        run: npm run test
+
+      - name: Production build
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Enforce verification gate
+        if: always()
+        run: |
+          test "${{ steps.typecheck.outcome }}" = "success"
+          test "${{ steps.lint.outcome }}" = "success"
+          test "${{ steps.tests.outcome }}" = "success"
+          test "${{ steps.build.outcome }}" = "success"

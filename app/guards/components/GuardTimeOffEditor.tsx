@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { useGuardAvailability, addTimeOff, deleteTimeOff } from '@/lib/useGuardAvailability';
+import { useGuardAvailability } from '@/lib/useGuardAvailability';
 
-type LeaveReason = 'holiday' | 'sick' | 'training' | 'other';
-
-const REASON_OPTIONS: { value: LeaveReason; label: string; color: string }[] = [
+const REASON_OPTIONS = [
   { value: 'holiday', label: 'Holiday', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   { value: 'sick', label: 'Sick Leave', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
   { value: 'training', label: 'Training', color: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
@@ -11,23 +9,17 @@ const REASON_OPTIONS: { value: LeaveReason; label: string; color: string }[] = [
 ];
 
 export default function GuardTimeOffEditor({ guardId }: { guardId: string }) {
-  const { timeOff, loading, refetch } = useGuardAvailability();
-  const [form, setForm] = useState<{ start_date: string; end_date: string; reason: LeaveReason }>({ start_date: '', end_date: '', reason: 'holiday' });
+  const { timeOff, addTimeOff, deleteTimeOff, loading } = useGuardAvailability(guardId);
+  const [form, setForm] = useState({ start_date: '', end_date: '', reason: 'holiday' as const });
   const [adding, setAdding] = useState(false);
 
   const handleAdd = async () => {
     if (!form.start_date || !form.end_date) return;
     if (new Date(form.start_date) > new Date(form.end_date)) return;
     setAdding(true);
-    await addTimeOff(guardId, form.start_date, form.end_date, form.reason);
-    await refetch();
+    await addTimeOff(form);
     setForm({ start_date: '', end_date: '', reason: 'holiday' });
     setAdding(false);
-  };
-
-  const handleDelete = async (id: string) => {
-    await deleteTimeOff(id);
-    await refetch();
   };
 
   return (
@@ -60,7 +52,7 @@ export default function GuardTimeOffEditor({ guardId }: { guardId: string }) {
             {REASON_OPTIONS.map((r) => (
               <button
                 key={r.value}
-                onClick={() => setForm({ ...form, reason: r.value })}
+                onClick={() => setForm({ ...form, reason: r.value as any })}
                 className={`px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-colors cursor-pointer whitespace-nowrap ${
                   form.reason === r.value ? `${r.color}` : 'bg-gray-800/40 text-gray-400 border-gray-700 hover:border-gray-600'
                 }`}
@@ -111,7 +103,7 @@ export default function GuardTimeOffEditor({ guardId }: { guardId: string }) {
                 )}
               </div>
               <button
-                onClick={() => handleDelete(to.id)}
+                onClick={() => deleteTimeOff(to.id)}
                 className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-400 transition-colors cursor-pointer"
               >
                 <i className="ri-delete-bin-line text-xs"></i>

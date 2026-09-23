@@ -17,7 +17,6 @@ export async function generateStaticParams() {
   ];
 }
 
-export default async function DocArticlePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  return <DocArticleClient slug={slug} />;
+export default function DocArticlePage({ params }: { params: { slug: string } }) {
+  return <DocArticleClient slug={params.slug} />;
 }

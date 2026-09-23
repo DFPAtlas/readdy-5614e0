@@ -9,7 +9,6 @@ export async function generateStaticParams() {
   return allSolutions.map((slug) => ({ slug }));
 }
 
-export default async function SolutionPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  return <SolutionPageContent slug={slug} />;
+export default function SolutionPage({ params }: { params: { slug: string } }) {
+  return <SolutionPageContent slug={params.slug} />;
 }

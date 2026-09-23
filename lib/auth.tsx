@@ -88,7 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializedRef = useRef(false);
   const profileLoadingRef = useRef(false);
   const redirectingRef = useRef(false);
-  const lastPathnameRef = useRef<string | null>(null);
 
   const loadUserProfile = useCallback(async (userId: string) => {
     if (profileLoadingRef.current) return;
@@ -174,12 +173,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-
-    if (lastPathnameRef.current !== pathname) {
-      lastPathnameRef.current = pathname;
-      redirectingRef.current = false;
-    }
-
     if (redirectingRef.current) return;
 
     const currentPath = pathname;

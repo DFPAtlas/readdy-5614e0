@@ -79,7 +79,6 @@ export default function SiteInstructionsEditor({ siteId, auth, onSaved, showToas
     const payload: SitesUpdate = {
       assignment_instructions: form.assignment_instructions || null,
       security_requirements: securityRequirements,
-      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase
