@@ -3,14 +3,19 @@ import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useGuardAvailability, isGuardOnLeave, isGuardAvailable, getGuardWeeklyHours, OVERTIME_THRESHOLD } from '@/lib/useGuardAvailability';
-import type { Shift } from '@/lib/useShifts';
+import type { Shift, ShiftForm } from '@/lib/useShifts';
+
+function guardDisplayName(g: { first_name: string | null; last_name: string | null }): string {
+  const name = [g.first_name, g.last_name].filter(Boolean).join(' ').trim();
+  return name || 'Unnamed guard';
+}
 
 interface ShiftModalProps {
   editingShift: Shift | null;
   initialSiteId?: string | null;
   initialDate?: string;
   allShifts: Shift[];
-  onSave: (payload: any) => void;
+  onSave: (payload: ShiftForm) => void;
   onClose: () => void;
   onDelete?: () => void;
   saving: boolean;
@@ -29,7 +34,7 @@ export default function ShiftModal({
   const { companyId } = useAuth();
   const { availability, timeOff } = useGuardAvailability();
   const [sites, setSites] = useState<{ id: string; site_name: string }[]>([]);
-  const [guards, setGuards] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+  const [guards, setGuards] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
 
   const [siteId, setSiteId] = useState(initialSiteId || '');
   const [guardId, setGuardId] = useState('');
@@ -41,7 +46,7 @@ export default function ShiftModal({
   const [notes, setNotes] = useState('');
   const [conflict, setConflict] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>();
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!companyId) return;
@@ -128,7 +133,7 @@ export default function ShiftModal({
 
     const { data } = await supabase
       .from('shifts')
-      .select('*, sites(site_name)')
+      .select('id, site_id, start_time, end_time')
       .eq('guard_id', guardId)
       .neq('id', editingShift?.id || '0')
       .lt('start_time', endDate.toISOString())
@@ -137,10 +142,13 @@ export default function ShiftModal({
 
     if (data && data.length > 0) {
       const conflictShift = data[0];
-      const siteName = (conflictShift as any).sites?.site_name || 'another site';
+      const conflictSite = sites.find((s) => s.id === conflictShift.site_id);
+      const siteName = conflictSite?.site_name || 'another site';
       const s = new Date(conflictShift.start_time);
       const e = new Date(conflictShift.end_time);
-      return `${conflictShift.guard_name || 'Guard'} is already booked ${format(s, 'HH:mm')}-${format(e, 'HH:mm')} at ${siteName}`;
+      const bookedGuard = guards.find((g) => g.id === guardId);
+      const guardName = bookedGuard ? guardDisplayName(bookedGuard) : 'Guard';
+      return `${guardName} is already booked ${format(s, 'HH:mm')}-${format(e, 'HH:mm')} at ${siteName}`;
     }
     return null;
   };
@@ -220,7 +228,7 @@ export default function ShiftModal({
               className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="">Open shift</option>
-              {guards.map((g) => <option key={g.id} value={g.id}>{g.first_name} {g.last_name}</option>)}
+              {guards.map((g) => <option key={g.id} value={g.id}>{guardDisplayName(g)}</option>)}
             </select>
           </div>
 

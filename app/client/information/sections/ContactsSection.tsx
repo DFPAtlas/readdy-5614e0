@@ -13,7 +13,7 @@ interface Props {
   onDelete: (contactId: string) => Promise<{ error: any }>;
 }
 
-const CONTACT_TYPES: Array<ClientContact['contact_type']> = ['Operations', 'Finance', 'Emergency', 'Site Contact', 'Contract Manager'];
+const CONTACT_TYPES: Array<NonNullable<ClientContact['contact_type']>> = ['Operations', 'Finance', 'Emergency', 'Site Contact', 'Contract Manager'];
 
 const TYPE_COLORS: Record<string, string> = {
   'Operations': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -23,10 +23,43 @@ const TYPE_COLORS: Record<string, string> = {
   'Contract Manager': 'bg-violet-500/10 text-violet-400 border-violet-500/20',
 };
 
+interface ContactForm {
+  name: string;
+  job_title: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  contact_type: ClientContact['contact_type'];
+  site_id: string | null;
+}
+
+const EMPTY_CONTACT_FORM: ContactForm = {
+  name: '',
+  job_title: '',
+  email: '',
+  phone: '',
+  mobile: '',
+  contact_type: 'Operations',
+  site_id: null,
+};
+
+function normalizeContactType(value: string): ClientContact['contact_type'] {
+  if (
+    value === 'Operations' ||
+    value === 'Finance' ||
+    value === 'Emergency' ||
+    value === 'Site Contact' ||
+    value === 'Contract Manager'
+  ) {
+    return value;
+  }
+  return null;
+}
+
 export default function ContactsSection({ contacts, sites, canEdit, saving, onCreate, onUpdate, onDelete }: Props) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<ClientContact>>({ contact_type: 'Operations' });
+  const [form, setForm] = useState<ContactForm>(EMPTY_CONTACT_FORM);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -43,11 +76,11 @@ export default function ContactsSection({ contacts, sites, canEdit, saving, onCr
     if (editingId) {
       const { error } = await onUpdate(editingId, form);
       setToast(error ? 'Failed to update' : 'Contact updated');
-      if (!error) { setEditingId(null); setForm({ contact_type: 'Operations' }); setAdding(false); }
+      if (!error) { setEditingId(null); setForm(EMPTY_CONTACT_FORM); setAdding(false); }
     } else {
-      const { data, error } = await onCreate(form as any);
+      const { data, error } = await onCreate(form);
       setToast(error ? 'Failed to create' : 'Contact added');
-      if (!error && data) { setAdding(false); setForm({ contact_type: 'Operations' }); }
+      if (!error && data) { setAdding(false); setForm(EMPTY_CONTACT_FORM); }
     }
     setTimeout(() => setToast(null), 3000);
   };
@@ -68,7 +101,7 @@ export default function ContactsSection({ contacts, sites, canEdit, saving, onCr
       phone: c.phone || '',
       mobile: c.mobile || '',
       contact_type: c.contact_type || 'Operations',
-      site_id: c.site_id || undefined,
+      site_id: c.site_id || null,
     });
     setAdding(true);
   };
@@ -121,7 +154,7 @@ export default function ContactsSection({ contacts, sites, canEdit, saving, onCr
               <label className="block text-xs text-gray-400 mb-1.5">Contact Type</label>
               <select
                 value={form.contact_type || 'Operations'}
-                onChange={(e) => setForm({ ...form, contact_type: e.target.value as any })}
+                onChange={(e) => setForm({ ...form, contact_type: normalizeContactType(e.target.value) })}
                 className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none pr-8"
               >
                 {CONTACT_TYPES.map((t) => (
@@ -160,7 +193,7 @@ export default function ContactsSection({ contacts, sites, canEdit, saving, onCr
               <label className="block text-xs text-gray-400 mb-1.5">Linked Site</label>
               <select
                 value={form.site_id || ''}
-                onChange={(e) => setForm({ ...form, site_id: e.target.value || undefined })}
+                onChange={(e) => setForm({ ...form, site_id: e.target.value || null })}
                 className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none pr-8"
               >
                 <option value="">None</option>
@@ -179,7 +212,7 @@ export default function ContactsSection({ contacts, sites, canEdit, saving, onCr
               {saving ? 'Saving...' : editingId ? 'Update Contact' : 'Add Contact'}
             </button>
             <button
-              onClick={() => { setAdding(false); setEditingId(null); setForm({ contact_type: 'Operations' }); }}
+              onClick={() => { setAdding(false); setEditingId(null); setForm(EMPTY_CONTACT_FORM); }}
               className="px-4 py-2 bg-gray-800/60 hover:bg-gray-800 text-gray-300 text-sm font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap"
             >
               Cancel

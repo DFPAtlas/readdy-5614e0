@@ -41,7 +41,7 @@ const METRIC_ICONS: Record<string, string> = {
 
 export default function ClientSLAPage() {
   const { companyId } = useAuth();
-  const { clientId, siteIds } = useClientAuth();
+  const { clientId } = useClientAuth();
   const { sites } = useClientPortal();
   const [metrics, setMetrics] = useState<SLAMetric[]>([]);
   const [results, setResults] = useState<SLAResult[]>([]);
@@ -66,14 +66,30 @@ export default function ClientSLAPage() {
     }
 
     const { data: metricData } = await supabase.from('sla_metrics').select('*').eq('company_id', companyId).or(`client_id.eq.${clientId},client_id.is.null`).eq('is_active', true);
-    setMetrics(metricData || []);
+
+    const mappedMetrics: SLAMetric[] = (metricData || []).map((m: any) => ({
+      id: m.id,
+      metric_name: m.metric_name ?? 'Metric',
+      description: m.description ?? '',
+      target: m.target ?? 0,
+      measurement_period: m.measurement_period ?? 'monthly',
+    }));
+    setMetrics(mappedMetrics);
 
     const { data: resultData } = await supabase.from('sla_results').select('*').eq('company_id', companyId).eq('client_id', clientId).gte('period_start', periodStart.toISOString().split('T')[0]).lte('period_end', periodEnd.toISOString().split('T')[0]).order('period_start', { ascending: false });
 
-    const enriched = (resultData || []).map((r: any) => ({
-      ...r,
-      metric_name: (metricData || []).find((m: any) => m.id === r.metric_id)?.metric_name || 'Unknown',
-      site_name: sites.find((s) => s.id === r.site_id)?.site_name || 'All Sites',
+    const enriched: SLAResult[] = (resultData || []).map((r: any) => ({
+      id: r.id,
+      metric_id: r.metric_id,
+      site_id: r.site_id ?? null,
+      metric_name: mappedMetrics.find((m) => m.id === r.metric_id)?.metric_name ?? 'Unknown',
+      site_name: sites.find((s) => s.id === r.site_id)?.site_name ?? 'All Sites',
+      period_start: r.period_start ?? '',
+      period_end: r.period_end ?? '',
+      actual_value: r.actual_value ?? 0,
+      target_value: r.target_value ?? 0,
+      met: r.met ?? false,
+      is_estimate: r.is_estimate ?? false,
     }));
     setResults(enriched);
     setLoading(false);

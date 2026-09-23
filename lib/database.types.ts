@@ -369,9 +369,33 @@ export interface Database {
           uploaded_by: string | null
           created_at: string | null
           client_visible: boolean | null
+          storage_path: string | null
         }
         Insert: Partial<Database['public']['Tables']['incident_media']['Row']>
         Update: Partial<Database['public']['Tables']['incident_media']['Row']>
+      }
+      incident_comments: {
+        Row: {
+          id: string
+          incident_id: string
+          user_id: string
+          comment: string
+          created_at: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['incident_comments']['Row']>
+        Update: Partial<Database['public']['Tables']['incident_comments']['Row']>
+      }
+      incident_timeline: {
+        Row: {
+          id: string
+          incident_id: string
+          actor_user_id: string
+          event_type: string
+          metadata: Record<string, unknown> | null
+          created_at: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['incident_timeline']['Row']>
+        Update: Partial<Database['public']['Tables']['incident_timeline']['Row']>
       }
       attendance_logs: {
         Row: {

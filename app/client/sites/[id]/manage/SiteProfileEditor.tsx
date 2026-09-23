@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
+
+type SitesUpdate = Database['public']['Tables']['sites']['Update'];
 
 interface SiteProfileEditorProps {
   siteId: string;
@@ -10,9 +13,27 @@ interface SiteProfileEditorProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
+interface SiteProfileForm {
+  site_name: string;
+  address: string;
+  postcode: string;
+  site_type: string;
+  risk_level: string;
+  site_status: string;
+  primary_contact_name: string;
+  primary_contact_phone: string;
+  primary_contact_email: string;
+  site_contact_name: string;
+  site_contact_phone: string;
+  site_contact_email: string;
+  emergency_contact: string;
+  patrol_enabled: boolean;
+  patrol_interval: number;
+}
+
 export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: SiteProfileEditorProps) {
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SiteProfileForm>({
     site_name: '',
     address: '',
     postcode: '',
@@ -51,8 +72,12 @@ export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: 
     });
   }, [auth.site]);
 
-  const handleChange = (field: string, value: any) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const handleChange = <K extends keyof SiteProfileForm>(field: K, value: SiteProfileForm[K]) => {
+    setForm((prev) => {
+      const next: SiteProfileForm = { ...prev };
+      next[field] = value;
+      return next;
+    });
   };
 
   const validate = () => {
@@ -70,26 +95,28 @@ export default function SiteProfileEditor({ siteId, auth, onSaved, showToast }: 
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
+    const payload: SitesUpdate = {
+      site_name: form.site_name.trim(),
+      address: form.address.trim(),
+      postcode: form.postcode || null,
+      site_type: form.site_type || null,
+      risk_level: form.risk_level || null,
+      status: form.site_status,
+      primary_contact_name: form.primary_contact_name || null,
+      primary_contact_phone: form.primary_contact_phone || null,
+      primary_contact_email: form.primary_contact_email || null,
+      site_contact_name: form.site_contact_name || null,
+      site_contact_phone: form.site_contact_phone || null,
+      site_contact_email: form.site_contact_email || null,
+      emergency_contact: form.emergency_contact || null,
+      patrol_enabled: form.patrol_enabled,
+      patrol_interval: form.patrol_interval,
+      updated_at: new Date().toISOString(),
+    };
+
     const { error } = await supabase
       .from('sites')
-      .update({
-        site_name: form.site_name.trim(),
-        address: form.address.trim(),
-        postcode: form.postcode || null,
-        site_type: form.site_type || null,
-        risk_level: form.risk_level || null,
-        status: form.site_status,
-        primary_contact_name: form.primary_contact_name || null,
-        primary_contact_phone: form.primary_contact_phone || null,
-        primary_contact_email: form.primary_contact_email || null,
-        site_contact_name: form.site_contact_name || null,
-        site_contact_phone: form.site_contact_phone || null,
-        site_contact_email: form.site_contact_email || null,
-        emergency_contact: form.emergency_contact || null,
-        patrol_enabled: form.patrol_enabled,
-        patrol_interval: form.patrol_interval,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', siteId);
 
     setSaving(false);

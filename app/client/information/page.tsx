@@ -1,12 +1,126 @@
 'use client';
 
 import { useState } from 'react';
-import { useClientInfo } from '@/lib/useClientInfo';
+import { useClientInfo, type ClientSite, type ClientContact, type SiteAISummary } from '@/lib/useClientInfo';
 import CompanyDetailsSection from './sections/CompanyDetailsSection';
 import SitesSection from './sections/SitesSection';
 import DocumentsSection from './sections/DocumentsSection';
 import ContactsSection from './sections/ContactsSection';
 import SiteSummarySection from './sections/SiteSummarySection';
+
+function toRiskLevel(value: string | null): ClientSite['risk_level'] {
+  if (value === 'Low' || value === 'Medium' || value === 'High') return value;
+  return null;
+}
+
+function toContactType(value: string | null): ClientContact['contact_type'] {
+  if (
+    value === 'Operations' ||
+    value === 'Finance' ||
+    value === 'Emergency' ||
+    value === 'Site Contact' ||
+    value === 'Contract Manager'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function mapClientSite(row: {
+  id: string;
+  client_id: string;
+  site_name: string;
+  site_address: string | null;
+  site_contact_person: string | null;
+  site_phone: string | null;
+  client_contact_for_site: string | null;
+  opening_hours: string | null;
+  security_cover_hours: string | null;
+  site_notes: string | null;
+  site_map_url: string | null;
+  risk_level: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}): ClientSite {
+  return {
+    id: row.id,
+    client_id: row.client_id,
+    site_name: row.site_name,
+    site_address: row.site_address,
+    site_contact_person: row.site_contact_person,
+    site_phone: row.site_phone,
+    client_contact_for_site: row.client_contact_for_site,
+    opening_hours: row.opening_hours,
+    security_cover_hours: row.security_cover_hours,
+    site_notes: row.site_notes,
+    site_map_url: row.site_map_url,
+    risk_level: toRiskLevel(row.risk_level),
+    created_by: row.created_by,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? '',
+  };
+}
+
+function mapClientContact(row: {
+  id: string;
+  client_id: string;
+  site_id: string | null;
+  name: string;
+  job_title: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  contact_type: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}): ClientContact {
+  return {
+    id: row.id,
+    client_id: row.client_id,
+    site_id: row.site_id,
+    name: row.name,
+    job_title: row.job_title,
+    email: row.email,
+    phone: row.phone,
+    mobile: row.mobile,
+    contact_type: toContactType(row.contact_type),
+    created_by: row.created_by,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? '',
+  };
+}
+
+function mapSiteAISummary(row: {
+  id: string;
+  site_id: string;
+  client_id: string;
+  site_overview: string | null;
+  key_contacts: string | null;
+  important_procedures: string | null;
+  risks: string | null;
+  emergency_notes: string | null;
+  guard_briefing_summary: string | null;
+  generated_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}): SiteAISummary {
+  return {
+    id: row.id,
+    site_id: row.site_id,
+    client_id: row.client_id,
+    site_overview: row.site_overview,
+    key_contacts: row.key_contacts,
+    important_procedures: row.important_procedures,
+    risks: row.risks,
+    emergency_notes: row.emergency_notes,
+    guard_briefing_summary: row.guard_briefing_summary,
+    generated_by: row.generated_by,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? '',
+  };
+}
 
 const TABS = [
   { key: 'company', label: 'Company Details', icon: 'ri-building-2-line' },
@@ -19,6 +133,21 @@ const TABS = [
 export default function ClientInformationPage() {
   const [activeTab, setActiveTab] = useState('company');
   const info = useClientInfo();
+
+  const handleCreateSite = async (data: Parameters<typeof info.createSite>[0]) => {
+    const { data: row, error } = await info.createSite(data);
+    return { data: row ? mapClientSite(row) : null, error };
+  };
+
+  const handleCreateContact = async (data: Parameters<typeof info.createContact>[0]) => {
+    const { data: row, error } = await info.createContact(data);
+    return { data: row ? mapClientContact(row) : null, error };
+  };
+
+  const handleGenerateSummary = async (siteId: string) => {
+    const { data: row, error } = await info.generateSiteSummary(siteId);
+    return { data: row ? mapSiteAISummary(row) : null, error };
+  };
 
   if (info.loading) {
     return (
@@ -93,7 +222,7 @@ export default function ClientInformationPage() {
               sites={info.sites}
               canEdit={info.canEdit}
               saving={info.saving}
-              onCreate={info.createSite}
+              onCreate={handleCreateSite}
               onUpdate={info.updateSite}
               onDelete={info.deleteSite}
             />
@@ -116,7 +245,7 @@ export default function ClientInformationPage() {
               sites={info.sites}
               canEdit={info.canEdit}
               saving={info.saving}
-              onCreate={info.createContact}
+              onCreate={handleCreateContact}
               onUpdate={info.updateContact}
               onDelete={info.deleteContact}
             />
@@ -129,7 +258,7 @@ export default function ClientInformationPage() {
               contacts={info.contacts}
               canEdit={info.canEdit}
               saving={info.saving}
-              onGenerate={info.generateSiteSummary}
+              onGenerate={handleGenerateSummary}
               onUpdate={info.updateSummary}
             />
           )}

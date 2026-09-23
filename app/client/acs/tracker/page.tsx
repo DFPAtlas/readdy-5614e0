@@ -33,7 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ACSTrackerPage() {
-  const { criteria, evidence, refresh } = useACS();
+  const { criteria, refresh } = useACS();
   const { currentUser } = useAuth();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);

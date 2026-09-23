@@ -40,9 +40,10 @@ export default function DashboardModulesEditor({ siteId, auth, onSaved, showToas
       .then(({ data }) => {
         if (data) {
           setConfigId(data.id);
-          if (data.enabled_modules && Array.isArray(data.enabled_modules)) {
-            setEnabledModules(data.enabled_modules);
-          }
+          const modules = Array.isArray(data.enabled_modules)
+            ? data.enabled_modules.filter((m): m is string => typeof m === 'string')
+            : [];
+          setEnabledModules(modules);
         }
         setLoading(false);
       });

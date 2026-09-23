@@ -15,6 +15,14 @@ export interface PublishedWeek {
   isAdmin: boolean;
 }
 
+async function resolvePublisherName(userId: string | null): Promise<string | undefined> {
+  if (!userId) return undefined;
+  const { data } = await supabase.from('users').select('first_name, last_name').eq('id', userId).maybeSingle();
+  if (!data) return undefined;
+  const name = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+  return name || undefined;
+}
+
 export function useRotaPublish() {
   const { companyId, profile } = useAuth();
   const [published, setPublished] = useState<PublishedWeek | null>(null);
@@ -31,7 +39,7 @@ export function useRotaPublish() {
       const weekKey = format(weekStart, 'yyyy-MM-dd');
       const { data, error: err } = await supabase
         .from('rota_published_weeks')
-        .select('*, profiles(full_name)')
+        .select('*')
         .eq('company_id', companyId)
         .eq('week_start', weekKey)
         .is('unpublished_at', null)
@@ -47,7 +55,7 @@ export function useRotaPublish() {
           week_start: data.week_start,
           published_by: data.published_by,
           published_at: data.published_at,
-          published_by_name: data.profiles?.full_name,
+          published_by_name: await resolvePublisherName(data.published_by),
           isAdmin,
         });
       } else {
@@ -87,12 +95,18 @@ export function useRotaPublish() {
           published_by: profile.id,
           published_at: new Date().toISOString(),
         })
-        .select('*, profiles(full_name)')
+        .select('*')
         .maybeSingle();
 
       if (err) {
         setError(err.message);
         return { error: err.message };
+      }
+
+      if (!data) {
+        const msg = 'Failed to publish rota';
+        setError(msg);
+        return { error: msg };
       }
 
       setPublished({
@@ -101,7 +115,7 @@ export function useRotaPublish() {
         week_start: data.week_start,
         published_by: data.published_by,
         published_at: data.published_at,
-        published_by_name: data.profiles?.full_name,
+        published_by_name: await resolvePublisherName(data.published_by),
         isAdmin,
       });
 

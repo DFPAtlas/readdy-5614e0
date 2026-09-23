@@ -1,11 +1,10 @@
 'use client';
 
 import { useClientPortal } from '@/lib/useClientPortal';
-import { useClientAuth } from '@/lib/useClientAuth';
 import AgentGate from '@/components/AgentGate';
 import { useAuth } from '@/lib/auth';
-import { callAgent, logWebhookEvent } from '@/lib/guardianhubAgents';
-import { useEffect, useCallback, useState } from 'react';
+import { callAgent } from '@/lib/guardianhubAgents';
+import { useEffect, useCallback } from 'react';
 import WidgetBoundary from '@/components/dashboard/WidgetBoundary';
 import WidgetFallback from '@/components/dashboard/WidgetFallback';
 
@@ -18,8 +17,13 @@ export default function ClientReportsPage() {
     try {
       await callAgent(
         'report_generator',
-        { reports_available: reports.filter(r => r.status === 'sent').length },
-        { clientId: profile.company_id, userId: profile.id, requestedPage: '/client/reports', requestedFeature: 'report_generator' }
+        'reports_view',
+        {
+          reports_available: reports.filter(r => r.status === 'sent').length,
+          client_id: profile.company_id,
+          user_id: profile.id,
+        },
+        { requestedPage: '/client/reports', requestedFeature: 'report_generator' }
       );
     } catch {}
   }, [profile?.id, profile?.company_id, reports.length]);

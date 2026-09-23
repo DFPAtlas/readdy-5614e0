@@ -1,7 +1,7 @@
 'use client';
 
 import { ReleaseState, ReleaseVersion, ReleaseDefect, ReleaseApproval, ReleaseAgent } from '@/lib/useReleaseControl';
-import { Badge, Dot, PanelCard, StatCard, severityTone, Tone } from './ui';
+import { Badge, Dot, PanelCard, StatCard, Tone } from './ui';
 
 const CATEGORY_LABELS: Record<string, string> = {
   security: 'Security',

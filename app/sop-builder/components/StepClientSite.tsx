@@ -27,11 +27,11 @@ export default function StepClientSite({ data, onChange }: Props) {
     setLoadingClients(true);
     supabase
       .from('clients')
-      .select('id, client_name')
+      .select('id, name')
       .eq('company_id', companyId)
-      .order('client_name', { ascending: true })
+      .order('name', { ascending: true })
       .then(({ data: d }) => {
-        setClients(d || []);
+        setClients((d || []).map((c) => ({ id: c.id, client_name: c.name })));
         setLoadingClients(false);
       });
   }, [companyId]);

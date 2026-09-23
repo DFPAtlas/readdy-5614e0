@@ -52,10 +52,10 @@ export function useGuardScanCheckpoint() {
         },
         body: JSON.stringify({
           checkpoint_code: checkpointCode,
-          gps_latitude: gps_lat,
-          gps_longitude: gps_lng,
-          gps_accuracy: gps_acc,
-          device_info: deviceInfo,
+          phone_latitude: gps_lat,
+          phone_longitude: gps_lng,
+          phone_gps_accuracy_meters: gps_acc,
+          device_user_agent: deviceInfo,
         }),
       });
 

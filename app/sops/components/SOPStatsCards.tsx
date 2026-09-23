@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import type { SOPAnalytics } from '@/lib/useSOPAnalytics';
 
@@ -165,7 +166,7 @@ export default function SOPStatsCards({ analytics, loading, tierLimit, tierName,
                   <i className="ri-error-warning-line"></i>
                 </div>
                 Usage limit reached. New AI queries are blocked.
-                <a href="/dashboard/settings" className="underline ml-auto cursor-pointer">Upgrade plan</a>
+                <Link href="/dashboard/settings" className="underline ml-auto cursor-pointer">Upgrade plan</Link>
               </div>
             )}
             {isWarning && !isBlocked && (
@@ -174,7 +175,7 @@ export default function SOPStatsCards({ analytics, loading, tierLimit, tierName,
                   <i className="ri-error-warning-line"></i>
                 </div>
                 Approaching usage limit. Consider upgrading soon.
-                <a href="/dashboard/settings" className="underline ml-auto cursor-pointer">Upgrade plan</a>
+                <Link href="/dashboard/settings" className="underline ml-auto cursor-pointer">Upgrade plan</Link>
               </div>
             )}
           </>

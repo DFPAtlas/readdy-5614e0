@@ -27,7 +27,7 @@ export default function SiteSummarySection({ sites, summaries, documents, contac
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [editingSummary, setEditingSummary] = useState<SiteAISummary | null>(null);
-  const [editForm, setEditForm] = useState<Partial<SiteAISummary>>();
+  const [editForm, setEditForm] = useState<Partial<SiteAISummary>>({});
   const [toast, setToast] = useState<string | null>(null);
 
   const selectedSite = sites.find((s) => s.id === selectedSiteId);

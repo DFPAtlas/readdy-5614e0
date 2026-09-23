@@ -321,7 +321,7 @@ export function useRotaConflicts() {
 async function validateConflicts(companyId: string, dates: string[]): Promise<number> {
   const { data: existing } = await supabase
     .from('shifts')
-    .select('id, guard_id, start_time, end_time, site_id, site_name')
+    .select('id, guard_id, start_time, end_time, site_id')
     .eq('company_id', companyId)
     .in('start_time', dates.map((d) => `${d}T00:00:00`));
   let count = 0;

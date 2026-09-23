@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
+
+type SitesUpdate = Database['public']['Tables']['sites']['Update'];
 
 interface SiteInstructionsEditorProps {
   siteId: string;
@@ -10,7 +13,26 @@ interface SiteInstructionsEditorProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
-const INSTRUCTION_FIELDS = [
+type InstructionField =
+  | 'assignment_instructions'
+  | 'emergency_procedures'
+  | 'access_instructions'
+  | 'keyholding_notes'
+  | 'alarm_response'
+  | 'site_rules';
+
+type InstructionsForm = Record<InstructionField, string>;
+
+const EMPTY_INSTRUCTIONS_FORM: InstructionsForm = {
+  assignment_instructions: '',
+  emergency_procedures: '',
+  access_instructions: '',
+  keyholding_notes: '',
+  alarm_response: '',
+  site_rules: '',
+};
+
+const INSTRUCTION_FIELDS: Array<{ key: InstructionField; label: string; placeholder: string }> = [
   { key: 'assignment_instructions', label: 'Assignment Instructions', placeholder: 'General instructions for security officers at this site...' },
   { key: 'emergency_procedures', label: 'Emergency Procedures', placeholder: 'What to do in case of fire, medical emergency, security breach...' },
   { key: 'access_instructions', label: 'Access Instructions', placeholder: 'How to access the site, key codes, entry points...' },
@@ -21,7 +43,7 @@ const INSTRUCTION_FIELDS = [
 
 export default function SiteInstructionsEditor({ siteId, auth, onSaved, showToast }: SiteInstructionsEditorProps) {
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<InstructionsForm>(EMPTY_INSTRUCTIONS_FORM);
 
   useEffect(() => {
     if (!auth.site) return;
@@ -36,25 +58,33 @@ export default function SiteInstructionsEditor({ siteId, auth, onSaved, showToas
     });
   }, [auth.site]);
 
-  const handleChange = (key: string, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const handleChange = (key: InstructionField, value: string) => {
+    setForm((prev) => {
+      const next: InstructionsForm = { ...prev };
+      next[key] = value;
+      return next;
+    });
   };
 
   const handleSave = async () => {
     setSaving(true);
+    const securityRequirements: Record<string, string> = {
+      emergency_procedures: form.emergency_procedures,
+      access_instructions: form.access_instructions,
+      keyholding_notes: form.keyholding_notes,
+      alarm_response: form.alarm_response,
+      site_rules: form.site_rules,
+    };
+
+    const payload: SitesUpdate = {
+      assignment_instructions: form.assignment_instructions || null,
+      security_requirements: securityRequirements,
+      updated_at: new Date().toISOString(),
+    };
+
     const { error } = await supabase
       .from('sites')
-      .update({
-        assignment_instructions: form.assignment_instructions || null,
-        security_requirements: {
-          emergency_procedures: form.emergency_procedures || '',
-          access_instructions: form.access_instructions || '',
-          keyholding_notes: form.keyholding_notes || '',
-          alarm_response: form.alarm_response || '',
-          site_rules: form.site_rules || '',
-        },
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', siteId);
 
     setSaving(false);

@@ -21,7 +21,7 @@ interface AIReport {
 }
 
 export default function ACSAIAssistantPage() {
-  const { evidence, staffCompliance, policies, criteria, actions, siteCompliance, config, refresh } = useACS();
+  const { evidence, staffCompliance, policies, criteria, actions, siteCompliance } = useACS();
   const { currentUser } = useAuth();
   const [scanning, setScanning] = useState(false);
   const [report, setReport] = useState<AIReport | null>(null);

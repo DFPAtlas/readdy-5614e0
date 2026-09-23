@@ -5,7 +5,6 @@ import Link from 'next/link';
 import type { ComplianceDoc, GuardCert, GuardVetting, ACSEvidence, ClientDoc } from '@/lib/useComplianceDocuments';
 import { getDaysUntilExpiry, getDocStatus } from '@/lib/useComplianceDocuments';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
 
 interface UnifiedDoc {
   id: string;
@@ -220,7 +219,6 @@ export default function DocumentsTable(props: DocumentsTableProps) {
   const [reviewReason, setReviewReason] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const { companyId } = useAuth();
 
   const allDocs = buildUnifiedDocs(props);
   const filtered = filterDocs(allDocs, search, entityFilter, typeFilter, statusFilter);

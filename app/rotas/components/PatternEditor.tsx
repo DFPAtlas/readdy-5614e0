@@ -57,7 +57,7 @@ export default function PatternEditor({ template, onSave, onClose }: Props) {
   const [patternType, setPatternType] = useState(template?.pattern_type || 'weekly');
   const [cycleLength, setCycleLength] = useState(template?.cycle_length || 7);
   const [slots, setSlots] = useState<PatternSlot[]>(template?.slots || []);
-  const [errors, setErrors] = useState<Record<string, string>>();
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [draggedType, setDraggedType] = useState<string | null>(null);
   const [previewMonth, setPreviewMonth] = useState(new Date());
   const [saving, setSaving] = useState(false);

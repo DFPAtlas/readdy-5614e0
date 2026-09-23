@@ -9,7 +9,7 @@ import Link from 'next/link';
 interface Site {
   id: string;
   site_name: string;
-  address: string;
+  address: string | null;
 }
 
 export default function ACSSitesPage() {
