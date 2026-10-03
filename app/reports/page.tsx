@@ -366,7 +366,7 @@ export default function ReportsPage() {
                               <div>
                                 <p className="text-sm font-medium text-white">{r.title}</p>
                                 {r.reference_id && (
-                                  <Link href={`/incidents/${r.reference_id}`} className="text-xs text-blue-400 hover:text-blue-300">
+                                  <Link href={`/incidents/detail?id=${r.reference_id}`} className="text-xs text-blue-400 hover:text-blue-300">
                                     View incident
                                   </Link>
                                 )}
@@ -477,7 +477,7 @@ export default function ReportsPage() {
                       </div>
 
                       {r.reference_id && (
-                        <Link href={`/incidents/${r.reference_id}`} className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-2">
+                        <Link href={`/incidents/detail?id=${r.reference_id}`} className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-2">
                           <div className="w-3 h-3 flex items-center justify-center"><i className="ri-link"></i></div>
                           View incident
                         </Link>

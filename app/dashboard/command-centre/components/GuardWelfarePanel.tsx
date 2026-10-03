@@ -225,7 +225,7 @@ export default function GuardWelfarePanel({ guardsOnShift, missingGuards, staffi
         ) : (
           <div className="space-y-2 max-h-36 overflow-y-auto">
             {sosEvents.map(e => (
-              <Link key={e.id} href={`/incidents/${e.id}`} className="flex items-center gap-3 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-colors cursor-pointer">
+              <Link key={e.id} href={`/incidents/detail?id=${e.id}`} className="flex items-center gap-3 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-colors cursor-pointer">
                 <div className="w-5 h-5 flex items-center justify-center text-red-400 shrink-0">
                   <i className="ri-alarm-warning-line text-sm"></i>
                 </div>

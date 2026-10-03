@@ -156,6 +156,8 @@ export default function HomeTab({ todayShift, nextShift, activeAttendance, guard
 
     const { error } = await supabase.from('attendance_logs').insert(payload);
     if (error) {
+      setClockingIn(false);
+      window.alert('Could not clock in. Please retry.');
       if (navigator.vibrate) navigator.vibrate([100, 100, 100]);
       return;
     }
@@ -193,11 +195,17 @@ export default function HomeTab({ todayShift, nextShift, activeAttendance, guard
       return;
     }
 
-    await supabase.from('attendance_logs').update({
+    const { error: clockOutError } = await supabase.from('attendance_logs').update({
       clock_out: new Date().toISOString(),
       clock_out_lat: loc?.lat ?? null,
       clock_out_lng: loc?.lng ?? null,
     }).eq('id', activeAttendance.id);
+
+    if (clockOutError) {
+      setClockingOut(false);
+      window.alert('Could not clock out. Please retry.');
+      return;
+    }
 
     await supabase.from('shifts').update({ status: 'completed' }).eq('id', todayShift.id);
 

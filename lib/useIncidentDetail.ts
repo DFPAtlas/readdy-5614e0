@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { useAuth } from '@/lib/auth';
+import type { PhaseOneDatabase } from './phaseOneDatabase.types';
 
 export interface IncidentComment {
   id: string;
@@ -190,8 +191,11 @@ export function useIncidentDetail(incidentId: string) {
     return () => { channels.forEach((c) => supabase.removeChannel(c)); };
   }, [companyId, incidentId, loadIncident]);
 
-  const updateIncident = async (payload: Partial<any>) => {
-    const { data, error } = await supabase.from('incidents').update(payload).eq('id', incidentId).select().maybeSingle();
+  const updateIncident = async (payload: PhaseOneDatabase['public']['Tables']['incidents']['Update']) => {
+    if (!companyId) return { error: new Error('No company') };
+    const updates = { ...payload };
+    if (payload.status) updates.resolved_at = ['closed','resolved'].includes(payload.status) ? new Date().toISOString() : null;
+    const { data, error } = await supabase.from('incidents').update(updates).eq('id', incidentId).eq('company_id', companyId).select().single();
     if (!error) await logTimelineEvent('status_change', { changed: Object.keys(payload), values: payload });
     return { data, error };
   };
@@ -217,6 +221,7 @@ export function useIncidentDetail(incidentId: string) {
   };
 
   const addMedia = async (fileUrl: string, mediaType: string, filename: string, storagePath?: string | null) => {
+    if (!companyId || !currentUser?.id) return { error: new Error('Not authenticated') };
     const { data, error } = await supabase.from('incident_media')
       .insert({ incident_id: incidentId, file_url: fileUrl, media_type: mediaType, filename, storage_path: storagePath || null, uploaded_by: currentUser?.id || null, client_visible: true })
       .select()
@@ -224,7 +229,7 @@ export function useIncidentDetail(incidentId: string) {
     if (!error) {
       await logTimelineEvent('media_upload', { media_id: data?.id, filename });
       const currentCount = incident?.linked_evidence_count ?? 0;
-      await supabase.from('incidents').update({ linked_evidence_count: currentCount + 1 }).eq('id', incidentId);
+      await supabase.from('incidents').update({ linked_evidence_count: currentCount + 1 }).eq('id', incidentId).eq('company_id', companyId);
     }
     return { data, error };
   };
@@ -235,7 +240,8 @@ export function useIncidentDetail(incidentId: string) {
   };
 
   const deleteIncident = async () => {
-    const { error } = await supabase.from('incidents').delete().eq('id', incidentId);
+    if (!companyId) return { error: new Error('No company') };
+    const { error } = await supabase.from('incidents').delete().eq('id', incidentId).eq('company_id', companyId);
     return { error };
   };
 

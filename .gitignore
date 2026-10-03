@@ -25,3 +25,9 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local validation and Supabase CLI state
+supabase/.temp/
+.next-phase-one-export/
+playwright-report/
+test-results/

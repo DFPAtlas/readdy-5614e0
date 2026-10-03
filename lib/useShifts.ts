@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { useAuth } from '@/lib/auth';
+import { format, startOfWeek } from 'date-fns';
 
 export interface Shift {
   id: string;
@@ -30,7 +31,7 @@ export interface ShiftForm {
 }
 
 export function useShifts(weekStart: Date, weekEnd: Date) {
-  const { companyId } = useAuth();
+  const { companyId, profile } = useAuth();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,11 +82,22 @@ export function useShifts(weekStart: Date, weekEnd: Date) {
     return () => clearInterval(interval);
   }, [companyId, loadShifts]);
 
+  const checkPublishedWeek = async (dates: string[]) => {
+    if (!companyId || !profile) return new Error('Your session has expired.');
+    if (['company_admin', 'super_admin'].includes(profile.role)) return null;
+    const weeks = [...new Set(dates.map(value => format(startOfWeek(new Date(value), { weekStartsOn: 1 }), 'yyyy-MM-dd')))];
+    const result = await supabase.from('rota_published_weeks').select('id').eq('company_id', companyId).in('week_start', weeks).is('unpublished_at', null).limit(1);
+    if (result.error) return new Error('Could not verify whether the rota is locked. Please retry.');
+    return result.data?.length ? new Error('This rota is published. Contact an admin to make changes.') : null;
+  };
+
   const createShift = async (payload: Omit<ShiftForm, 'status'> & { status?: string }) => {
     if (!companyId) return { error: new Error('No company') };
     const startDate = new Date(`${payload.date}T${payload.start_time}`);
     let endDate = new Date(`${payload.date}T${payload.end_time}`);
     if (endDate <= startDate) { endDate.setDate(endDate.getDate() + 1); }
+    const lockError = await checkPublishedWeek([startDate.toISOString()]);
+    if (lockError) return { error: lockError };
     const { data, error } = await supabase
       .from('shifts')
       .insert({
@@ -104,6 +116,11 @@ export function useShifts(weekStart: Date, weekEnd: Date) {
   };
 
   const updateShift = async (id: string, payload: Partial<ShiftForm>) => {
+    if (!companyId) return { error: new Error('No company') };
+    const original = await supabase.from('shifts').select('start_time').eq('id', id).eq('company_id', companyId).single();
+    if (original.error || !original.data) return { error: new Error('Shift not found or access denied.') };
+    const lockError = await checkPublishedWeek([original.data.start_time, ...(payload.date ? [payload.date + 'T' + (payload.start_time || '00:00')] : [])]);
+    if (lockError) return { error: lockError };
     const updates: any = {};
     if (payload.site_id != null) updates.site_id = payload.site_id;
     if (payload.guard_id !== undefined) updates.guard_id = payload.guard_id;
@@ -117,17 +134,19 @@ export function useShifts(weekStart: Date, weekEnd: Date) {
       updates.start_time = startDate.toISOString();
       updates.end_time = endDate.toISOString();
     }
-    const { data, error } = await supabase.from('shifts').update(updates).eq('id', id).select().maybeSingle();
+    const { data, error } = await supabase.from('shifts').update(updates).eq('id', id).eq('company_id', companyId).select().maybeSingle();
     return { data, error };
   };
 
   const deleteShift = async (id: string) => {
-    const { error } = await supabase.from('shifts').delete().eq('id', id);
+    if (!companyId) return { error: new Error('No company') };
+    const { error } = await supabase.from('shifts').delete().eq('id', id).eq('company_id', companyId);
     return { error };
   };
 
   const assignGuard = async (shiftId: string, guardId: string | null) => {
-    const { data, error } = await supabase.from('shifts').update({ guard_id: guardId }).eq('id', shiftId).select().maybeSingle();
+    if (!companyId) return { error: new Error('No company') };
+    const { data, error } = await supabase.from('shifts').update({ guard_id: guardId }).eq('id', shiftId).eq('company_id', companyId).select().maybeSingle();
     return { data, error };
   };
 

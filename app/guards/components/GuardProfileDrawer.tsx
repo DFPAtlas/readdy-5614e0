@@ -130,6 +130,7 @@ function EmptyBlock({ icon, label }: { icon: string; label: string }) {
 }
 
 interface Props {
+  fullPage?: boolean;
   guard: Guard | null;
   onClose: () => void;
   onEdit: (guard: Guard) => void;
@@ -137,7 +138,7 @@ interface Props {
   canViewIncidents?: boolean;
 }
 
-export default function GuardProfileDrawer({ guard, onClose, onEdit, canEdit = false, canViewIncidents = false }: Props) {
+export default function GuardProfileDrawer({ guard, onClose, onEdit, canEdit = false, canViewIncidents = false, fullPage = false }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
   const drawerRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -155,10 +156,10 @@ export default function GuardProfileDrawer({ guard, onClose, onEdit, canEdit = f
     refetchShifts,
     refetchIncidents,
     refetchDocs,
-  } = useGuardProfile(guard?.id ?? null);
+  } = useGuardProfile(guard?.id ?? null, canViewIncidents);
 
   useEffect(() => {
-    if (!guard) return;
+    if (!guard || fullPage) return;
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
     const closeBtn = drawerRef.current?.querySelector<HTMLElement>('[data-drawer-close]');
@@ -170,7 +171,7 @@ export default function GuardProfileDrawer({ guard, onClose, onEdit, canEdit = f
   }, [guard]);
 
   useEffect(() => {
-    if (!guard) return;
+    if (!guard || fullPage) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -213,14 +214,14 @@ export default function GuardProfileDrawer({ guard, onClose, onEdit, canEdit = f
   else siaBadge = { label: 'Valid', tone: 'bg-emerald-500/10 text-emerald-400' };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true"></div>
+    <div className={fullPage ? "max-w-5xl mx-auto" : "fixed inset-0 z-50 flex justify-end"}>
+      {!fullPage && <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true"></div>}
       <div
         ref={drawerRef}
-        role="dialog"
-        aria-modal="true"
+        role={fullPage ? undefined : "dialog"}
+        aria-modal={fullPage ? undefined : true}
         aria-label={`Guard profile for ${getFullName(guard)}`}
-        className="relative w-full max-w-md bg-[#111827] border-l border-gray-800 h-full overflow-y-auto"
+        className={`relative w-full bg-[#111827] border border-gray-800 ${fullPage ? "rounded-xl" : "max-w-md h-full overflow-y-auto"}`}
       >
         <div className="sticky top-0 bg-[#111827] border-b border-gray-800 px-5 py-4 flex items-center justify-between z-10">
           <h2 className="text-lg font-semibold text-white">Guard Profile</h2>
@@ -252,7 +253,7 @@ export default function GuardProfileDrawer({ guard, onClose, onEdit, canEdit = f
 
           <div className="overflow-x-auto -mx-5 px-5 mb-6" role="tablist" aria-label="Guard profile sections">
             <div className="flex items-center gap-1 bg-gray-800/40 rounded-lg p-1 w-max">
-              {TABS.map((t) => (
+              {TABS.filter(t => t.key !== 'incidents' || canViewIncidents).map((t) => (
                 <button
                   key={t.key}
                   role="tab"
@@ -445,7 +446,7 @@ function IncidentHistory({ incidents, loading, error, onRetry, canView }: { inci
               </span>
               {canView && (
                 <Link
-                  href={`/incidents/${inc.id}`}
+                  href={`/incidents/detail?id=${inc.id}`}
                   className="inline-flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
                 >
                   View

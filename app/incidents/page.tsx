@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useIncidents, type Incident } from '@/lib/useIncidents';
 import { useAuth } from '@/lib/auth';
 import { useMyPermissions } from '@/lib/usePermissions';
@@ -15,6 +16,7 @@ import StatusMultiSelect from './components/StatusMultiSelect';
 import Toast from '@/app/sites/components/Toast';
 
 export default function IncidentsPage() {
+  const router = useRouter();
   const { companyId, profile } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, companyId);
 
@@ -83,8 +85,7 @@ export default function IncidentsPage() {
   const paged = sorted.slice((safePage - 1) * 25, safePage * 25);
 
   const openAdd = () => {
-    setEditingIncident(null);
-    setModalOpen(true);
+    router.push('/incidents/new');
   };
 
   const openEdit = (incident: Incident) => {
@@ -226,7 +227,7 @@ export default function IncidentsPage() {
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
-        onView={openEdit}
+        onView={(incident) => router.push(`/incidents/detail?id=${incident.id}`)}
         page={safePage}
         totalPages={totalPages}
         onPageChange={setPage}

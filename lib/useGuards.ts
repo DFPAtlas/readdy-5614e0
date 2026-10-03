@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { useAuth } from '@/lib/auth';
 
 export interface Guard {
@@ -16,7 +16,7 @@ export interface Guard {
   skills: string[] | null;
   availability: Record<string, any> | null;
   status: string | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 export interface GuardForm {
@@ -64,7 +64,7 @@ export function useGuards() {
 
       if (err) setError(err.message);
       else {
-        setGuards(data || []);
+        setGuards((data || []).map(row => ({...row, availability: row.availability && typeof row.availability === 'object' && !Array.isArray(row.availability) ? row.availability as Record<string, any> : null})));
         hasLoadedOnceRef.current = true;
       }
       setLoading(false);
@@ -117,6 +117,7 @@ export function useGuards() {
   };
 
   const updateGuard = async (id: string, payload: Partial<GuardForm>) => {
+    if (!companyId) return { error: new Error('No company') };
     const { data, error } = await supabase
       .from('guards')
       .update(payload)
@@ -128,6 +129,7 @@ export function useGuards() {
   };
 
   const setGuardStatus = async (id: string, status: string) => {
+    if (!companyId) return { error: new Error('No company') };
     const { data, error } = await supabase
       .from('guards')
       .update({ status })

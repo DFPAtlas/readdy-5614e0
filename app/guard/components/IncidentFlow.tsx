@@ -223,7 +223,7 @@ export default function IncidentFlow({ todayShift, guardId, companyId, guardName
         type: 'incident_critical',
         title: `Critical incident: ${incidentType}`,
         body: `${guardName} reported ${incidentType} at ${todayShift.site?.site_name || 'site'}. Incident #${incidentData.incident_number}`,
-        link: `/incidents/${incidentData.id}`,
+        link: `/incidents/detail?id=${incidentData.id}`,
         relatedId: incidentData.id,
         relatedType: 'incident',
         severity: 'critical',

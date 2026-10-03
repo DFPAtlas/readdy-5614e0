@@ -359,7 +359,7 @@ function RequestsTab({ companyId, clients }: { companyId: string | null; clients
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="text-sm font-semibold text-white capitalize">{r.request_type.replace(/_/g, ' ')}</span>
+                      <Link href={`/dashboard/client-management/requests/detail?id=${r.id}`} className="text-sm font-semibold text-blue-400 capitalize">{r.request_type.replace(/_/g, ' ')}</Link>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium capitalize ${STATUS_STYLES[r.status] || STATUS_STYLES.submitted}`}>{r.status.replace(/_/g, ' ')}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium capitalize ${r.priority === 'urgent' ? 'bg-red-500/10 text-red-400 border-red-500/20' : r.priority === 'high' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{r.priority}</span>
                     </div>
