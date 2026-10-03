@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, subDays } from 'date-fns';
 import { useIncidentDetail, type IncidentDetail } from '@/lib/useIncidentDetail';
 import { SEVERITY_COLORS, INCIDENT_TYPES } from '@/lib/useIncidents';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
+import { useMyPermissions } from '@/lib/usePermissions';
+import IncidentModal from '../components/IncidentModal';
 import SeverityBadge from '../components/SeverityBadge';
 import IncidentStatusBadge from '../components/IncidentStatusBadge';
 import Toast from '@/app/sites/components/Toast';
@@ -16,7 +18,16 @@ import ReportsTab from './components/ReportsTab';
 
 export default function IncidentDetailClient({ incidentId }: { incidentId: string }) {
   const { incident, loading, error, refetch, updateIncident, addComment, addMedia, deleteMedia, deleteIncident, logTimelineEvent } = useIncidentDetail(incidentId);
-  const { currentUser, user } = useAuth();
+  const { currentUser, user, companyId, profile } = useAuth();
+  const { can } = useMyPermissions(profile?.id || null, companyId);
+  const canEdit = can('incidents', 'edit');
+  const canDelete = can('incidents', 'delete');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [related, setRelated] = useState<{ id: string; title: string | null }[]>([]);
+  useEffect(() => {
+    if (!incident?.site_id || !companyId) return;
+    supabase.from('incidents').select('id,title').eq('company_id',companyId).eq('site_id',incident.site_id).neq('id',incidentId).order('created_at',{ascending:false}).limit(5).then(({data,error}) => { setRelated(data || []); if(error) setToast('Could not load related incidents.'); });
+  },[incident?.site_id,companyId,incidentId]);
   const router = useRouter();
 
   const [editing, setEditing] = useState(false);
@@ -33,9 +44,15 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'comments' | 'reports'>('overview');
   const [tabToast, setTabToast] = useState<string | null>(null);
 
-  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin';
+  const saveEdit = async (payload: any) => {
+    if (!canEdit || saving) return;
+    setSaving(true); setSaveError(null);
+    try { const result = await updateIncident(payload); if (result.error || !result.data) throw new Error(); setEditing(false); setToast('Incident updated'); refetch(); }
+    catch { setSaveError('Could not save the incident. Please retry.'); } finally { setSaving(false); }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
+    if (!canEdit || saving) return;
     setSaving(true);
     const { error } = await updateIncident({ status: newStatus });
     if (!error) {
@@ -46,6 +63,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   };
 
   const handleSeverityChange = async (newSeverity: string) => {
+    if (!canEdit || saving) return;
     setSaving(true);
     const { error } = await updateIncident({ severity: newSeverity });
     if (!error) {
@@ -56,6 +74,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   };
 
   const handleClientVisibleToggle = async () => {
+    if (!canEdit || saving) return;
     if (!incident) return;
     setSaving(true);
     const { error } = await updateIncident({ client_visible: !incident.client_visible });
@@ -67,6 +86,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   };
 
   const handleFollowUpToggle = async () => {
+    if (!canEdit || saving) return;
     if (!incident) return;
     setSaving(true);
     const { error } = await updateIncident({ requires_follow_up: !incident.requires_follow_up });
@@ -78,6 +98,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   };
 
   const handleEscalate = async () => {
+    if (!canEdit || saving) return;
     setSaving(true);
     const { error } = await updateIncident({ severity: 'critical', status: 'reviewing' });
     if (!error) {
@@ -89,7 +110,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   };
 
   const handlePostComment = async () => {
-    if (!comment.trim()) return;
+    if (!canEdit || postingComment || !comment.trim()) return;
     setPostingComment(true);
     const { error } = await addComment(comment.trim());
     if (!error) { setComment(''); setToast('Comment added'); refetch(); }
@@ -99,9 +120,10 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || !incident || !currentUser?.id) return;
+    if (!canEdit || uploading || !files || !incident || !currentUser?.id) return;
     setUploading(true);
     setUploadProgress(0);
+    let uploaded = 0;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -118,16 +140,19 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
         continue;
       }
       const { data: signedUrl } = await supabase.storage.from('incident-media').createSignedUrl(path, 60 * 60 * 24 * 7);
-      await addMedia(signedUrl?.signedUrl || path, file.type.startsWith('video') ? 'video' : 'image', file.name, path);
+      const saved = await addMedia(signedUrl?.signedUrl || path, file.type.startsWith('video') ? 'video' : 'image', file.name, path);
+      if (saved.error || !saved.data) { await supabase.storage.from('incident-media').remove([path]); continue; }
+      uploaded++;
       setUploadProgress(((i + 1) / files.length) * 100);
     }
-    setToast('Evidence uploaded');
+    setToast(uploaded === files.length ? 'Evidence uploaded' : `Uploaded ${uploaded} of ${files.length} files. Please retry the remaining files.`);
     setUploading(false);
     setUploadProgress(0);
     refetch();
   };
 
   const handleDelete = async () => {
+    if (!canDelete || saving) return;
     setSaving(true);
     const { error } = await deleteIncident();
     if (!error) { setToast('Incident deleted'); router.push('/incidents'); }
@@ -136,6 +161,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
   };
 
   const handleCloseInstead = async () => {
+    if (!canEdit || saving) return;
     const { error } = await updateIncident({ status: 'closed', resolved_at: new Date().toISOString() });
     if (!error) { setToast('Incident closed'); refetch(); }
     else setToast('Failed to close');
@@ -176,6 +202,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
 
   return (
     <div className="space-y-5">
+      {editing && <IncidentModal editingIncident={incident} saving={saving} saveError={saveError} onSave={saveEdit} onClose={() => { if (!saving) setEditing(false); }} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -191,12 +218,12 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
             <p className="text-sm text-gray-400">{incident.site_name || 'Unknown site'}</p>
           </div>
         </div>
-        {isAdmin && (
+        {canEdit && (
           <div className="flex items-center gap-2">
             <button onClick={() => setEditing(true)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-800/60 text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors cursor-pointer">
               <div className="w-5 h-5 flex items-center justify-center"><i className="ri-pencil-line"></i></div>
             </button>
-            <button onClick={() => setShowDelete(true)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-800/60 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
+            <button disabled={!canDelete} onClick={() => setShowDelete(true)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-800/60 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
               <div className="w-5 h-5 flex items-center justify-center"><i className="ri-delete-bin-line"></i></div>
             </button>
           </div>
@@ -287,7 +314,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
               <div className="bg-[#111827]/60 border border-gray-800 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Description</h3>
-                  <button className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap">AI Rewrite</button>
+
                 </div>
                 <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{incident.description || 'No description provided.'}</p>
                 {incident.ai_rewritten_report && (
@@ -313,7 +340,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
                   <label className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap">
                     <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line"></i></div>
                     Add Evidence
-                    <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileUpload} />
+                    <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={!canEdit || uploading} onChange={handleFileUpload} />
                   </label>
                 </div>
                 {uploading && (
@@ -390,7 +417,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
                     <div className="text-xs text-gray-500">{comment.length}/500</div>
                     <button
                       onClick={handlePostComment}
-                      disabled={!comment.trim() || postingComment}
+                      disabled={!canEdit || !comment.trim() || postingComment}
                       className="px-4 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       {postingComment ? 'Posting...' : 'Post'}
@@ -436,7 +463,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
               <select
                 value={incident.status || 'open'}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                disabled={saving}
+                disabled={saving || !canEdit}
                 className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
               >
                 <option value="open">Open</option>
@@ -449,7 +476,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
               <select
                 value={incident.severity || 'medium'}
                 onChange={(e) => handleSeverityChange(e.target.value)}
-                disabled={saving}
+                disabled={saving || !canEdit}
                 className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
               >
                 <option value="low">Low</option>
@@ -465,7 +492,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Client Portal</h3>
             <button
               onClick={handleClientVisibleToggle}
-              disabled={saving}
+              disabled={saving || !canEdit}
               className={`w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center justify-between ${
                 incident.client_visible
                   ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
@@ -482,7 +509,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
             </button>
             <button
               onClick={handleFollowUpToggle}
-              disabled={saving}
+              disabled={saving || !canEdit}
               className={`w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center justify-between ${
                 incident.requires_follow_up
                   ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20'
@@ -512,13 +539,10 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
               <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-pdf-line"></i></div>
               Generate Report PDF
             </button>
-            <button className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-gray-800/50 transition-colors flex items-center gap-2 cursor-pointer">
-              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-mail-send-line"></i></div>
-              Notify Client
-            </button>
+
             <button
               onClick={handleEscalate}
-              disabled={saving}
+              disabled={saving || !canEdit}
               className="w-full text-left px-3 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors flex items-center gap-2 cursor-pointer"
             >
               <div className="w-4 h-4 flex items-center justify-center"><i className="ri-fire-line"></i></div>
@@ -531,11 +555,11 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Related</h3>
             <div>
               <div className="text-xs text-gray-500 mb-1">Related Shifts</div>
-              <p className="text-sm text-gray-400">Shift history at this site around incident time — coming soon.</p>
+              {incident.shift_id ? <Link className="text-sm text-blue-400" href={`/rotas/shifts/detail?id=${incident.shift_id}`}>View linked shift</Link> : <p className="text-sm text-gray-400">No shift linked to this incident.</p>}
             </div>
             <div>
               <div className="text-xs text-gray-500 mb-1">Related Incidents</div>
-              <p className="text-sm text-gray-400">Other incidents at this site in last 30 days — coming soon.</p>
+              {related.length ? related.map(row => <Link key={row.id} className="block text-sm text-blue-400" href={`/incidents/detail?id=${row.id}`}>{row.title || 'Incident'}</Link>) : <p className="text-sm text-gray-400">No other incidents recorded at this site.</p>}
             </div>
           </div>
         </div>
@@ -571,7 +595,7 @@ export default function IncidentDetailClient({ incidentId }: { incidentId: strin
               <button onClick={() => setShowDelete(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap">
                 Cancel
               </button>
-              <button onClick={handleDelete} disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap">
+              <button onClick={handleDelete} disabled={saving || !canEdit} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap">
                 Delete permanently
               </button>
             </div>

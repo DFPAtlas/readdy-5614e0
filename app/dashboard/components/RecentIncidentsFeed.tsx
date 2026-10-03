@@ -55,7 +55,7 @@ export default function RecentIncidentsFeed({ incidents }: RecentIncidentsFeedPr
             return (
               <Link
                 key={inc.id}
-                href={`/incidents/${inc.id}`}
+                href={`/incidents/detail?id=${inc.id}`}
                 className={`flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 transition-colors cursor-pointer ${i !== incidents.length - 1 ? 'border-b border-white/5' : ''}`}
               >
                 <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${s.dot}`}></div>

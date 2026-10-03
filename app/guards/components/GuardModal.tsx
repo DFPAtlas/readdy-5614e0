@@ -22,6 +22,7 @@ interface SaveResult {
 }
 
 interface Props {
+  fullPage?: boolean;
   editingGuard: Guard | null;
   onSave: (payload: any) => Promise<SaveResult>;
   onClose: () => void;
@@ -32,7 +33,7 @@ function normalizeSIA(value: string): string {
   return digits.replace(/(\d{4})(?=\d)/g, '$1-');
 }
 
-export default function GuardModal({ editingGuard, onSave, onClose }: Props) {
+export default function GuardModal({ editingGuard, onSave, onClose, fullPage = false }: Props) {
   const [form, setForm] = useState<GuardForm>({
     first_name: '',
     last_name: '',
@@ -94,6 +95,7 @@ export default function GuardModal({ editingGuard, onSave, onClose }: Props) {
   }, [editingGuard]);
 
   useEffect(() => {
+    if (fullPage) return;
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     firstFieldRef.current?.focus();
 
@@ -232,17 +234,17 @@ export default function GuardModal({ editingGuard, onSave, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      className={fullPage ? "max-w-4xl mx-auto" : "fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) closeModal();
       }}
     >
       <div
         ref={modalRef}
-        role="dialog"
-        aria-modal="true"
+        role={fullPage ? undefined : "dialog"}
+        aria-modal={fullPage ? undefined : true}
         aria-label={editingGuard ? 'Edit guard' : 'Add guard'}
-        className="bg-[#111827] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className={`bg-[#111827] border border-gray-800 rounded-xl w-full ${fullPage ? "" : "max-w-2xl max-h-[90vh] overflow-y-auto"}`}
       >
         <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-[#111827] z-10">
           <h2 className="text-lg font-semibold text-white">{editingGuard ? 'Edit Guard' : 'Add Guard'}</h2>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { useGuardAvailability, isGuardOnLeave, isGuardAvailable, getGuardWeeklyHours, OVERTIME_THRESHOLD } from '@/lib/useGuardAvailability';
 import type { Shift, ShiftForm } from '@/lib/useShifts';
 
@@ -19,6 +19,8 @@ interface ShiftModalProps {
   onClose: () => void;
   onDelete?: () => void;
   saving: boolean;
+  fullPage?: boolean;
+  saveError?: string | null;
 }
 
 export default function ShiftModal({
@@ -30,6 +32,8 @@ export default function ShiftModal({
   onClose,
   onDelete,
   saving,
+  fullPage = false,
+  saveError,
 }: ShiftModalProps) {
   const { companyId } = useAuth();
   const { availability, timeOff } = useGuardAvailability();
@@ -44,6 +48,7 @@ export default function ShiftModal({
   const [shiftType, setShiftType] = useState('night');
   const [status, setStatus] = useState('scheduled');
   const [notes, setNotes] = useState('');
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -95,8 +100,10 @@ export default function ShiftModal({
 
     // Overtime check
     const weekStart = startOfWeek(startDate, { weekStartsOn: 1 });
-    const currentHours = getGuardWeeklyHours(guardId, allShifts, weekStart);
-    const shiftHours = (new Date(`${date}T${endTime}`).getTime() - startDate.getTime()) / (1000 * 60 * 60);
+    const currentHours = getGuardWeeklyHours(guardId, allShifts.filter(s => s.id !== editingShift?.id && s.status !== 'cancelled'), weekStart);
+    const finish = new Date(`${date}T${endTime}`);
+    if (finish <= startDate) finish.setDate(finish.getDate() + 1);
+    const shiftHours = (finish.getTime() - startDate.getTime()) / (1000 * 60 * 60);
     const totalHours = currentHours + shiftHours;
     if (totalHours > OVERTIME_THRESHOLD) {
       newWarnings.push(`Guard would work ${totalHours.toFixed(1)}h this week (limit: ${OVERTIME_THRESHOLD}h)`);
@@ -126,19 +133,24 @@ export default function ShiftModal({
   };
 
   const checkConflicts = async (): Promise<string | null> => {
+    if (!companyId) return 'Your session has expired.';
     if (!guardId || !date || !startTime || !endTime) return null;
     const startDate = new Date(`${date}T${startTime}`);
     let endDate = new Date(`${date}T${endTime}`);
     if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1);
 
-    const { data } = await supabase
+    let query = supabase
       .from('shifts')
       .select('id, site_id, start_time, end_time')
       .eq('guard_id', guardId)
-      .neq('id', editingShift?.id || '0')
+      .eq('company_id', companyId)
+      .neq('status', 'cancelled')
       .lt('start_time', endDate.toISOString())
       .gt('end_time', startDate.toISOString())
       .limit(1);
+    if (editingShift?.id) query = query.neq('id', editingShift.id);
+    const { data, error } = await query;
+    if (error) return 'Could not verify guard availability. Please retry.';
 
     if (data && data.length > 0) {
       const conflictShift = data[0];
@@ -154,11 +166,14 @@ export default function ShiftModal({
   };
 
   const handleSave = async () => {
+    if (saving || checkingConflicts) return;
     setConflict(null);
     if (!validate()) return;
     if (guardId) {
-      const c = await checkConflicts();
-      if (c) { setConflict(c); return; }
+      setCheckingConflicts(true);
+      try { const c = await checkConflicts(); if (c) { setConflict(c); return; } }
+      catch { setConflict('Could not verify guard availability. Please retry.'); return; }
+      finally { setCheckingConflicts(false); }
     }
     onSave({
       site_id: siteId,
@@ -178,8 +193,8 @@ export default function ShiftModal({
   const overnight = endDt.getDate() !== startDt.getDate();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-[#151b27] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className={fullPage ? "max-w-4xl mx-auto" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"}>
+      <div className={`bg-[#151b27] border border-gray-800 rounded-xl w-full shadow-2xl ${fullPage ? "" : "max-w-lg max-h-[90vh] overflow-y-auto"}`}>
         <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">{editingShift ? 'Edit Shift' : 'Add Shift'}</h2>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
@@ -188,6 +203,7 @@ export default function ShiftModal({
         </div>
 
         <div className="px-6 py-5 space-y-4">
+          {saveError && <p role="alert" className="text-red-400">{saveError}</p>}
           {/* Warnings */}
           {warnings.length > 0 && (
             <div className="space-y-1.5">
@@ -334,7 +350,7 @@ export default function ShiftModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || checkingConflicts}
             className="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
           >
             {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}

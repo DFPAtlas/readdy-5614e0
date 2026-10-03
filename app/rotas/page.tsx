@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { useShifts } from '@/lib/useShifts';
 import { useGuards } from '@/lib/useGuards';
@@ -35,6 +36,7 @@ import PublishRotaBanner from './components/PublishRotaBanner';
 import RotaStatusStrip from './components/RotaStatusStrip';
 
 export default function RotasPage() {
+  const router = useRouter();
   const { companyId, profile } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, companyId);
   const [view, setView] = useState<'week' | 'month'>('week');
@@ -179,10 +181,7 @@ export default function RotasPage() {
   };
 
   const openEditShift = (shift: ReturnType<typeof useShifts>['shifts'][0]) => {
-    setEditingShift(shift);
-    setInitialSiteId(null);
-    setInitialDate(null);
-    setModalOpen(true);
+    router.push(`/rotas/shifts/detail?id=${shift.id}`);
   };
 
   const handleSave = async (payload: any) => {
@@ -729,7 +728,7 @@ export default function RotasPage() {
         onToday={handleToday}
         view={view}
         onToggleView={handleToggleView}
-        onAddShift={() => openAddShift()}
+        onAddShift={() => router.push('/rotas/shifts/new')}
         sites={sites}
         selectedSiteId={selectedSiteId}
         onSelectSite={setSelectedSiteId}

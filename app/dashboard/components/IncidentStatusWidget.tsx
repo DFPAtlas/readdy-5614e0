@@ -85,7 +85,7 @@ export default function IncidentStatusWidget({ incidents, totalOpen, highCritica
           display.map((inc) => {
             const cfg = severityConfig[inc.severity] || severityConfig.low;
             return (
-              <Link key={inc.id} href={`/incidents/${inc.id}`} className="block cursor-pointer">
+              <Link key={inc.id} href={`/incidents/detail?id=${inc.id}`} className="block cursor-pointer">
                 <div className={`px-4 py-3 border-t border-white/5 border-l-2 ${cfg.border} hover:bg-white/5 transition-all`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`w-2 h-2 rounded-full ${cfg.dot}`}></span>

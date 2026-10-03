@@ -109,7 +109,7 @@ export default function PriorityAlertFeed(props: PriorityAlertFeedProps) {
       description: `${i.site_name} — ${i.status}`,
       severity: mapSeverity(i.severity),
       timestamp: i.created_at,
-      link: `/incidents/${i.id}`,
+      link: `/incidents/detail?id=${i.id}`,
       source: 'Incident',
       meta: i.severity,
     })),

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { INCIDENT_TYPES, SEVERITY_COLORS } from '@/lib/useIncidents';
 
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
   onSave: (payload: any) => void;
   onClose: () => void;
   saving: boolean;
+  fullPage?: boolean;
+  saveError?: string | null;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -16,11 +18,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function IncidentModal({ editingIncident, onSave, onClose, saving }: Props) {
+export default function IncidentModal({ editingIncident, onSave, onClose, saving, fullPage = false, saveError }: Props) {
   const { companyId } = useAuth();
   const [sites, setSites] = useState<{ id: string; site_name: string }[]>([]);
-  const [guards, setGuards] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
-  const [shifts, setShifts] = useState<{ id: string; guard_id: string; site_id: string; start_time: string; end_time: string }[]>([]);
+  const [guards, setGuards] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
+  const [shifts, setShifts] = useState<{ id: string; guard_id: string | null; site_id: string | null; start_time: string; end_time: string }[]>([]);
 
   const [siteId, setSiteId] = useState('');
   const [guardId, setGuardId] = useState('');
@@ -94,7 +96,7 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
   };
 
   const handleSave = () => {
-    if (!validate()) return;
+    if (saving || !validate()) return;
     onSave({
       site_id: siteId,
       guard_id: guardId || null,
@@ -114,8 +116,8 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
   const sevOptions = ['low', 'medium', 'high', 'critical'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-[#151b27] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className={fullPage ? "max-w-4xl mx-auto" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"}>
+      <div className={`bg-[#151b27] border border-gray-800 rounded-xl w-full shadow-2xl ${fullPage ? "" : "max-w-lg max-h-[90vh] overflow-y-auto"}`}>
         <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">{editingIncident ? 'Edit Incident' : 'Log Incident'}</h2>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
@@ -124,6 +126,7 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
         </div>
 
         <div className="px-6 py-5 space-y-4">
+          {saveError && <p role="alert" className="text-red-400">{saveError}</p>}
           <SectionLabel>Incident Details</SectionLabel>
 
           <div className="grid grid-cols-2 gap-3">
@@ -131,7 +134,7 @@ export default function IncidentModal({ editingIncident, onSave, onClose, saving
               <label className="block text-sm font-medium text-gray-400 mb-1">Site <span className="text-red-400">*</span></label>
               <select
                 value={siteId}
-                onChange={(e) => setSiteId(e.target.value)}
+                onChange={(e) => { setSiteId(e.target.value); setShiftId(''); }}
                 className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer pr-8"
               >
                 <option value="" disabled>Select site...</option>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useGuardAuth } from '@/lib/useGuardAuth';
 import { useGuardLeaveRequests } from '@/lib/useGuardLeaveRequests';
@@ -94,7 +95,7 @@ export default function GuardShiftsPage() {
   };
 
   const now = Date.now();
-  const upcomingShifts = futureShifts.filter((s) => new Date(s.start_time).getTime() > now);
+  const upcomingShifts = futureShifts.filter((s) => new Date(s.end_time).getTime() > now);
   const pastShifts = futureShifts.filter((s) => new Date(s.end_time).getTime() <= now);
 
   if (g.loading) {
@@ -173,7 +174,7 @@ export default function GuardShiftsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-white truncate">
-                        {shift.site_name || 'Unknown Site'}
+                        <Link href={`/guard/shifts/detail?id=${shift.id}`} className="text-blue-400">{shift.site_name || 'Unknown Site'}</Link>
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         {formatShiftTime(shift.start_time, shift.end_time)}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { useAuth } from '@/lib/auth';
 
 export interface Incident {
@@ -53,7 +53,7 @@ export interface IncidentFilters {
 }
 
 export function useIncidents(filters?: IncidentFilters) {
-  const { companyId } = useAuth();
+  const { companyId, currentUser } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +164,7 @@ export function useIncidents(filters?: IncidentFilters) {
       .from('incidents')
       .insert({
         company_id: companyId,
+        user_id: currentUser?.id || null,
         site_id: payload.site_id,
         guard_id: payload.guard_id || null,
         shift_id: payload.shift_id || null,
@@ -184,10 +185,12 @@ export function useIncidents(filters?: IncidentFilters) {
   };
 
   const updateIncident = async (id: string, payload: Partial<IncidentForm>) => {
+    if (!companyId) return { error: new Error('No company') };
     const { data, error } = await supabase
       .from('incidents')
       .update(payload)
       .eq('id', id)
+      .eq('company_id', companyId)
       .select()
       .maybeSingle();
     return { data, error };

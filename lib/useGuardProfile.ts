@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { phaseOneSupabase as supabase } from '@/lib/phaseOneSupabase';
 import { useAuth } from '@/lib/auth';
 
 export interface GuardShift {
@@ -31,7 +31,7 @@ export interface GuardDoc {
   expiry_date: string | null;
 }
 
-export function useGuardProfile(guardId: string | null) {
+export function useGuardProfile(guardId: string | null, includeIncidents = true) {
   const { companyId } = useAuth();
   const [shifts, setShifts] = useState<GuardShift[]>([]);
   const [incidents, setIncidents] = useState<GuardIncident[]>([]);
@@ -73,7 +73,7 @@ export function useGuardProfile(guardId: string | null) {
   }, [guardId, companyId]);
 
   const loadIncidents = useCallback(async () => {
-    if (!guardId || !companyId) return;
+    if (!guardId || !companyId || !includeIncidents) return;
     setIncidentsLoading(true);
     setIncidentsError(null);
     const { data, error } = await supabase
@@ -101,7 +101,7 @@ export function useGuardProfile(guardId: string | null) {
       );
     }
     setIncidentsLoading(false);
-  }, [guardId, companyId]);
+  }, [guardId, companyId, includeIncidents]);
 
   const loadDocs = useCallback(async () => {
     if (!guardId || !companyId) return;

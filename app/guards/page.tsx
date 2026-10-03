@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useGuards, getSIAStatus, type Guard } from '@/lib/useGuards';
 import { useAuth } from '@/lib/auth';
@@ -33,6 +34,7 @@ const SIA_OPTIONS = [
 ];
 
 export default function GuardsPage() {
+  const router = useRouter();
   const { guards, loading, refreshing, error, refetch, refresh, addGuard, updateGuard, setGuardStatus } = useGuards();
   const { profile } = useAuth();
   const { can } = useMyPermissions(profile?.id || null, profile?.company_id || null);
@@ -147,13 +149,11 @@ export default function GuardsPage() {
       setLimitModalOpen(true);
       return;
     }
-    setEditingGuard(null);
-    setModalOpen(true);
+    router.push('/guards/new');
   };
 
   const openEdit = (guard: Guard) => {
-    setEditingGuard(guard);
-    setModalOpen(true);
+    router.push(`/guards/edit?id=${guard.id}`);
   };
 
   const handleSave = async (payload: any): Promise<{ success: boolean; message?: string }> => {
@@ -307,7 +307,7 @@ export default function GuardsPage() {
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
-        onView={setProfileGuard}
+        onView={(guard) => router.push(`/guards/detail?id=${guard.id}`)}
         onEdit={openEdit}
         onDeactivate={setDeactivateTarget}
         page={safePage}

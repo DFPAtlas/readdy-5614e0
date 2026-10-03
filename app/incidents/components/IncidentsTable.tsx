@@ -156,7 +156,7 @@ export default function IncidentsTable({
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Link
-                      href={`/incidents/${incident.id}`}
+                      href={`/incidents/detail?id=${incident.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
                     >

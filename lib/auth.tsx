@@ -227,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.replace(onboardingRoute);
         return;
       }
-      if (currentPath.startsWith('/guard')) {
+      if ((currentPath === '/guard' || currentPath.startsWith('/guard/'))) {
         redirectingRef.current = true;
         router.replace(homeRoute);
         return;
@@ -240,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (profile.role === 'guard') {
-      if (!currentPath.startsWith('/guard') && !isPublicRoute(currentPath)) {
+      if (!(currentPath === '/guard' || currentPath.startsWith('/guard/')) && !isPublicRoute(currentPath)) {
         redirectingRef.current = true;
         router.replace('/guard');
       }
